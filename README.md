@@ -27,6 +27,23 @@ Nous utilisons différentes branches :
 - **dev** : contient le code en cours de développement.
 - **dev-nom_de_la_feature** : branches dédiées à une nouvelle fonctionnalité.
 
+### Développement
+Pour contribuer à ce projet, commencez par cloner le dépôt :
+
+`git clone <url-du-repo>`
+
+`cd <nom-du-projet>`
+
+Installez ensuite les dépendances nécessaires :
+
+`npm install`
+
+Enfin, lancez le serveur de développement :
+
+`npm run dev`
+
+L'application sera alors accessible via une URL locale (par exemple : http://localhost:5173).
+
 ## Auteurs
 Ce projet est réalisé dans le cadre d'une mission à Oteria par des étudiants en M1 de la promo 2027. 
 

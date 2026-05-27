@@ -471,18 +471,32 @@ opencrisis/
 │
 └── 02-backend/
     ├── Dockerfile
+    ├── package.json
+    ├── tsconfig.json
     ├── prisma/
     │   ├── schema.prisma
-    │   └── seed.ts
+    │   ├── seed.ts
+    │   └── migrations/
+    │       ├── migration_lock.toml
+    │       └── 20260527000000_init/
+    │           └── migration.sql
     └── src/
+        ├── context.ts               # GraphQLContext (userId, req, res)
+        ├── prisma.ts                # PrismaClient singleton
+        ├── pubsub.ts                # Redis pub/sub (Phase 4)
+        ├── server.ts                # Express + Apollo + WebSocket + env validation
         ├── schema/
+        │   ├── auth.ts              # typeDefs auth (User, Role, AuthPayload, Query, Mutation)
+        │   └── index.ts
         ├── resolvers/
+        │   ├── auth.ts              # login, logout, refreshToken, me
+        │   └── index.ts
         ├── services/
-        ├── middleware/
-        │   ├── auth.ts
-        │   └── rbac.ts
-        ├── pubsub.ts
-        └── server.ts
+        │   └── auth.ts              # bcrypt, JWT, Prisma — USER_INCLUDE exporté
+        └── middleware/
+            ├── auth.ts              # verifyAccessToken, extractBearerToken
+            ├── rbac.ts              # requirePermission (réutilise USER_INCLUDE)
+            └── audit.ts             # logAudit fire-and-forget
 ```
 
 ---
@@ -516,11 +530,12 @@ opencrisis/
 - Génération de `pnpm-lock.yaml`
 - Ajout de l'`ErrorBoundary` (composant classe — seule façon de capturer les erreurs de rendu React)
 
-### Phase 3 — Backend : fondations auth & RBAC
-- Prisma schema + migration initiale
-- Seed : rôles système + compte `admin@opencrisis.local`
-- Resolvers auth : `login`, `logout`, `refreshToken`, `me`
-- Middleware JWT (HTTP + WebSocket) + middleware RBAC
+### ✅ Phase 3 — Backend : fondations auth & RBAC *(terminée)*
+- Prisma schema complet (13 tables, 7 enums) + migration initiale versionnée
+- Seed idempotent : 18 permissions, 5 rôles système, compte `admin@opencrisis.local / Admin1234!`
+- Resolvers auth : `login`, `logout`, `refreshToken`, `me` — entièrement testés
+- Middleware JWT (HTTP + WebSocket) + middleware RBAC (`requirePermission`)
+- Audit log fire-and-forget (`logAudit`) + validation des env vars au démarrage
 
 ### Phase 4 — Backend : modules métier
 - Resolvers Incident, LogEntry, Tag, TimelineEvent, Document, Contact

@@ -14,6 +14,14 @@ import { prisma } from './prisma';
 import { verifyAccessToken, extractBearerToken } from './middleware/auth';
 import type { GraphQLContext } from './context';
 
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`[startup] Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
 

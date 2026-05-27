@@ -256,12 +256,87 @@ dist/assets/index-BrdzOaiK.js  143.91 kB │ gzip: 46.27 kB
 
 | Phase | Test à effectuer |
 |---|---|
-| Phase 3 | `prisma migrate dev` applique le schéma sans erreur |
-| Phase 3 | `prisma db seed` crée les rôles système et le compte admin |
 | Phase 5 | Login avec `admin@opencrisis.local` → JWT reçu |
 | Phase 5 | Accès `/incidents` → liste des incidents |
 | Phase 6 | Ouvrir 2 onglets sur la main courante → saisir une entrée → apparition temps réel |
 | Phase 7 | Export PDF d'un rapport post-incident → fichier téléchargeable |
+
+---
+
+## Checklist de validation Phase 3
+
+Tests effectués manuellement via l'API GraphQL exposée par nginx (`http://localhost/api/graphql`).
+
+### Erreurs rencontrées et corrections
+
+#### Erreur 1 — `AuditLogUncheckedCreateInput` (TS2322)
+
+**Symptôme** : TypeScript refusait d'assigner `userId: string | null` à l'union discriminée Prisma.
+
+**Correction** : Typer explicitement le `data` en `Prisma.AuditLogUncheckedCreateInput` et caster `metadata` en `Prisma.InputJsonValue | undefined`.
+
+#### Erreur 2 — `libssl.so.1.1: No such file or directory`
+
+**Symptôme** : Le Prisma client ne démarrait pas sur Alpine 3.20 (OpenSSL 3 uniquement).
+
+**Correction** : Ajouter `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` dans `schema.prisma` + `RUN apk add --no-cache openssl` dans les deux stages du Dockerfile.
+
+#### Erreur 3 — `ts-node TS5109` (module vs moduleResolution)
+
+**Symptôme** : ts-node ne pouvait pas exécuter le seed — conflit entre `module: commonjs` et la résolution par défaut `NodeNext` de TypeScript 5.4.
+
+**Correction** : Ajouter `"moduleResolution": "node"` dans `tsconfig.json` + déplacer `typescript` de `devDependencies` vers `dependencies`.
+
+### Sécurité — modifications post-review
+
+- **`audit.ts`** : `logAudit` rendu fire-and-forget (erreurs loguées, ne propagent plus vers la mutation parente)
+- **`server.ts`** : Validation des variables d'environnement critiques au démarrage (`DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`) — `process.exit(1)` si manquante
+- **`rbac.ts`** : `USER_INCLUDE` exporté depuis `services/auth.ts` et réutilisé (suppression de la duplication)
+- **Migrations** : Fichier `prisma/migrations/20260527000000_init/migration.sql` généré et marqué comme appliqué via `prisma migrate resolve`
+- **Dockerfile** : CMD mis à jour pour exécuter `prisma migrate deploy` avant le démarrage du serveur
+
+### Tests GraphQL effectués
+
+```graphql
+# 1. Login
+mutation {
+  login(email: "admin@opencrisis.local", password: "Admin1234!") {
+    accessToken
+    user { id email firstName roles { name } permissions { resource action } }
+  }
+}
+# Résultat : accessToken JWT + 18 permissions (9 ressources × 2 actions) ✅
+
+# 2. Query me (avec Authorization: Bearer <token>)
+query { me { id email firstName roles { name } } }
+# Résultat : utilisateur admin avec rôle Administrateur ✅
+
+# 3. RefreshToken (via cookie HttpOnly)
+mutation { refreshToken { accessToken user { email } } }
+# Résultat : nouvel accessToken émis, ancien refresh token supprimé ✅
+
+# 4. Logout + vérification révocation
+mutation { logout }   # → true ✅
+mutation { refreshToken { accessToken } }  # → UNAUTHENTICATED ✅
+
+# 5. Mauvais mot de passe
+mutation { login(email: "admin@opencrisis.local", password: "Wrong!") { accessToken } }
+# → errors[0].message: "Email ou mot de passe incorrect", code: UNAUTHENTICATED ✅
+```
+
+### Checklist Phase 3
+
+- [x] `docker compose build backend` → build sans erreur (TypeScript + Prisma generate)
+- [x] Migration initiale créée (`prisma/migrations/20260527000000_init/migration.sql`)
+- [x] Migration marquée comme appliquée (`prisma migrate resolve --applied`)
+- [x] Seed exécuté : 18 permissions + 5 rôles système + compte `admin@opencrisis.local`
+- [x] `POST /api/graphql` — mutation `login` → accessToken + cookies refreshToken ✅
+- [x] `POST /api/graphql` — query `me` avec Bearer token → utilisateur courant ✅
+- [x] Mutation `refreshToken` via cookie → nouveau token émis, ancien révoqué ✅
+- [x] Mutation `logout` → cookie supprimé, `refreshToken` renvoie `UNAUTHENTICATED` ✅
+- [x] Login avec mauvais mot de passe → `UNAUTHENTICATED` (pas de fuite d'info) ✅
+- [x] Variables d'environnement manquantes → `process.exit(1)` au démarrage ✅
+- [x] Échec audit log → erreur loguée, mutation non interrompue ✅
 
 ---
 

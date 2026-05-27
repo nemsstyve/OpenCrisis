@@ -8,7 +8,7 @@ import { logAudit } from '../middleware/audit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const USER_INCLUDE = {
+export const USER_INCLUDE = {
   roleAssignments: {
     include: {
       role: {
@@ -76,7 +76,7 @@ export async function login(
   await issueRefreshToken(user.id, res);
   const accessToken = generateAccessToken(user.id, user.email);
 
-  await logAudit({ userId: user.id, action: 'LOGIN', resource: 'AUTH', ipAddress });
+  logAudit({ userId: user.id, action: 'LOGIN', resource: 'AUTH', ipAddress });
 
   return { accessToken, user };
 }
@@ -88,7 +88,7 @@ export async function logout(
 ): Promise<boolean> {
   await prisma.refreshToken.deleteMany({ where: { userId, token: refreshToken } });
   res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', path: '/' });
-  await logAudit({ userId, action: 'LOGOUT', resource: 'AUTH' });
+  logAudit({ userId, action: 'LOGOUT', resource: 'AUTH' });
   return true;
 }
 

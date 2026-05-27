@@ -2,6 +2,7 @@ import { GraphQLError } from 'graphql';
 import type { PermissionResource, PermissionAction } from '@prisma/client';
 import type { GraphQLContext } from '../context';
 import { prisma } from '../prisma';
+import { USER_INCLUDE } from '../services/auth';
 
 export async function requirePermission(
   ctx: GraphQLContext,
@@ -14,15 +15,7 @@ export async function requirePermission(
 
   const user = await prisma.user.findFirst({
     where: { id: ctx.userId, deletedAt: null, isActive: true },
-    include: {
-      roleAssignments: {
-        include: {
-          role: {
-            include: { permissions: { include: { permission: true } } },
-          },
-        },
-      },
-    },
+    include: USER_INCLUDE,
   });
 
   if (!user) {

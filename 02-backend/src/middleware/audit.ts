@@ -11,7 +11,7 @@ interface AuditParams {
   ipAddress?: string | null;
 }
 
-export async function logAudit(params: AuditParams): Promise<void> {
+export function logAudit(params: AuditParams): void {
   const data: Prisma.AuditLogUncheckedCreateInput = {
     action: params.action,
     resource: params.resource,
@@ -21,5 +21,7 @@ export async function logAudit(params: AuditParams): Promise<void> {
     incidentId: params.incidentId,
     metadata: params.metadata as Prisma.InputJsonValue | undefined,
   };
-  await prisma.auditLog.create({ data });
+  prisma.auditLog.create({ data }).catch(err => {
+    console.error('[audit] write failed:', err);
+  });
 }

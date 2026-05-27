@@ -10,7 +10,6 @@ const contacts = [
     site: "Paris - Siège",
     phone: "+33 6 12 34 56 78",
     email: "marie.dubois@company.com",
-    status: "available",
   },
   {
     id: 2,
@@ -21,7 +20,6 @@ const contacts = [
     site: "Paris - Siège",
     phone: "+33 6 23 45 67 89",
     email: "jean.martin@company.com",
-    status: "available",
   },
   {
     id: 3,
@@ -32,7 +30,6 @@ const contacts = [
     site: "Paris - Siège",
     phone: "+33 6 34 56 78 90",
     email: "sophie.laurent@company.com",
-    status: "busy",
   },
   {
     id: 4,
@@ -43,7 +40,6 @@ const contacts = [
     site: "Lyon - Data Center",
     phone: "+33 6 45 67 89 01",
     email: "pierre.dupont@company.com",
-    status: "available",
   },
   {
     id: 5,
@@ -54,7 +50,6 @@ const contacts = [
     site: "Paris - Siège",
     phone: "+33 6 56 78 90 12",
     email: "claire.bernard@company.com",
-    status: "offline",
   },
   {
     id: 6,
@@ -65,7 +60,6 @@ const contacts = [
     site: "Marseille",
     phone: "+33 6 67 89 01 23",
     email: "thomas.petit@company.com",
-    status: "available",
   },
   {
     id: 7,
@@ -76,7 +70,6 @@ const contacts = [
     site: "Paris - Siège",
     phone: "+33 6 78 90 12 34",
     email: "isabelle.moreau@company.com",
-    status: "available",
   },
   {
     id: 8,
@@ -87,15 +80,8 @@ const contacts = [
     site: "Lille",
     phone: "+33 6 89 01 23 45",
     email: "lucas.rousseau@company.com",
-    status: "busy",
   },
 ];
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  available: { label: "Disponible", color: "bg-green-500" },
-  busy: { label: "Occupé", color: "bg-orange-500" },
-  offline: { label: "Hors ligne", color: "bg-gray-500" },
-};
 
 export default function Annuaire() {
   return (
@@ -111,35 +97,6 @@ export default function Annuaire() {
           <Plus className="w-5 h-5" />
           Ajouter un contact
         </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-blue-400" />
-            <h3 className="text-gray-600 dark:text-gray-400 text-sm">Total contacts</h3>
-          </div>
-          <p className="text-3xl text-gray-900 dark:text-white">{contacts.length}</p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">Disponibles</h3>
-          <p className="text-3xl text-green-400">
-            {contacts.filter((c) => c.status === "available").length}
-          </p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">Occupés</h3>
-          <p className="text-3xl text-orange-400">
-            {contacts.filter((c) => c.status === "busy").length}
-          </p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">Hors ligne</h3>
-          <p className="text-3xl text-gray-400">
-            {contacts.filter((c) => c.status === "offline").length}
-          </p>
-        </div>
       </div>
 
       {/* Search */}
@@ -180,9 +137,6 @@ export default function Annuaire() {
                 </th>
                 <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Email
-                </th>
-                <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Statut
                 </th>
               </tr>
             </thead>
@@ -234,18 +188,6 @@ export default function Annuaire() {
                       <Mail className="w-4 h-4" />
                       {contact.email}
                     </a>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          statusConfig[contact.status].color
-                        }`}
-                      />
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {statusConfig[contact.status].label}
-                      </span>
-                    </div>
                   </td>
                 </tr>
               ))}

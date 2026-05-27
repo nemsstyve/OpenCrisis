@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── IDENTITÉ & ACCÈS ─────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  company      String?
+  site         String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  roleAssignments RoleAssignment[]
+  logEntries      LogEntry[]
+  timelineEvents  TimelineEvent[]
+  documents       Document[]
+  contacts        Contact[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  assignments RoleAssignment[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id       String             @id @default(uuid())
+  resource PermissionResource
+  action   PermissionAction
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RoleAssignment {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ─── INCIDENT (WORKSPACE CENTRAL) ─────────────────────────────────────────────
+
+model Incident {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  status        IncidentStatus @default(ACTIVE)
+  severity      Severity       @default(MEDIUM)
+  startedAt     DateTime       @default(now())
+  resolvedAt    DateTime?
+  createdById   String
+  openctiCaseId String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  logEntries     LogEntry[]
+  timelineEvents TimelineEvent[]
+  documents      Document[]
+  contacts       IncidentContact[]
+  auditLogs      AuditLog[]
+}
+
+// ─── MAIN COURANTE ────────────────────────────────────────────────────────────
+
+model LogEntry {
+  id         String    @id @default(uuid())
+  incidentId String
+  cell       Cell
+  content    String
+  authorId   String
+  isEdited   Boolean   @default(false)
+  editedAt   DateTime?
+  editedById String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  incident Incident      @relation(fields: [incidentId], references: [id])
+  author   User          @relation(fields: [authorId], references: [id])
+  tags     LogEntryTag[]
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  color String @default("#6B7280")
+
+  logEntries LogEntryTag[]
+}
+
+model LogEntryTag {
+  logEntryId String
+  tagId      String
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id])
+  tag      Tag      @relation(fields: [tagId], references: [id])
+
+  @@id([logEntryId, tagId])
+}
+
+// ─── TIMELINE ─────────────────────────────────────────────────────────────────
+
+model TimelineEvent {
+  id                String            @id @default(uuid())
+  incidentId        String
+  type              TimelineEventType
+  title             String
+  description       String?
+  occurredAt        DateTime
+  actorId           String?
+  ipAddress         String?
+  assetName         String?
+  affectedUser      String?
+  openctiEntityId   String?
+  openctiEntityType String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  incident  Incident   @relation(fields: [incidentId], references: [id])
+  actor     User?      @relation(fields: [actorId], references: [id])
+  documents Document[]
+}
+
+// ─── DOCUMENTS, BIBLIOTHÈQUE & ARTEFACTS ──────────────────────────────────────
+
+model Document {
+  id                String           @id @default(uuid())
+  incidentId        String?
+  timelineEventId   String?
+  name              String
+  filePath          String
+  mimeType          String
+  sizeBytes         Int
+  category          DocumentCategory
+  uploadedById      String
+  openctiEntityId   String?
+  openctiEntityType String?
+  createdAt         DateTime         @default(now())
+  deletedAt         DateTime?
+
+  incident      Incident?      @relation(fields: [incidentId], references: [id])
+  timelineEvent TimelineEvent? @relation(fields: [timelineEventId], references: [id])
+  uploadedBy    User           @relation(fields: [uploadedById], references: [id])
+}
+
+// ─── ANNUAIRE ─────────────────────────────────────────────────────────────────
+
+model Contact {
+  id           String    @id @default(uuid())
+  firstName    String
+  lastName     String
+  role         String
+  organization String?
+  phone        String?
+  email        String?
+  site         String?
+  notes        String?
+  isGlobal     Boolean   @default(true)
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  createdBy User              @relation(fields: [createdById], references: [id])
+  incidents IncidentContact[]
+}
+
+model IncidentContact {
+  incidentId String
+  contactId  String
+
+  incident Incident @relation(fields: [incidentId], references: [id])
+  contact  Contact  @relation(fields: [contactId], references: [id])
+
+  @@id([incidentId, contactId])
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  incidentId String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id])
+  incident Incident? @relation(fields: [incidentId], references: [id])
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum IncidentStatus {
+  ACTIVE
+  CONTAINED
+  CLOSED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Cell {
+  DIRECTIONAL
+  OPERATIONAL
+  SHARED
+}
+
+enum TimelineEventType {
+  DETECTION
+  ACTION
+  DECISION
+  COMMUNICATION
+  ESCALATION
+  RESOLUTION
+}
+
+enum DocumentCategory {
+  ARTIFACT
+  FICHE_REFLEXE
+  RAPPORT
+  PROCEDURE
+  OTHER
+}
+
+enum PermissionAction {
+  READ
+  WRITE
+}
+
+enum PermissionResource {
+  DASHBOARD
+  MAIN_COURANTE_DIR
+  MAIN_COURANTE_OPS
+  TIMELINE
+  DOCUMENTS
+  BIBLIOTHEQUE
+  ANNUAIRE
+  CARTOGRAPHIE
+  ADMIN
+}

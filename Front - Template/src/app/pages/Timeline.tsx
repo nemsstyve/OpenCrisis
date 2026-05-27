@@ -1,4 +1,4 @@
-import { Plus, Download, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { useState } from "react";
 
 interface TimelineEvent {
@@ -112,57 +112,13 @@ export default function Timeline() {
 
   return (
     <div className="p-8 bg-[#0f1116] dark:bg-[#0f1116] bg-gray-50 min-h-screen">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl mb-2 text-gray-900 dark:text-white">
-            Timeline - Cellule opérationnelle
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Chronologie détaillée des événements opérationnels
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 bg-[#1e2229] dark:bg-[#1e2229] bg-gray-200 hover:bg-[#2a2e39] dark:hover:bg-[#2a2e39] hover:bg-gray-300 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition-colors">
-            <Download className="w-4 h-4" />
-            Exporter
-          </button>
-          <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-            <Plus className="w-5 h-5" />
-            Ajouter un événement
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-            Événements totaux
-          </h3>
-          <p className="text-3xl text-gray-900 dark:text-white">
-            {events.length}
-          </p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-            Événements affichés
-          </h3>
-          <p className="text-3xl text-blue-400">{filteredEvents.length}</p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-            Filtres actifs
-          </h3>
-          <p className="text-3xl text-purple-400">{activeFilterCount}</p>
-        </div>
-        <div className="bg-[#13151a] dark:bg-[#13151a] bg-white border border-[#1e2229] dark:border-[#1e2229] border-gray-200 rounded-lg p-6">
-          <h3 className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-            Utilisateurs
-          </h3>
-          <p className="text-3xl text-green-400">
-            {new Set(events.map((e) => e.user)).size}
-          </p>
-        </div>
+      <div className="mb-8">
+        <h1 className="text-3xl mb-2 text-gray-900 dark:text-white">
+          Timeline - Cellule opérationnelle
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Chronologie détaillée des événements opérationnels
+        </p>
       </div>
 
       {/* Active Filters Display */}

@@ -28,9 +28,7 @@ const navigationSections: NavSection[] = [
   {
     title: "Vue d'ensemble",
     items: [
-      { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
       { path: "/annuaire", label: "Annuaire", icon: Users },
-      { path: "/cartographie", label: "Cartographie", icon: Map },
       { path: "/bibliotheque", label: "Bibliothèque", icon: Library },
     ],
   },
@@ -38,7 +36,6 @@ const navigationSections: NavSection[] = [
     title: "Cellule de Direction",
     items: [
       { path: "/main-courante-direction", label: "Main courante", icon: FileText },
-      { path: "/tableau-blanc", label: "Tableau blanc", icon: StickyNote },
     ],
   },
   {
@@ -46,7 +43,6 @@ const navigationSections: NavSection[] = [
     items: [
       { path: "/main-courante-operationnelle", label: "Main courante", icon: FileText },
       { path: "/timeline", label: "Timeline", icon: Clock },
-      { path: "/artifacts", label: "Artefacts", icon: FileSearch },
     ],
   },
 ];

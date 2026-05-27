@@ -76,8 +76,7 @@ Invoke-WebRequest -Uri "http://localhost" -UseBasicParsing | Select-Object Statu
 
 Ouvrir un navigateur et aller sur : **http://localhost**
 
-> À ce stade (Phase 1), la page affiche "OpenCrisis — Infrastructure opérationnelle — Phase 2 en cours."
-> L'interface complète sera disponible à partir de la Phase 5.
+> L'interface complète est disponible avec données mockées (Phase 2). L'authentification fonctionnelle et la connexion GraphQL seront opérationnelles à partir de la Phase 5.
 
 ---
 
@@ -109,7 +108,7 @@ CORS_ORIGIN=http://localhost:5173
 ### Démarrer le backend
 
 ```powershell
-cd backend
+cd 02-backend
 npm install
 npx prisma migrate dev    # Applique les migrations
 npx prisma db seed        # Peuple les données initiales (rôles + admin)
@@ -120,8 +119,14 @@ Le backend est disponible sur `http://localhost:4000`.
 
 ### Démarrer le frontend
 
+Le fichier `01-frontend/.env.development` contient déjà les URLs correctes pour le dev local :
+```env
+VITE_API_URL=http://localhost:4000/graphql
+VITE_WS_URL=ws://localhost:4000/graphql
+```
+
 ```powershell
-cd frontend
+cd 01-frontend
 pnpm install
 pnpm dev
 ```

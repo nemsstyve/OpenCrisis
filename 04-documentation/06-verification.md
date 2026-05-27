@@ -262,3 +262,42 @@ dist/assets/index-BrdzOaiK.js  143.91 kB │ gzip: 46.27 kB
 | Phase 5 | Accès `/incidents` → liste des incidents |
 | Phase 6 | Ouvrir 2 onglets sur la main courante → saisir une entrée → apparition temps réel |
 | Phase 7 | Export PDF d'un rapport post-incident → fichier téléchargeable |
+
+---
+
+## Checklist de validation Phase 2
+
+Tests effectués manuellement via Docker (`docker compose up --build`).
+
+### Routing & navigation
+
+- [x] `/` redirige vers `/incidents`
+- [x] `/incidents` affiche le sélecteur d'incident (IncidentSelector)
+- [x] Cliquer sur un incident navigue vers `/incidents/demo/dashboard`
+- [x] `/login` affiche la page de connexion
+- [x] Soumettre le formulaire Login navigue vers `/incidents`
+- [x] Route inconnue (`/incidents/demo/xyz`) affiche la page 404
+- [x] Route 404 a un lien "Retour au tableau de bord" vers `/incidents/demo/dashboard`
+- [x] Route 404 hors incident (`/xyz`) a un lien "Retour au tableau de bord" vers `/incidents`
+
+### Sidebar & pages
+
+- [x] La sidebar affiche 6 onglets : Dashboard, Annuaire, Bibliothèque, Main Courante Direction, Main Courante Opérationnelle, Timeline
+- [x] Aucun onglet Cartographie, Tableau Blanc ou Artefacts
+- [x] Chaque onglet navigue vers la bonne route `/incidents/:id/<page>`
+- [x] L'onglet actif est mis en évidence
+- [x] Le bouton "Changer d'incident" navigue vers `/incidents`
+
+### UI & thème
+
+- [x] Mode sombre fonctionne (toggle dans la sidebar)
+- [x] Mode clair fonctionne — fond blanc (pas de fond sombre en mode clair)
+- [x] Aucune régression visuelle sur les 7 pages
+
+### Qualité du build
+
+- [x] `docker compose build frontend` se termine sans erreur
+- [x] `tsc --noEmit` ne produit aucune erreur TypeScript
+- [x] `pnpm-lock.yaml` présent et cohérent avec `package.json`
+- [x] `ErrorBoundary` enveloppe toute l'application dans `App.tsx`
+- [x] `vite-env.d.ts` présent — `import.meta.env.VITE_*` sans erreur TypeScript

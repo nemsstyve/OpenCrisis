@@ -10,7 +10,7 @@ Application web de gestion de crise (principalement cyber) pour une **seule orga
 À la connexion, l'utilisateur choisit sur quelle crise travailler (comme un workspace Slack). Il peut basculer d'un incident à un autre sans se déconnecter, ce qui permet de gérer plusieurs crises simultanément et de consulter l'historique.
 
 **Bases existantes :**
-- `Front - Template/` — 9 pages React déjà construites, à adapter (ne pas recréer)
+- `Front - Template/` — 9 pages React construites, adaptées en Phase 2 (dossier supprimé après migration)
 - Schéma DB initial fourni — trop incomplet, entièrement refondu en Prisma
 
 ---
@@ -90,24 +90,24 @@ volumes:
 | `MainCouranteOperationnelle.tsx` | `/main-courante-operationnelle` | GraphQL + subscription temps réel |
 | `Timeline.tsx` | `/timeline` | GraphQL + subscription + lien OpenCTI |
 | `Bibliotheque.tsx` | `/bibliotheque` | Upload/download via GraphQL |
-| `Artifacts.tsx` | `/artifacts` | Fusionner avec Documents (même modèle, `category` différente) |
-| `Cartographie.tsx` | `/cartographie` | GraphQL (assets système) |
+| `Artifacts.tsx` | `/artifacts` | **Supprimé** — sera réintégré dans une page Documents (Phase 6) |
+| `Cartographie.tsx` | `/cartographie` | **Supprimé** — hors scope (peut être réintroduit en Phase 7+) |
 
 ### Pages à créer from scratch
 
 | Page | Route | Description |
 |---|---|---|
-| `Login` | `/login` | Formulaire auth, gestion JWT + refresh token |
-| `IncidentSelector` | `/incidents` | Workspace picker — liste des crises avec statut et sévérité |
+| `Login` | `/login` | **Créée (Phase 2)** — formulaire placeholder, auth réelle en Phase 5 |
+| `IncidentSelector` | `/incidents` | **Créée (Phase 2)** — workspace picker avec données mockées, GraphQL en Phase 5 |
 | `Administration` | `/admin` | Gestion utilisateurs, rôles, permissions |
 
-### Corrections à apporter au template
+### Corrections apportées au template *(Phase 2)*
 
-1. **Supprimer Material UI** — `@mui/material`, `@emotion/react`, `@emotion/styled` (conflit avec shadcn, inutile)
-2. **Ajouter `tsconfig.json`** — absent, TypeScript non configuré
-3. **Restructurer le routing** — `/` pointe sur Annuaire ; restructurer autour de `/incidents/:id/*`
-4. **Supprimer le plugin Figma** — `figma-asset-resolver` dans `vite.config.ts`
-5. **Ajouter Apollo Client** — couche GraphQL + WebSocket link pour les subscriptions
+1. ✅ **Supprimer Material UI** — `@mui/material`, `@emotion/react`, `@emotion/styled` supprimés
+2. ✅ **`tsconfig.json`** — présent et configuré (`strict: true`, alias `@/`)
+3. ✅ **Restructurer le routing** — `/` → `/incidents` ; workspace model `/incidents/:incidentId/*`
+4. ✅ **Supprimer le plugin Figma** — `figma-asset-resolver` et dossier `figma/` supprimés
+5. ✅ **Ajouter Apollo Client** — couche GraphQL + WebSocket split link opérationnel
 
 ---
 
@@ -424,39 +424,52 @@ Activée via `.env` (`OPENCTI_ENABLED=true`, `OPENCTI_URL`, `OPENCTI_TOKEN`).
 ```
 opencrisis/
 ├── docker-compose.yml
+├── docker-compose.dev.yml
 ├── .env.example
 ├── CLAUDE.md
-├── PLAN.md
-├── nginx/
+├── 03-nginx/
 │   └── nginx.conf
 │
-├── frontend/
+├── 01-frontend/
 │   ├── Dockerfile
-│   ├── tsconfig.json                    # À créer
-│   ├── vite.config.ts                   # Nettoyer plugin Figma
+│   ├── .dockerignore
+│   ├── .env.development                 # URLs dev locales (non commité)
+│   ├── tsconfig.json
+│   ├── vite.config.ts
 │   ├── codegen.yml
 │   ├── package.json
+│   ├── pnpm-lock.yaml
 │   └── src/
-│       ├── pages/
-│       │   ├── Login/                   # À créer
-│       │   ├── IncidentSelector/        # À créer
-│       │   ├── Dashboard/               # Adapter
-│       │   ├── MainCourante/            # Adapter (Direction + Opérationnelle)
-│       │   ├── Timeline/                # Adapter + OpenCTI
-│       │   ├── Documents/               # Fusionner Bibliothèque + Artifacts
-│       │   ├── Annuaire/                # Adapter
-│       │   ├── Cartographie/            # Adapter
-│       │   └── Administration/          # À créer
-│       ├── components/ui/               # 52 composants shadcn
+│       ├── vite-env.d.ts                # Déclarations TypeScript pour import.meta.env
+│       ├── app/
+│       │   ├── App.tsx
+│       │   ├── routes.ts
+│       │   ├── layouts/RootLayout.tsx
+│       │   ├── providers/ThemeProvider.tsx
+│       │   ├── components/
+│       │   │   ├── ErrorBoundary.tsx
+│       │   │   ├── Sidebar.tsx
+│       │   │   └── ui/                  # 52 composants shadcn
+│       │   └── pages/
+│       │       ├── Login.tsx            # Placeholder — auth réelle Phase 5
+│       │       ├── IncidentSelector.tsx # Placeholder — GraphQL Phase 5
+│       │       ├── Dashboard.tsx
+│       │       ├── Annuaire.tsx
+│       │       ├── Bibliotheque.tsx
+│       │       ├── MainCouranteDirection.tsx
+│       │       ├── MainCouranteOperationnelle.tsx
+│       │       ├── Timeline.tsx
+│       │       └── NotFound.tsx
+│       ├── lib/apolloClient.ts          # Apollo Client (HTTP + WebSocket split)
+│       ├── store/useAppStore.ts         # Zustand — currentUser, currentIncident, permissions
+│       ├── context/AuthContext.tsx      # Skeleton AuthProvider (Phase 5)
 │       ├── graphql/
 │       │   ├── queries/
 │       │   ├── mutations/
 │       │   └── subscriptions/
-│       ├── store/                       # Zustand
-│       ├── context/                     # AuthContext
-│       └── types/generated.ts           # Auto-généré par codegen
+│       └── types/generated.ts           # Auto-généré par codegen — NE PAS ÉDITER
 │
-└── backend/
+└── 02-backend/
     ├── Dockerfile
     ├── prisma/
     │   ├── schema.prisma
@@ -480,21 +493,28 @@ opencrisis/
 
 **Frontend** : `@apollo/client`, `graphql-ws`, `zustand`, `react-router-dom v7`, `shadcn/ui`, `tailwind v4`, `react-hook-form`, `zod`, `@graphql-codegen/*`
 
-**À supprimer du template** : `@mui/material`, `@emotion/react`, `@emotion/styled`, plugin `figma-asset-resolver`
+**Supprimés du template (Phase 2)** : `@mui/material`, `@emotion/react`, `@emotion/styled`, `framer-motion`, `react-dnd`, `react-responsive-masonry`, plugin `figma-asset-resolver`
 
 ---
 
 ## Phases d'implémentation
 
-### Phase 1 — Infrastructure Docker
+### ✅ Phase 1 — Infrastructure Docker *(terminée)*
 - `docker-compose.yml` : 5 services, healthchecks, volumes `postgres_data` et `uploads_data`
 - `.env.example` : `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `REDIS_URL`, `CORS_ORIGIN`, `OPENCTI_*`
 - `nginx.conf` : reverse proxy HTTP
 
-### Phase 2 — Frontend : nettoyage du template
-- Ajouter `tsconfig.json`, supprimer MUI, nettoyer `vite.config.ts`
-- Restructurer le routing : `/login`, `/incidents`, `/incidents/:id/*`
-- Installer Apollo Client, Zustand, graphql-ws
+### ✅ Phase 2 — Frontend : nettoyage du template *(terminée)*
+- Suppression des dépendances inutilisées : MUI, `@emotion/*`, `framer-motion`, `react-dnd`, `react-responsive-masonry`
+- Suppression des pages hors scope : `Cartographie.tsx`, `TableauBlanc.tsx`, `Artifacts.tsx`
+- Suppression du dossier `Front - Template/` et des artefacts Figma (`src/app/components/figma/`)
+- Restructuration du routing : `/login`, `/incidents`, `/incidents/:incidentId/*` (7 routes actives)
+- Création des pages `Login.tsx` et `IncidentSelector.tsx`
+- Installation d'Apollo Client + `graphql-ws` + Zustand + GraphQL Code Generator
+- Ajout de `vite-env.d.ts` (déclarations TypeScript pour `import.meta.env`)
+- Ajout de `.dockerignore` et `01-frontend/.env.development`
+- Génération de `pnpm-lock.yaml`
+- Ajout de l'`ErrorBoundary` (composant classe — seule façon de capturer les erreurs de rendu React)
 
 ### Phase 3 — Backend : fondations auth & RBAC
 - Prisma schema + migration initiale

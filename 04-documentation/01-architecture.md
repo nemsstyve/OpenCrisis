@@ -117,15 +117,13 @@ Ce modèle permet de **gérer plusieurs crises simultanément** (ex : incident c
 | Module | Route | Cellule(s) | Description |
 |---|---|---|---|
 | **Sélecteur d'incident** | `/incidents` | Toutes | Choix du workspace de crise |
-| **Dashboard** | `/incidents/:id` | Toutes | Vue synthétique de l'état de la crise |
+| **Dashboard** | `/incidents/:id/dashboard` | Toutes | Vue synthétique de l'état de la crise |
 | **Main courante directionnelle** | `/incidents/:id/main-courante-direction` | Directionnelle | Journal des décisions stratégiques |
 | **Main courante opérationnelle** | `/incidents/:id/main-courante-operationnelle` | Opérationnelle | Journal des actions techniques |
 | **Timeline** | `/incidents/:id/timeline` | Toutes | Chronologie des événements de l'incident |
-| **Documents** | `/incidents/:id/documents` | Toutes | Artefacts, rapports, preuves liés à l'incident |
-| **Bibliothèque** | `/bibliotheque` | Toutes | Fiches réflexes et procédures globales |
-| **Annuaire** | `/annuaire` | Toutes | Contacts de crise (global + incident) |
-| **Cartographie** | `/incidents/:id/cartographie` | Opérationnelle | Infrastructure SI et assets impactés |
-| **Administration** | `/admin` | Administrateur | Gestion des utilisateurs, rôles, permissions |
+| **Bibliothèque** | `/incidents/:id/bibliotheque` | Toutes | Fiches réflexes, procédures, PCA/PRA |
+| **Annuaire** | `/incidents/:id/annuaire` | Toutes | Contacts de crise (global + incident) |
+| **Administration** | `/admin` | Administrateur | Gestion des utilisateurs, rôles, permissions *(Phase 7)* |
 
 ---
 

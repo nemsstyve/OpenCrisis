@@ -1,11 +1,5 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { createRoot } from "react-dom/client";
+import App from "./app/App.tsx";
+import "./styles/index.css";
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <div style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
-      <h1>OpenCrisis</h1>
-      <p>Infrastructure opérationnelle — Phase 2 en cours.</p>
-    </div>
-  </React.StrictMode>
-)
+createRoot(document.getElementById("root")!).render(<App />);

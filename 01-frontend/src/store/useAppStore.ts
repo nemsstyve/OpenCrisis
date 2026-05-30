@@ -1,26 +1,14 @@
 import { create } from "zustand";
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  permissions: string[];
-}
-
-interface Incident {
-  id: string;
-  name: string;
-  status: "ACTIVE" | "CONTAINED" | "CLOSED";
-  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-}
+import type { GqlUser, GqlIncident } from "../types/api";
 
 interface AppStore {
-  currentUser: User | null;
-  currentIncident: Incident | null;
-  setCurrentUser: (user: User | null) => void;
-  setCurrentIncident: (incident: Incident | null) => void;
-  hasPermission: (resource: string) => boolean;
+  currentUser: GqlUser | null;
+  currentIncident: GqlIncident | null;
+  setCurrentUser: (user: GqlUser | null) => void;
+  setCurrentIncident: (incident: GqlIncident | null) => void;
+  /** Vérifie si l'utilisateur possède la permission resource:action */
+  hasPermission: (resource: string, action?: "READ" | "WRITE") => boolean;
+  clearSession: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -30,9 +18,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setCurrentUser: (user) => set({ currentUser: user }),
   setCurrentIncident: (incident) => set({ currentIncident: incident }),
 
-  hasPermission: (resource: string) => {
+  hasPermission: (resource, action = "READ") => {
     const { currentUser } = get();
     if (!currentUser) return false;
-    return currentUser.permissions.includes(resource);
+    return currentUser.permissions.some(
+      (p) => p.resource === resource && p.action === action
+    );
   },
+
+  clearSession: () => set({ currentUser: null, currentIncident: null }),
 }));

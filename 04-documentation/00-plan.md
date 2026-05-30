@@ -545,11 +545,15 @@ opencrisis/
 - `pubsub.ts` activé avec topics nommés constants (`TOPICS`)
 - OpenCTI : champs réservés sur Incident/TimelineEvent/Document — resolvers Phase 7
 
-### Phase 5 — Frontend : auth & navigation
-- Page Login + AuthContext + Zustand store
-- Routes protégées par permission
-- Page IncidentSelector (workspace picker)
-- Sidebar avec sélecteur d'incident
+### ✅ Phase 5 — Frontend : auth & navigation *(terminée)*
+- `tokenStore.ts` : JWT access token en mémoire (pas de localStorage — réduction surface XSS)
+- `apolloClient.ts` : `authLink` injecte le JWT dans chaque requête HTTP ; `connectionParams` dynamique pour WS
+- `AuthContext` : `login()`, `logout()`, restauration automatique de session via `refreshToken` au démarrage
+- `ProtectedOutlet` : composant parent protégé — spinner pendant la restauration, redirect /login si non authentifié
+- `routes.ts` : `ProtectedOutlet` englobe toutes les routes `/incidents/**`
+- `Login.tsx` : formulaire réel avec mutation GraphQL, gestion erreurs, spinner, redirect post-login
+- `IncidentSelector.tsx` : query GraphQL incidents, modal création, RBAC (bouton "Créer" conditionné à DASHBOARD:WRITE)
+- `Sidebar.tsx` : onglets filtrés par permission, nom de l'incident, info utilisateur, bouton logout
 
 ### Phase 6 — Frontend : connexion GraphQL par module
 - GraphQL Code Generator setup + génération initiale

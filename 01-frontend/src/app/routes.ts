@@ -1,5 +1,6 @@
 import { createBrowserRouter, redirect } from "react-router";
 import RootLayout from "./layouts/RootLayout";
+import ProtectedOutlet from "./components/ProtectedOutlet";
 import Login from "./pages/Login";
 import IncidentSelector from "./pages/IncidentSelector";
 import Dashboard from "./pages/Dashboard";
@@ -19,26 +20,32 @@ export const router = createBrowserRouter([
     path: "/login",
     Component: Login,
   },
+  // ─── Routes protégées ──────────────────────────────────────────────────────
   {
-    path: "/incidents",
-    Component: IncidentSelector,
-  },
-  {
-    path: "/incidents/:incidentId",
-    Component: RootLayout,
+    Component: ProtectedOutlet,
     children: [
       {
-        index: true,
-        loader: ({ params }) =>
-          redirect(`/incidents/${params.incidentId ?? ""}/dashboard`),
+        path: "/incidents",
+        Component: IncidentSelector,
       },
-      { path: "dashboard", Component: Dashboard },
-      { path: "annuaire", Component: Annuaire },
-      { path: "bibliotheque", Component: Bibliotheque },
-      { path: "main-courante-direction", Component: MainCouranteDirection },
-      { path: "main-courante-operationnelle", Component: MainCouranteOperationnelle },
-      { path: "timeline", Component: Timeline },
-      { path: "*", Component: NotFound },
+      {
+        path: "/incidents/:incidentId",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            loader: ({ params }) =>
+              redirect(`/incidents/${params.incidentId ?? ""}/dashboard`),
+          },
+          { path: "dashboard", Component: Dashboard },
+          { path: "annuaire", Component: Annuaire },
+          { path: "bibliotheque", Component: Bibliotheque },
+          { path: "main-courante-direction", Component: MainCouranteDirection },
+          { path: "main-courante-operationnelle", Component: MainCouranteOperationnelle },
+          { path: "timeline", Component: Timeline },
+          { path: "*", Component: NotFound },
+        ],
+      },
     ],
   },
   {

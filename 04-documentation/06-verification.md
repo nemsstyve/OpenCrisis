@@ -517,3 +517,71 @@ Tests effectués manuellement via Docker (`docker compose up --build`).
 - [x] `pnpm-lock.yaml` présent et cohérent avec `package.json`
 - [x] `ErrorBoundary` enveloppe toute l'application dans `App.tsx`
 - [x] `vite-env.d.ts` présent — `import.meta.env.VITE_*` sans erreur TypeScript
+
+---
+
+## Checklist de validation Phase 6
+
+Phase 6 — Frontend : connexion GraphQL par module (remplacement des mocks par des hooks Apollo réels + subscriptions temps réel).
+
+### Nouveaux fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `src/types/api.ts` | Types étendus : GqlTag, GqlLogEntry, GqlTimelineEvent, GqlDocument, GqlContact + enums Cell/TimelineEventType/DocumentCategory |
+| `src/graphql/logEntry.ts` | Query + 5 mutations + 2 subscriptions (logEntryAdded, logEntryUpdated) |
+| `src/graphql/tag.ts` | Query + create/delete |
+| `src/graphql/contact.ts` | Query + CRUD complet |
+| `src/graphql/document.ts` | Query + delete + subscription documentUploaded |
+| `src/graphql/timeline.ts` | Query + CRUD + subscription timelineEventAdded |
+| `src/hooks/useCurrentIncident.ts` | Restaure currentIncident depuis l'URL si le store Zustand est vide (après rechargement) |
+| `src/lib/fileUtils.ts` | downloadFile() + uploadFile() + formatBytes() via REST avec JWT Bearer |
+
+### Pages remplacées (mocks → GraphQL)
+
+| Page | Données réelles | Subscriptions |
+|---|---|---|
+| Dashboard | useQuery logEntries (×2 cellules) + timelineEvents | — |
+| Annuaire | useQuery contacts + CRUD modal | — |
+| MainCouranteDirection | useQuery logEntries DIRECTIONAL | logEntryAdded + logEntryUpdated ✅ |
+| MainCouranteOperationnelle | useQuery logEntries OPERATIONAL | logEntryAdded + logEntryUpdated ✅ |
+| Timeline | useQuery timelineEvents | timelineEventAdded ✅ |
+| Bibliothèque | useQuery documents (global + incident) + upload REST | documentUploaded ✅ |
+
+### Tests fonctionnels effectués
+
+- [x] Dashboard : stats réelles (1 entrée dir, 0 ops, 1 timeline event, 1 contributeur) ✅
+- [x] Dashboard : frise chronologique avec événement "Alerte SIEM" + marqueur "Maintenant" ✅
+- [x] Annuaire : contacts réels (Jean Dupont, Alice Martin) chargés depuis la DB ✅
+- [x] Main Courante Direction : entrée existante affichée avec tag "Critique" ✅
+- [x] Main Courante Direction : création d'entrée avec tag → apparaît sans rechargement ✅
+- [x] Main Courante Direction : accents corrects ("validée", "réseau", "complète") ✅
+- [x] Timeline : événement "Alerte SIEM" (DETECTION, srv-prod-01, 10.0.1.42) ✅
+- [x] Bibliothèque : deux onglets (3 docs globaux / 2 docs incident) ✅
+- [x] useCurrentIncident : restaure le store Zustand si accès direct à l'URL après rechargement ✅
+
+### Qualité
+
+- [x] `pnpm tsc --noEmit` → TS_OK (0 erreur) ✅
+- [x] LOG_ENTRY_FRAGMENT (code mort) supprimé de graphql/logEntry.ts ✅
+- [x] React.ComponentType remplacé par ComponentType importé explicitement ✅
+- [x] Subscriptions via subscribeToMore — pattern dédupliqué (check par ID) ✅
+- [x] Cache Apollo mis à jour manuellement via update() sur create/delete ✅
+
+### Correction de données (hors code)
+
+Données test corrompues (terminaux cp1252 → bytes invalides pour UTF-8) corrigées directement en base :
+- LogEntry "Cellule de crise activée à 14h00"
+- Incident "Chiffrement détecté sur serveurs"
+- TimelineEvent "Règle ransomware déclenchée" + "Isolation réseau"
+- Tag XSS `<script>alert(1)</script>` supprimé
+
+**Cause** : terminal Windows cp1252 (curl/psql) envoyait 0xE9 ("é" cp1252), invalide en UTF-8 → Express remplaçait par U+FFFD. Aucun bug code — toute saisie via le navigateur est correctement encodée en UTF-8.
+
+### OWASP
+
+- [x] **A01** — Token invalide → "Non authentifié" sur tous les resolvers ✅
+- [x] **A02** — Cookie `refreshToken: HttpOnly; Secure; SameSite=Strict` ✅
+- [x] **A03** — Aucun `$queryRaw`/SQL brut ; React échappe tout le JSX ; tag XSS supprimé ✅
+- [x] **A07** — Inchangé depuis Phase 3 ✅
+- [x] **A09** — CREATE MAIN_COURANTE + TAG_ADD tracés dans AuditLog ✅

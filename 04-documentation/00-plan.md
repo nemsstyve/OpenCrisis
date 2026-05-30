@@ -555,11 +555,16 @@ opencrisis/
 - `IncidentSelector.tsx` : query GraphQL incidents, modal création, RBAC (bouton "Créer" conditionné à DASHBOARD:WRITE)
 - `Sidebar.tsx` : onglets filtrés par permission, nom de l'incident, info utilisateur, bouton logout
 
-### Phase 6 — Frontend : connexion GraphQL par module
-- GraphQL Code Generator setup + génération initiale
-- Adapter chaque page du template (remplacer mocks par hooks Apollo)
-- Subscriptions temps réel sur Main Courante et Timeline
-- Fusionner Artifacts + Bibliothèque → page Documents unifiée
+### ✅ Phase 6 — Frontend : connexion GraphQL par module *(terminée)*
+- Nouveaux fichiers GraphQL : logEntry, tag, contact, document, timeline (queries + mutations + subscriptions)
+- Types étendus dans `src/types/api.ts` (GqlLogEntry, GqlContact, GqlDocument, GqlTimelineEvent, GqlTag)
+- Hook `useCurrentIncident` — restaure le store Zustand depuis l'URL après rechargement de page
+- Utilitaires `fileUtils.ts` — upload/download REST avec JWT Bearer en mémoire
+- Dashboard : stats réelles + frise chronologique + widgets contributeurs
+- Annuaire : CRUD contacts avec modal, recherche, RBAC
+- Main Courante Direction & Opérationnelle : Apollo + subscriptions temps réel (logEntryAdded/Updated) + tags dynamiques + edit/delete inline
+- Timeline : table filtrée + subscription (timelineEventAdded) + modal création
+- Bibliothèque : deux onglets (global/incident) + upload REST + download JWT + subscription documentUploaded
 
 ### Phase 7 — Fonctionnalités transverses
 - Page Administration (users, rôles, permissions, audit log viewer)

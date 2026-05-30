@@ -4,12 +4,6 @@ import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export const INCIDENT_INCLUDE = {
-  _count: false,
-} as const;
-
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getIncidents() {

@@ -9,10 +9,6 @@ const LOG_ENTRY_INCLUDE = {
   tags: { include: { tag: true } },
 } as const;
 
-function toGql(entry: Awaited<ReturnType<typeof prisma.logEntry.findFirstOrThrow>>) {
-  return entry;
-}
-
 async function getEntry(id: string) {
   const entry = await prisma.logEntry.findFirst({ where: { id, deletedAt: null }, include: LOG_ENTRY_INCLUDE });
   if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
@@ -76,10 +72,12 @@ export async function addTagToLogEntry(logEntryId: string, tagId: string, userId
     create: { logEntryId, tagId },
     update: {},
   });
+  logAudit({ userId, action: 'TAG_ADD', resource: 'MAIN_COURANTE', resourceId: logEntryId });
   return getEntry(logEntryId);
 }
 
 export async function removeTagFromLogEntry(logEntryId: string, tagId: string, userId: string) {
   await prisma.logEntryTag.deleteMany({ where: { logEntryId, tagId } });
+  logAudit({ userId, action: 'TAG_REMOVE', resource: 'MAIN_COURANTE', resourceId: logEntryId });
   return getEntry(logEntryId);
 }

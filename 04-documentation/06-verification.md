@@ -319,19 +319,32 @@ POST /api/files/upload  →  filePath: "incidents/:id/..." ✅
 | A01 | `requirePermission` sur chaque resolver | ✅ |
 | A09 | CREATE/UPDATE/DELETE/UPLOAD dans AuditLog | ✅ |
 
+### Corrections qualité post-commit (vérification finale)
+
+- **`services/logEntry.ts`** : suppression de la fonction `toGql` jamais appelée (code mort)
+- **`services/incident.ts`** : suppression de `INCIDENT_INCLUDE` exporté mais jamais importé (code mort)
+- **`services/logEntry.ts`** : `addTagToLogEntry` / `removeTagFromLogEntry` — `userId` désormais utilisé pour `logAudit` (`TAG_ADD` / `TAG_REMOVE`)
+
+### Sécurité — vérifications finales
+
+- **A05** : Introspection GraphQL désactivée automatiquement en production par Apollo Server 4 ✅
+- **A03** : Payload XSS stocké sans exécution — React échappe le contenu en JSX, aucune faille backend ✅
+
 ### Checklist Phase 4
 
 - [x] Build Docker sans erreur TypeScript
-- [x] `incidents` → liste vide, `createIncident` → incident créé avec `createdBy`
-- [x] `updateIncident(status: CONTAINED)` → statut mis à jour
-- [x] `createTag` + `createLogEntry` + `addTagToLogEntry` → tags attachés
+- [x] `incidents` → liste, `createIncident` → incident créé avec `createdBy`
+- [x] `updateIncident(status: CLOSED)` → statut mis à jour, `resolvedAt` renseigné
+- [x] `deleteIncident` → soft delete (filtre `deletedAt: null`)
+- [x] `createTag` + `createLogEntry` + `addTagToLogEntry` → tags attachés, audit log TAG_ADD
 - [x] `createTimelineEvent` avec assetName/ipAddress → événement enregistré
-- [x] `createContact` → contact créé
+- [x] `createContact` + `linkContactToIncident` → contact lié à un incident
 - [x] Upload fichier → `filePath: incidents/:id/...` (chemin correct) ✅
 - [x] Upload response → `uploadedBy` sans `passwordHash` ✅
 - [x] Upload/download sans token → 401 ✅
-- [x] Toute mutation sans token → `UNAUTHENTICATED` ✅
-- [x] Audit log : CREATE/UPDATE/UPLOAD pour chaque action ✅
+- [x] 5 mutations sans token → `UNAUTHENTICATED` ✅
+- [x] Introspection GraphQL → désactivée en production ✅
+- [x] Audit log : 11 catégories CREATE/UPDATE/DELETE/UPLOAD/TAG_ADD/LINK ✅
 - [x] pubsub TOPICS définis, subscriptions déclarées (tests WS en Phase 6)
 
 ---

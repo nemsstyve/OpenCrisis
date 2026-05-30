@@ -537,10 +537,13 @@ opencrisis/
 - Middleware JWT (HTTP + WebSocket) + middleware RBAC (`requirePermission`)
 - Audit log fire-and-forget (`logAudit`) + validation des env vars au démarrage
 
-### Phase 4 — Backend : modules métier
-- Resolvers Incident, LogEntry, Tag, TimelineEvent, Document, Contact
-- Middleware audit log (toutes les mutations)
-- Resolvers OpenCTI (conditionnel sur `OPENCTI_ENABLED`)
+### ✅ Phase 4 — Backend : modules métier *(terminée)*
+- Resolvers Incident, LogEntry (+ Tag), TimelineEvent, Document, Contact — entièrement testés
+- Endpoint REST `POST /api/files/upload` (multer) + `GET /api/files/:id` (download avec auth JWT)
+- `requirePermission` sur chaque resolver, `logAudit` sur chaque mutation
+- Subscriptions déclarées : `incidentCreated`, `incidentStatusChanged`, `logEntryAdded`, `logEntryUpdated`, `timelineEventAdded`, `documentUploaded` (testées en Phase 6)
+- `pubsub.ts` activé avec topics nommés constants (`TOPICS`)
+- OpenCTI : champs réservés sur Incident/TimelineEvent/Document — resolvers Phase 7
 
 ### Phase 5 — Frontend : auth & navigation
 - Page Login + AuthContext + Zustand store

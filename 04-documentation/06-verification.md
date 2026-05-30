@@ -263,6 +263,79 @@ dist/assets/index-BrdzOaiK.js  143.91 kB │ gzip: 46.27 kB
 
 ---
 
+## Checklist de validation Phase 4
+
+Tests effectués via l'API GraphQL (`http://localhost/api/graphql`) et l'endpoint REST (`http://localhost/api/files`).
+
+### Erreurs rencontrées et corrections
+
+#### Erreur 1 — Types Express incorrects dans `routes/files.ts` (TS2493)
+**Symptôme** : Utilisation de `Parameters<typeof router.use>` pour typer le middleware Express, ce qui produit des types incompatibles.
+**Correction** : Utiliser `Request`, `Response`, `NextFunction` directement depuis `express`.
+
+#### Erreur 2 — `req.body` indisponible dans le callback `destination` de multer
+**Symptôme** : multer remplit `req.body` après avoir traité le fichier, pas avant. L'`incidentId` était donc `undefined` dans `destination()`, forçant le stockage dans `global/`.
+**Correction** : Toujours sauvegarder dans un dossier `tmp/` puis déplacer (`fs.rename`) dans `incidents/:id/` ou `global/` une fois `req.body` disponible dans le handler de route.
+
+#### Erreur 3 — `passwordHash` exposé dans la réponse upload
+**Symptôme** : `createDocument` incluait `uploadedBy: true` (tous les champs User), exposant le hash du mot de passe dans la réponse JSON.
+**Correction** : Remplacer par `uploadedBy: { select: { id, email, firstName, lastName } }`.
+
+### Tests GraphQL effectués
+
+```graphql
+# Incidents
+query { incidents { id name status severity } }         # → [] ✅
+mutation { createIncident(input: { name: "Ransomware Prod", severity: CRITICAL }) { id name status createdBy { email } } }  # ✅
+mutation { updateIncident(id: "...", input: { status: CONTAINED }) { status } }  # ✅
+
+# Tags + LogEntry
+mutation { createTag(name: "Critique", color: "#EF4444") { id } }  # ✅
+mutation { createLogEntry(incidentId: "...", cell: DIRECTIONAL, content: "...") { id author { email } } }  # ✅
+mutation { addTagToLogEntry(logEntryId: "...", tagId: "...") { tags { name } } }  # ✅
+
+# Timeline
+mutation { createTimelineEvent(incidentId: "...", input: { type: DETECTION, title: "Alerte SIEM", occurredAt: "...", assetName: "srv-prod-01" }) { id type assetName } }  # ✅
+
+# Contact
+mutation { createContact(input: { firstName: "Jean", lastName: "Dupont", role: "RSSI" }) { id } }  # ✅
+```
+
+### Tests REST effectués
+
+```bash
+# Upload fichier (avec incidentId → bon dossier)
+POST /api/files/upload  →  filePath: "incidents/:id/..." ✅
+# Upload sans token → 401 ✅
+# Download sans token → 401 ✅
+```
+
+### Tests sécurité (OWASP)
+
+| Contrôle | Test | Résultat |
+|---|---|---|
+| A01 | Toute mutation sans token → `UNAUTHENTICATED` | ✅ |
+| A01 | Upload/download sans token → 401 | ✅ |
+| A01 | `requirePermission` sur chaque resolver | ✅ |
+| A09 | CREATE/UPDATE/DELETE/UPLOAD dans AuditLog | ✅ |
+
+### Checklist Phase 4
+
+- [x] Build Docker sans erreur TypeScript
+- [x] `incidents` → liste vide, `createIncident` → incident créé avec `createdBy`
+- [x] `updateIncident(status: CONTAINED)` → statut mis à jour
+- [x] `createTag` + `createLogEntry` + `addTagToLogEntry` → tags attachés
+- [x] `createTimelineEvent` avec assetName/ipAddress → événement enregistré
+- [x] `createContact` → contact créé
+- [x] Upload fichier → `filePath: incidents/:id/...` (chemin correct) ✅
+- [x] Upload response → `uploadedBy` sans `passwordHash` ✅
+- [x] Upload/download sans token → 401 ✅
+- [x] Toute mutation sans token → `UNAUTHENTICATED` ✅
+- [x] Audit log : CREATE/UPDATE/UPLOAD pour chaque action ✅
+- [x] pubsub TOPICS définis, subscriptions déclarées (tests WS en Phase 6)
+
+---
+
 ## Checklist de validation Phase 3
 
 Tests effectués manuellement via l'API GraphQL exposée par nginx (`http://localhost/api/graphql`).

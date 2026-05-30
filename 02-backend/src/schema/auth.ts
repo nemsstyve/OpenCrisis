@@ -30,11 +30,11 @@ export const authTypeDefs = `#graphql
     user: User!
   }
 
-  type Query {
+  extend type Query {
     me: User
   }
 
-  type Mutation {
+  extend type Mutation {
     login(email: String!, password: String!): AuthPayload!
     logout: Boolean!
     refreshToken: AuthPayload!

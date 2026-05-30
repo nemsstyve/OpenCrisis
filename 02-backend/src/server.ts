@@ -11,7 +11,9 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { typeDefs } from './schema';
 import { resolvers } from './resolvers';
 import { prisma } from './prisma';
+import { pubsub } from './pubsub';
 import { verifyAccessToken, extractBearerToken } from './middleware/auth';
+import filesRouter from './routes/files';
 import type { GraphQLContext } from './context';
 
 const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
@@ -36,6 +38,8 @@ async function main() {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'opencrisis-backend', timestamp: new Date().toISOString() });
   });
+
+  app.use('/files', filesRouter);
 
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 
@@ -94,6 +98,7 @@ async function main() {
   const shutdown = async () => {
     await server.stop();
     await prisma.$disconnect();
+    await pubsub.close();
     process.exit(0);
   };
   process.on('SIGTERM', shutdown);

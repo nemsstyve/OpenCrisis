@@ -263,6 +263,61 @@ dist/assets/index-BrdzOaiK.js  143.91 kB │ gzip: 46.27 kB
 
 ---
 
+## Checklist de validation Phase 5
+
+Tests effectués via l'API GraphQL et l'inspection du bundle JS frontend.
+
+### Corrections qualité post-commit
+
+- **`Login.tsx`** : remplacement de `navigate()` pendant le rendu par `<Navigate>` (anti-pattern React corrigé)
+- **`AuthContext.tsx`** : suppression de `mapUser()` — fonction identité inutile (code mort)
+
+### Correction sécurité (A05 — nginx)
+
+Nginx ne renvoyait aucun header de sécurité HTTP. Ajout dans `nginx.conf` :
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin`
+- `X-XSS-Protection: 1; mode=block`
+
+### Note JWT — A07
+
+Après logout, le JWT access token reste valide côté serveur jusqu'à expiration (TTL 15 min). C'est le tradeoff standard des JWT sans blocklist. Mitigations en place :
+- Token effacé de la mémoire immédiatement côté client (`tokenStore.set(null)`)
+- Refresh token révoqué instantanément en base
+- TTL court (15 min)
+
+### Tests effectués
+
+```
+login(admin@opencrisis.local / Admin1234!)  → 18 permissions ✅
+refreshToken (cookie HttpOnly)              → session restaurée ✅
+incidents avec token                        → données retournées ✅
+incidents sans token                        → UNAUTHENTICATED ✅
+logout                                      → true ✅
+refreshToken après logout                   → UNAUTHENTICATED ✅
+JWT falsifié                                → me: null ✅
+Login email inconnu vs connu               → même message d'erreur ✅
+```
+
+### Checklist Phase 5
+
+- [x] Build frontend sans erreur TypeScript
+- [x] SPA accessible sur `/`, `/login`, `/incidents` → 200
+- [x] Bundle JS contient le code Phase 5 (`refreshToken`)
+- [x] `login()` mutation → accessToken + 18 permissions
+- [x] `refreshToken` → restauration de session via cookie
+- [x] `logout` → cookie révoqué, refreshToken → UNAUTHENTICATED
+- [x] JWT falsifié → `me: null`
+- [x] Token en mémoire uniquement (pas localStorage) ✅
+- [x] Cookie `HttpOnly; Secure; SameSite=Strict` ✅
+- [x] Headers nginx A05 ajoutés ✅
+- [x] Messages d'erreur login non discriminants (même texte email connu/inconnu) ✅
+- [x] `<Navigate>` au lieu de `navigate()` pendant le rendu ✅
+- [x] `mapUser()` identité supprimée ✅
+
+---
+
 ## Checklist de validation Phase 4
 
 Tests effectués via l'API GraphQL (`http://localhost/api/graphql`) et l'endpoint REST (`http://localhost/api/files`).

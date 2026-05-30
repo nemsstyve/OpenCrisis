@@ -24,17 +24,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function mapUser(raw: GqlUser): GqlUser {
-  return {
-    id: raw.id,
-    email: raw.email,
-    firstName: raw.firstName,
-    lastName: raw.lastName,
-    roles: raw.roles,
-    permissions: raw.permissions,
-  };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { currentUser, setCurrentUser, clearSession } = useAppStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (!cancelled && data?.refreshToken) {
           tokenStore.set(data.refreshToken.accessToken);
-          setCurrentUser(mapUser(data.refreshToken.user));
+          setCurrentUser(data.refreshToken.user as GqlUser);
         }
       } catch {
         // Pas de session valide — l'utilisateur devra se reconnecter
@@ -70,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (!data?.login) throw new Error("Réponse invalide du serveur");
     tokenStore.set(data.login.accessToken);
-    setCurrentUser(mapUser(data.login.user));
+    setCurrentUser(data.login.user as GqlUser);
   }
 
   async function logout(): Promise<void> {

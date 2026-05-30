@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useLocation, Navigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
 
@@ -14,11 +14,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Déjà connecté → rediriger directement
+  // Déjà connecté → rediriger via composant (pas d'appel navigate pendant le rendu)
   if (isAuthenticated && currentUser) {
     const from = (location.state as { from?: string })?.from ?? "/incidents";
-    navigate(from, { replace: true });
-    return null;
+    return <Navigate to={from} replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {

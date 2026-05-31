@@ -9,6 +9,7 @@ import {
   Moon,
   ChevronLeft,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAppStore } from "../../store/useAppStore";
@@ -48,6 +49,12 @@ function buildNavSections(incidentId: string): NavSection[] {
       items: [
         { path: `${base}/main-courante-operationnelle`, label: "Main courante", icon: FileText, permission: "MAIN_COURANTE_OPS" },
         { path: `${base}/timeline`, label: "Timeline", icon: Clock, permission: "TIMELINE" },
+      ],
+    },
+    {
+      title: "Système",
+      items: [
+        { path: `${base}/admin`, label: "Administration", icon: Settings, permission: "ADMIN" },
       ],
     },
   ];

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, X, Plus, Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, X, Plus, Loader2, Trash2, Download } from "lucide-react";
+import { exportXlsx } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
 import {
   TIMELINE_EVENTS_QUERY,
@@ -197,9 +198,10 @@ function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalPr
 // ── Page Timeline ─────────────────────────────────────────────────────────────
 
 export default function Timeline() {
-  const { incidentId } = useCurrentIncident();
+  const { incidentId, incident } = useCurrentIncident();
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("TIMELINE", "WRITE");
+  const [exporting, setExporting] = useState(false);
 
   const [filters, setFilters] = useState<Record<string, string>>({
     occurredAt: "",
@@ -376,15 +378,32 @@ export default function Timeline() {
           <h1 className="text-3xl mb-2 text-white">Timeline — Cellule opérationnelle</h1>
           <p className="text-gray-400">Chronologie détaillée des événements opérationnels</p>
         </div>
-        {canWrite && (
+        <div className="flex gap-2">
           <button
-            onClick={() => { setShowModal(true); setModalError(null); }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            onClick={async () => {
+              if (!incidentId || exporting) return;
+              setExporting(true);
+              try { await exportXlsx(incidentId, incident?.name ?? incidentId); }
+              catch (e) { alert(e instanceof Error ? e.message : "Erreur export"); }
+              finally { setExporting(false); }
+            }}
+            disabled={exporting}
+            className="flex items-center gap-2 bg-[#1e2229] hover:bg-[#2a2e39] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            title="Exporter le rapport complet en Excel"
           >
-            <Plus className="w-4 h-4" />
-            Ajouter un événement
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {exporting ? "Export…" : "Exporter Excel"}
           </button>
-        )}
+          {canWrite && (
+            <button
+              onClick={() => { setShowModal(true); setModalError(null); }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter un événement
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtres actifs */}

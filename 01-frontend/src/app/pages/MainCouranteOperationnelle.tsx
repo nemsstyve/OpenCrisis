@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Download, Plus, Clock, Tag, Filter, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { exportPdf } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
 import {
   LOG_ENTRIES_QUERY,
@@ -201,10 +202,11 @@ function EntryRow({
 // ── Page Main Courante Opérationnelle ─────────────────────────────────────────
 
 export default function MainCouranteOperationnelle() {
-  const { incidentId } = useCurrentIncident();
+  const { incidentId, incident } = useCurrentIncident();
   const currentUser = useAppStore((s) => s.currentUser);
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("MAIN_COURANTE_OPS", "WRITE");
+  const [exporting, setExporting] = useState(false);
 
   const [newEntry, setNewEntry] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -355,11 +357,19 @@ export default function MainCouranteOperationnelle() {
           <p className="text-gray-400">Journal des actions techniques et opérationnelles</p>
         </div>
         <button
-          title="Export indisponible — Phase 7"
-          className="flex items-center gap-2 bg-[#1e2229] text-white px-4 py-2 rounded-lg opacity-50 cursor-not-allowed"
+          onClick={async () => {
+            if (!incidentId || exporting) return;
+            setExporting(true);
+            try { await exportPdf(incidentId, incident?.name ?? incidentId); }
+            catch (e) { alert(e instanceof Error ? e.message : "Erreur export"); }
+            finally { setExporting(false); }
+          }}
+          disabled={exporting}
+          className="flex items-center gap-2 bg-[#1e2229] hover:bg-[#2a2e39] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+          title="Exporter la main courante en PDF"
         >
-          <Download className="w-4 h-4" />
-          Exporter
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {exporting ? "Export…" : "Exporter PDF"}
         </button>
       </div>
 

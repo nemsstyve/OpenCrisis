@@ -5,6 +5,7 @@ import { tagTypeDefs } from './tag';
 import { timelineTypeDefs } from './timeline';
 import { documentTypeDefs } from './document';
 import { contactTypeDefs } from './contact';
+import { adminTypeDefs } from './admin';
 
 // Base types — étendu par chaque module
 const baseTypeDefs = `#graphql
@@ -21,4 +22,5 @@ export const typeDefs = [
   timelineTypeDefs,
   documentTypeDefs,
   contactTypeDefs,
+  adminTypeDefs,
 ];

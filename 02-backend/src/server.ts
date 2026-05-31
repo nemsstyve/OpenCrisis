@@ -14,6 +14,7 @@ import { prisma } from './prisma';
 import { pubsub } from './pubsub';
 import { verifyAccessToken, extractBearerToken } from './middleware/auth';
 import filesRouter from './routes/files';
+import exportRouter from './routes/export';
 import type { GraphQLContext } from './context';
 
 const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
@@ -40,6 +41,7 @@ async function main() {
   });
 
   app.use('/files', filesRouter);
+  app.use('/export', exportRouter);
 
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 

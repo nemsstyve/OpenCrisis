@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Download, Plus, Clock, Tag, Filter, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { exportPdf } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
 import {
   LOG_ENTRIES_QUERY,
@@ -208,7 +209,7 @@ function EntryRow({
 // ── Page Main Courante Direction ──────────────────────────────────────────────
 
 export default function MainCouranteDirection() {
-  const { incidentId } = useCurrentIncident();
+  const { incidentId, incident } = useCurrentIncident();
   const currentUser = useAppStore((s) => s.currentUser);
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("MAIN_COURANTE_DIR", "WRITE");
@@ -219,6 +220,7 @@ export default function MainCouranteDirection() {
   const [submitting, setSubmitting] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [showNewTagInput, setShowNewTagInput] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const {
@@ -364,12 +366,19 @@ export default function MainCouranteDirection() {
           <p className="text-gray-400">Journal des décisions stratégiques et communications</p>
         </div>
         <button
-          onClick={() => {}}
-          title="Export indisponible — Phase 7"
-          className="flex items-center gap-2 bg-[#1e2229] hover:bg-[#2a2e39] text-white px-4 py-2 rounded-lg transition-colors opacity-50 cursor-not-allowed"
+          onClick={async () => {
+            if (!incidentId || exporting) return;
+            setExporting(true);
+            try { await exportPdf(incidentId, incident?.name ?? incidentId); }
+            catch (e) { alert(e instanceof Error ? e.message : "Erreur export"); }
+            finally { setExporting(false); }
+          }}
+          disabled={exporting}
+          className="flex items-center gap-2 bg-[#1e2229] hover:bg-[#2a2e39] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+          title="Exporter la main courante en PDF"
         >
-          <Download className="w-4 h-4" />
-          Exporter
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {exporting ? "Export…" : "Exporter PDF"}
         </button>
       </div>
 

@@ -1,0 +1,245 @@
+import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import PDFDocument from 'pdfkit';
+import ExcelJS from 'exceljs';
+import { prisma } from '../prisma';
+import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
+
+type AuthRequest = Request & { userId: string };
+
+const router = Router();
+
+function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = extractBearerToken(req.headers.authorization);
+  const payload = token ? verifyAccessToken(token) : null;
+  if (!payload) { res.status(401).json({ error: 'Non authentifié' }); return; }
+  (req as AuthRequest).userId = payload.userId;
+  next();
+}
+
+// ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────
+// Export de la main courante complète en PDF (toutes cellules, tri chronologique)
+
+router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
+  try {
+    const { incidentId } = req.params;
+
+    const [incident, entries] = await Promise.all([
+      prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
+      prisma.logEntry.findMany({
+        where: { incidentId, deletedAt: null },
+        include: {
+          author: { select: { firstName: true, lastName: true } },
+          tags: { include: { tag: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    if (!incident) { res.status(404).json({ error: 'Incident introuvable' }); return; }
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="main-courante-${incidentId.slice(0, 8)}.pdf"`,
+    );
+    doc.pipe(res);
+
+    // ── Entête ──
+    doc.font('Helvetica-Bold').fontSize(18).text('Main Courante — OpenCrisis', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(14).text(incident.name, { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).fillColor('#888888')
+      .text(`Statut : ${incident.status}  |  Sévérité : ${incident.severity}`, { align: 'center' });
+    doc.text(`Ouvert le : ${new Date(incident.startedAt).toLocaleString('fr-FR')}`, { align: 'center' });
+    doc.text(`Exporté le : ${new Date().toLocaleString('fr-FR')}`, { align: 'center' });
+    doc.fillColor('#000000');
+    doc.moveDown(0.8);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#333333').lineWidth(1).stroke();
+    doc.moveDown(0.8);
+
+    if (entries.length === 0) {
+      doc.font('Helvetica').fontSize(11).text('Aucune entrée dans la main courante.', { align: 'center' });
+    } else {
+      const CELL_LABELS: Record<string, string> = {
+        DIRECTIONAL: 'Cellule de Direction',
+        OPERATIONAL: 'Cellule Opérationnelle',
+        SHARED: 'Partagé',
+      };
+
+      for (const entry of entries) {
+        // Méta-ligne
+        const cell = CELL_LABELS[entry.cell] ?? entry.cell;
+        const ts = new Date(entry.createdAt).toLocaleString('fr-FR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+        const author = `${entry.author.firstName} ${entry.author.lastName}`;
+
+        doc.font('Helvetica').fontSize(8.5).fillColor('#666666')
+          .text(`${ts}  •  ${author}  •  ${cell}`, { continued: false });
+
+        if (entry.tags.length > 0) {
+          const tagStr = entry.tags.map((t) => t.tag.name).join(', ');
+          doc.fontSize(8).text(`Tags : ${tagStr}`);
+        }
+
+        doc.moveDown(0.1);
+        doc.font('Helvetica').fontSize(10.5).fillColor('#111111').text(entry.content);
+
+        doc.moveDown(0.4);
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+        doc.moveDown(0.4);
+      }
+    }
+
+    // Pied de page
+    const totalPages = doc.bufferedPageRange ? doc.bufferedPageRange().count : 1;
+    doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
+      .text(`OpenCrisis — ${entries.length} entrée${entries.length > 1 ? 's' : ''}  |  Page 1/${totalPages}`, 50, 790, { align: 'center' });
+
+    doc.end();
+  } catch (err) {
+    console.error('[export/pdf]', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+  }
+});
+
+// ─── GET /api/export/:incidentId/xlsx ─────────────────────────────────────────
+// Export complet de l'incident en Excel (3 feuilles : résumé, main courante, timeline)
+
+router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
+  try {
+    const { incidentId } = req.params;
+
+    const [incident, entries, timelineEvents] = await Promise.all([
+      prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
+      prisma.logEntry.findMany({
+        where: { incidentId, deletedAt: null },
+        include: {
+          author: { select: { firstName: true, lastName: true } },
+          tags: { include: { tag: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.timelineEvent.findMany({
+        where: { incidentId },
+        include: { actor: { select: { firstName: true, lastName: true } } },
+        orderBy: { occurredAt: 'asc' },
+      }),
+    ]);
+
+    if (!incident) { res.status(404).json({ error: 'Incident introuvable' }); return; }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'OpenCrisis';
+    workbook.created = new Date();
+
+    // ── Feuille 1 : Résumé incident ──
+    const infoSheet = workbook.addWorksheet('Incident');
+    infoSheet.columns = [
+      { key: 'label', width: 25 },
+      { key: 'value', width: 60 },
+    ];
+    infoSheet.getColumn('label').font = { bold: true };
+    infoSheet.addRows([
+      { label: 'Nom', value: incident.name },
+      { label: 'Description', value: incident.description ?? '' },
+      { label: 'Statut', value: incident.status },
+      { label: 'Sévérité', value: incident.severity },
+      { label: 'Ouvert le', value: new Date(incident.startedAt).toLocaleString('fr-FR') },
+      { label: 'Clos le', value: incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString('fr-FR') : '' },
+      { label: 'Exporté le', value: new Date().toLocaleString('fr-FR') },
+    ]);
+
+    // ── Feuille 2 : Main Courante ──
+    const logSheet = workbook.addWorksheet('Main Courante');
+    logSheet.columns = [
+      { header: 'Horodatage', key: 'createdAt', width: 22 },
+      { header: 'Auteur', key: 'author', width: 26 },
+      { header: 'Cellule', key: 'cell', width: 22 },
+      { header: 'Contenu', key: 'content', width: 70 },
+      { header: 'Tags', key: 'tags', width: 28 },
+      { header: 'Modifié', key: 'isEdited', width: 10 },
+    ];
+    const logHeader = logSheet.getRow(1);
+    logHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    logHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+
+    const CELL_LABELS: Record<string, string> = {
+      DIRECTIONAL: 'Direction',
+      OPERATIONAL: 'Opérationnelle',
+      SHARED: 'Partagé',
+    };
+
+    for (const entry of entries) {
+      const row = logSheet.addRow({
+        createdAt: new Date(entry.createdAt).toLocaleString('fr-FR'),
+        author: `${entry.author.firstName} ${entry.author.lastName}`,
+        cell: CELL_LABELS[entry.cell] ?? entry.cell,
+        content: entry.content,
+        tags: entry.tags.map((t) => t.tag.name).join(', '),
+        isEdited: entry.isEdited ? 'Oui' : 'Non',
+      });
+      row.getCell('content').alignment = { wrapText: true, vertical: 'top' };
+    }
+
+    // ── Feuille 3 : Timeline ──
+    const tlSheet = workbook.addWorksheet('Timeline');
+    tlSheet.columns = [
+      { header: 'Date / Heure', key: 'occurredAt', width: 22 },
+      { header: 'Type', key: 'type', width: 16 },
+      { header: 'Titre', key: 'title', width: 42 },
+      { header: 'Description', key: 'description', width: 55 },
+      { header: 'Acteur', key: 'actor', width: 26 },
+      { header: 'Asset', key: 'assetName', width: 20 },
+      { header: 'Adresse IP', key: 'ipAddress', width: 16 },
+      { header: 'Utilisateur affecté', key: 'affectedUser', width: 28 },
+    ];
+    const tlHeader = tlSheet.getRow(1);
+    tlHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    tlHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6D28D9' } };
+
+    const TYPE_LABELS: Record<string, string> = {
+      DETECTION: 'Détection',
+      ACTION: 'Action',
+      DECISION: 'Décision',
+      COMMUNICATION: 'Communication',
+      ESCALATION: 'Escalade',
+      RESOLUTION: 'Résolution',
+    };
+
+    for (const event of timelineEvents) {
+      tlSheet.addRow({
+        occurredAt: new Date(event.occurredAt).toLocaleString('fr-FR'),
+        type: TYPE_LABELS[event.type] ?? event.type,
+        title: event.title,
+        description: event.description ?? '',
+        actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
+        assetName: event.assetName ?? '',
+        ipAddress: event.ipAddress ?? '',
+        affectedUser: event.affectedUser ?? '',
+      });
+    }
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="rapport-${incidentId.slice(0, 8)}.xlsx"`,
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[export/xlsx]', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la génération Excel' });
+  }
+});
+
+export default router;

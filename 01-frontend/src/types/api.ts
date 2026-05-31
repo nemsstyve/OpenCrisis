@@ -114,6 +114,59 @@ export interface GqlDocument {
   createdAt: string;
 }
 
+// ── Administration ────────────────────────────────────────────────────────────
+
+export interface GqlPermission2 {
+  id: string;
+  resource: string;
+  action: string;
+}
+
+export interface GqlRoleDetail {
+  id: string;
+  name: string;
+  description?: string | null;
+  isSystem: boolean;
+  permissions: GqlPermission2[];
+}
+
+export interface GqlAdminUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  company?: string | null;
+  site?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  roles: { id: string; name: string; isSystem: boolean }[];
+}
+
+export interface GqlAuditLogUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface GqlAuditLogEntry {
+  id: string;
+  user?: GqlAuditLogUser | null;
+  action: string;
+  resource: string;
+  resourceId?: string | null;
+  incidentId?: string | null;
+  metadata?: string | null;
+  ipAddress?: string | null;
+  createdAt: string;
+}
+
+export interface GqlAuditLogPage {
+  items: GqlAuditLogEntry[];
+  total: number;
+}
+
 // ── Contact ───────────────────────────────────────────────────────────────────
 export interface GqlContact {
   id: string;

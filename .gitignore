@@ -5,22 +5,22 @@
 
 # ─── DÉPENDANCES ──────────────────────────────────────────────────────────────
 node_modules/
-frontend/node_modules/
-backend/node_modules/
 
 # ─── BUILD ────────────────────────────────────────────────────────────────────
-frontend/dist/
-backend/dist/
+dist/
+
+# ─── PNPM ─────────────────────────────────────────────────────────────────────
+.pnpm-store/
 
 # ─── PRISMA ───────────────────────────────────────────────────────────────────
-backend/prisma/migrations/*/migration.sql
+02-backend/prisma/migrations/*/migration.sql
 # Ne pas ignorer le dossier migrations lui-même (versionné)
 
 # ─── GRAPHQL CODEGEN ──────────────────────────────────────────────────────────
-frontend/src/types/generated.ts
+01-frontend/src/types/generated.ts
 
 # ─── UPLOADS (fichiers utilisateurs) ──────────────────────────────────────────
-backend/uploads/
+02-backend/uploads/
 
 # ─── OS & IDE ─────────────────────────────────────────────────────────────────
 .DS_Store

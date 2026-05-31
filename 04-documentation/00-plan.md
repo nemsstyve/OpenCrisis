@@ -566,10 +566,12 @@ opencrisis/
 - Timeline : table filtrée + subscription (timelineEventAdded) + modal création
 - Bibliothèque : deux onglets (global/incident) + upload REST + download JWT + subscription documentUploaded
 
-### Phase 7 — Fonctionnalités transverses
-- Page Administration (users, rôles, permissions, audit log viewer)
-- Export PDF via `pdfkit`
-- Export Excel via `exceljs`
+### ✅ Phase 7 — Fonctionnalités transverses *(terminée)*
+- Page Administration (3 onglets : Utilisateurs CRUD + reset mdp, Rôles & Permissions avec matrice éditable, Journal d'audit paginé)
+- Export PDF via `pdfkit` — GET /api/export/:id/pdf — main courante complète triée chronologiquement
+- Export Excel via `exceljs` — GET /api/export/:id/xlsx — 3 feuilles : résumé incident, main courante, timeline
+- Boutons Export câblés sur Main Courante (PDF) et Timeline (Excel)
+- Lien Administration dans sidebar (permission ADMIN uniquement)
 
 ---
 

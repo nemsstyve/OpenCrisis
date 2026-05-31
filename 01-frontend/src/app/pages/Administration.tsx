@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ComponentType } from "react";
+import type { ChangeEvent, ComponentType, FormEvent } from "react";
 import {
   Users, Shield, ScrollText, Plus, Pencil, Trash2,
   Loader2, X, Key, Check, ChevronLeft, ChevronRight,
@@ -13,7 +13,7 @@ import {
 } from "../../graphql/admin";
 import { useAppStore } from "../../store/useAppStore";
 import type {
-  GqlAdminUser, GqlRoleDetail, GqlPermission2, GqlAuditLogPage, GqlAuditLogEntry,
+  GqlAdminUser, GqlRoleDetail, GqlAdminPermission, GqlAuditLogPage, GqlAuditLogEntry,
 } from "../../types/api";
 
 type Tab = "users" | "roles" | "audit";
@@ -71,12 +71,12 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
   function field(key: keyof typeof form) {
     return {
       value: String(form[key]),
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      onChange: (e: ChangeEvent<HTMLInputElement>) =>
         setForm((p) => ({ ...p, [key]: e.target.value })),
     };
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
@@ -376,7 +376,7 @@ function RolesTab() {
   const { data: rolesData, loading: rolesLoading } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY, {
     fetchPolicy: "cache-and-network",
   });
-  const { data: permsData } = useQuery<{ adminPermissions: GqlPermission2[] }>(ADMIN_PERMISSIONS_QUERY);
+  const { data: permsData } = useQuery<{ adminPermissions: GqlAdminPermission[] }>(ADMIN_PERMISSIONS_QUERY);
 
   const [deleteRole] = useMutation<{ adminDeleteRole: boolean }, { id: string }>(ADMIN_DELETE_ROLE_MUTATION, {
     update(cache, _, { variables }) {
@@ -396,7 +396,7 @@ function RolesTab() {
   const allPerms = permsData?.adminPermissions ?? [];
 
   // Group permissions by resource for the permission matrix
-  const byResource = allPerms.reduce<Record<string, GqlPermission2[]>>((acc, p) => {
+  const byResource = allPerms.reduce<Record<string, GqlAdminPermission[]>>((acc, p) => {
     (acc[p.resource] ??= []).push(p);
     return acc;
   }, {});
@@ -417,7 +417,7 @@ function RolesTab() {
     }
   }
 
-  async function handleCreateRole(e: React.FormEvent) {
+  async function handleCreateRole(e: FormEvent) {
     e.preventDefault();
     if (!newRoleName.trim()) return;
     setSaving(true);

@@ -585,3 +585,57 @@ Données test corrompues (terminaux cp1252 → bytes invalides pour UTF-8) corri
 - [x] **A03** — Aucun `$queryRaw`/SQL brut ; React échappe tout le JSX ; tag XSS supprimé ✅
 - [x] **A07** — Inchangé depuis Phase 3 ✅
 - [x] **A09** — CREATE MAIN_COURANTE + TAG_ADD tracés dans AuditLog ✅
+
+---
+
+## Checklist de validation Phase 7
+
+Phase 7 — Fonctionnalités transverses : page Administration (CRUD users/rôles/permissions + audit log) et export PDF/Excel.
+
+### Nouveaux fichiers backend
+
+| Fichier | Rôle |
+|---|---|
+| `src/schema/admin.ts` | Types GraphQL : AuditLogEntry, RoleDetail, Permission + 9 queries/mutations admin |
+| `src/services/admin.ts` | Logique métier : CRUD users (bcrypt 12), CRUD rôles, transactions, audit log paginé |
+| `src/resolvers/admin.ts` | Resolvers avec `requirePermission(ADMIN, READ/WRITE)` + logAudit sur chaque mutation |
+| `src/routes/export.ts` | GET /api/export/:id/pdf (pdfkit) + GET /api/export/:id/xlsx (exceljs, 3 feuilles) |
+| `package.json` | pdfkit@0.15 + exceljs@4.4 ajoutés |
+
+### Nouveaux fichiers frontend
+
+| Fichier | Rôle |
+|---|---|
+| `src/app/pages/Administration.tsx` | Page admin 3 onglets : Utilisateurs, Rôles & Permissions, Journal d'audit |
+| `src/graphql/admin.ts` | 12 queries/mutations GraphQL admin |
+| `src/lib/exportUtils.ts` | exportPdf() + exportXlsx() via fetch + JWT Bearer |
+| `src/app/components/Sidebar.tsx` | Lien "Administration" gated sur permission ADMIN |
+| `src/app/routes.ts` | Route /admin ajoutée |
+
+### Tests fonctionnels effectués
+
+- [x] adminUsers : 1 utilisateur (admin@opencrisis.local, Administrateur, Actif) ✅
+- [x] adminRoles : 5 rôles système avec permissions complètes ✅
+- [x] adminAuditLogs : 60 entrées paginées (25/page) ✅
+- [x] adminCreateUser + adminDeleteUser : cycle complet ✅
+- [x] Export PDF GET /api/export/:id/pdf → HTTP 200 ✅
+- [x] Export Excel GET /api/export/:id/xlsx → HTTP 200 ✅
+- [x] Bouton "Exporter PDF" sur Main Courante → téléchargement déclenché ✅
+- [x] Bouton "Exporter Excel" sur Timeline → câblé ✅
+- [x] TypeScript : FRONTEND_OK + BACKEND_OK (0 erreur) ✅
+
+### Qualité
+
+- [x] `adminUserResolvers` (code mort) supprimé de resolvers/admin.ts ✅
+- [x] `GqlPermission2` renommé en `GqlAdminPermission` ✅
+- [x] `React.ChangeEvent` / `React.FormEvent` remplacés par imports explicites ✅
+- [x] `flattenPermissions` et `UserWithRoles` inutilisés supprimés de admin.ts ✅
+
+### OWASP
+
+- [x] **A01** — adminDeleteUser sur soi-même → "Vous ne pouvez pas supprimer votre propre compte" ✅
+- [x] **A01** — adminUpdateUser sur soi-même → interdit (guard) ✅
+- [x] **A01** — export REST sans token → HTTP 401 ✅
+- [x] **A01** — queries admin sans token → "Non authentifié" ✅
+- [x] **A03** — aucun `$queryRaw`, bcrypt 12 rounds pour création/reset password ✅
+- [x] **A09** — CREATE/DELETE ADMIN tracés dans AuditLog avec metadata ✅

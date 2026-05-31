@@ -2,7 +2,6 @@ import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
 import { requirePermission } from '../middleware/rbac';
 import { logAudit } from '../middleware/audit';
-import type { UserWithRoles } from '../services/auth';
 import * as adminService from '../services/admin';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -19,21 +18,6 @@ function mapRoleDetail(role: RoleRow) {
   };
 }
 
-// Shared User field resolvers (reused from auth resolvers)
-function flattenPermissions(user: UserWithRoles) {
-  const seen = new Set<string>();
-  const result: { resource: string; action: string }[] = [];
-  for (const ra of user.roleAssignments) {
-    for (const rp of ra.role.permissions) {
-      const key = `${rp.permission.resource}:${rp.permission.action}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push({ resource: rp.permission.resource, action: rp.permission.action });
-      }
-    }
-  }
-  return result;
-}
 
 // ── Resolvers ─────────────────────────────────────────────────────────────────
 
@@ -171,13 +155,6 @@ export const adminResolvers = {
     },
   },
 
-  // User field resolvers needed for admin queries (same as auth resolvers)
-  // These are registered at the top level and apply to all User objects
 };
-
-// Exported separately so they can be merged
-export const adminUserResolvers = {
-  roles: (parent: UserWithRoles) => parent.roleAssignments.map((ra) => ra.role),
-  permissions: (parent: UserWithRoles) => flattenPermissions(parent),
-  createdAt: (parent: UserWithRoles) => parent.createdAt.toISOString(),
-};
+// Note: User field resolvers (roles, permissions, createdAt) are handled
+// by authResolvers.User and apply globally to all User objects in the schema.

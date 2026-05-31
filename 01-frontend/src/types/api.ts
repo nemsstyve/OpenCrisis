@@ -116,7 +116,7 @@ export interface GqlDocument {
 
 // ── Administration ────────────────────────────────────────────────────────────
 
-export interface GqlPermission2 {
+export interface GqlAdminPermission {
   id: string;
   resource: string;
   action: string;
@@ -127,7 +127,7 @@ export interface GqlRoleDetail {
   name: string;
   description?: string | null;
   isSystem: boolean;
-  permissions: GqlPermission2[];
+  permissions: GqlAdminPermission[];
 }
 
 export interface GqlAdminUser {

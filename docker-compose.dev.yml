@@ -1,0 +1,30 @@
+# Surcharge pour le développement local
+# Usage : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# En dev :
+#   - postgres et redis démarrent normalement
+#   - nginx, frontend et backend sont désactivés
+#   - frontend tourne avec "pnpm dev" (HMR Vite)
+#   - backend tourne avec "npm run dev" (nodemon)
+#   Les deux sont lancés directement sur le host, pas dans Docker
+
+services:
+  nginx:
+    profiles:
+      - donotstart
+
+  frontend:
+    profiles:
+      - donotstart
+
+  backend:
+    profiles:
+      - donotstart
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"

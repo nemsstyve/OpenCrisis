@@ -1,0 +1,373 @@
+﻿type Query
+type Mutation
+
+type UserPermission {
+    resource: String!
+    action: String!
+  }
+
+  type Role {
+    id: ID!
+    name: String!
+    description: String
+    isSystem: Boolean!
+  }
+
+  type User {
+    id: ID!
+    email: String!
+    firstName: String!
+    lastName: String!
+    phone: String
+    company: String
+    site: String
+    isActive: Boolean!
+    mustChangePassword: Boolean!
+    createdAt: String!
+    roles: [Role!]!
+    permissions: [UserPermission!]!
+  }
+
+  type AuthPayload {
+    accessToken: String!
+    user: User!
+  }
+
+  extend type Query {
+    me: User
+  }
+
+  extend type Mutation {
+    login(email: String!, password: String!): AuthPayload!
+    logout: Boolean!
+    refreshToken: AuthPayload!
+    changePassword(currentPassword: String!, newPassword: String!): Boolean!
+  }
+
+enum IncidentStatus { ACTIVE CONTAINED CLOSED }
+  enum Severity { LOW MEDIUM HIGH CRITICAL }
+
+  type Incident {
+    id: ID!
+    name: String!
+    description: String
+    status: IncidentStatus!
+    severity: Severity!
+    startedAt: String!
+    resolvedAt: String
+    createdBy: User!
+    openctiCaseId: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  input CreateIncidentInput {
+    name: String!
+    description: String
+    severity: Severity
+  }
+
+  input UpdateIncidentInput {
+    name: String
+    description: String
+    status: IncidentStatus
+    severity: Severity
+  }
+
+  extend type Query {
+    incidents: [Incident!]!
+    incident(id: ID!): Incident
+  }
+
+  extend type Mutation {
+    createIncident(input: CreateIncidentInput!): Incident!
+    updateIncident(id: ID!, input: UpdateIncidentInput!): Incident!
+    deleteIncident(id: ID!): Boolean!
+  }
+
+  type Subscription {
+    incidentCreated: Incident!
+    incidentStatusChanged(incidentId: ID!): Incident!
+  }
+
+enum Cell { DIRECTIONAL OPERATIONAL SHARED }
+
+  type LogEntry {
+    id: ID!
+    incidentId: ID!
+    cell: Cell!
+    content: String!
+    author: User!
+    isEdited: Boolean!
+    editedAt: String
+    createdAt: String!
+    updatedAt: String!
+    tags: [Tag!]!
+  }
+
+  extend type Query {
+    logEntries(incidentId: ID!, cell: Cell): [LogEntry!]!
+  }
+
+  extend type Mutation {
+    createLogEntry(incidentId: ID!, cell: Cell!, content: String!): LogEntry!
+    editLogEntry(id: ID!, content: String!): LogEntry!
+    deleteLogEntry(id: ID!): Boolean!
+    addTagToLogEntry(logEntryId: ID!, tagId: ID!): LogEntry!
+    removeTagFromLogEntry(logEntryId: ID!, tagId: ID!): LogEntry!
+  }
+
+  extend type Subscription {
+    logEntryAdded(incidentId: ID!, cell: Cell): LogEntry!
+    logEntryUpdated(incidentId: ID!, cell: Cell): LogEntry!
+  }
+
+type Tag {
+    id: ID!
+    name: String!
+    color: String!
+  }
+
+  extend type Query {
+    tags: [Tag!]!
+  }
+
+  extend type Mutation {
+    createTag(name: String!, color: String): Tag!
+    deleteTag(id: ID!): Boolean!
+  }
+
+enum TimelineEventType {
+    DETECTION
+    ACTION
+    DECISION
+    COMMUNICATION
+    ESCALATION
+    RESOLUTION
+  }
+
+  type TimelineEvent {
+    id: ID!
+    incidentId: ID!
+    type: TimelineEventType!
+    title: String!
+    description: String
+    occurredAt: String!
+    actor: User
+    ipAddress: String
+    assetName: String
+    affectedUser: String
+    openctiEntityId: String
+    openctiEntityType: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  input CreateTimelineEventInput {
+    type: TimelineEventType!
+    title: String!
+    description: String
+    occurredAt: String!
+    actorId: ID
+    ipAddress: String
+    assetName: String
+    affectedUser: String
+  }
+
+  input UpdateTimelineEventInput {
+    type: TimelineEventType
+    title: String
+    description: String
+    occurredAt: String
+    ipAddress: String
+    assetName: String
+    affectedUser: String
+  }
+
+  extend type Query {
+    timelineEvents(incidentId: ID!): [TimelineEvent!]!
+    timelineEvent(id: ID!): TimelineEvent
+  }
+
+  extend type Mutation {
+    createTimelineEvent(incidentId: ID!, input: CreateTimelineEventInput!): TimelineEvent!
+    updateTimelineEvent(id: ID!, input: UpdateTimelineEventInput!): TimelineEvent!
+    deleteTimelineEvent(id: ID!): Boolean!
+  }
+
+  extend type Subscription {
+    timelineEventAdded(incidentId: ID!): TimelineEvent!
+  }
+
+enum DocumentCategory { ARTIFACT FICHE_REFLEXE RAPPORT PROCEDURE OTHER }
+
+  type Document {
+    id: ID!
+    incidentId: ID
+    timelineEventId: ID
+    name: String!
+    mimeType: String!
+    sizeBytes: Int!
+    category: DocumentCategory!
+    uploadedBy: User!
+    createdAt: String!
+  }
+
+  extend type Query {
+    documents(incidentId: ID, category: DocumentCategory): [Document!]!
+    document(id: ID!): Document
+  }
+
+  extend type Mutation {
+    deleteDocument(id: ID!): Boolean!
+  }
+
+  extend type Subscription {
+    documentUploaded(incidentId: ID!): Document!
+  }
+
+type Contact {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    role: String!
+    organization: String
+    phone: String
+    email: String
+    site: String
+    notes: String
+    isGlobal: Boolean!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  input CreateContactInput {
+    firstName: String!
+    lastName: String!
+    role: String!
+    organization: String
+    phone: String
+    email: String
+    site: String
+    notes: String
+    isGlobal: Boolean
+  }
+
+  input UpdateContactInput {
+    firstName: String
+    lastName: String
+    role: String
+    organization: String
+    phone: String
+    email: String
+    site: String
+    notes: String
+  }
+
+  extend type Query {
+    contacts(incidentId: ID): [Contact!]!
+    contact(id: ID!): Contact
+  }
+
+  extend type Mutation {
+    createContact(input: CreateContactInput!, incidentId: ID): Contact!
+    updateContact(id: ID!, input: UpdateContactInput!): Contact!
+    deleteContact(id: ID!): Boolean!
+    linkContactToIncident(contactId: ID!, incidentId: ID!): Boolean!
+    unlinkContactFromIncident(contactId: ID!, incidentId: ID!): Boolean!
+  }
+
+# â”€â”€ Types spÃ©cifiques Ã  l'administration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  # User lÃ©ger pour les logs d'audit (sans roles/permissions pour Ã©viter N+1)
+  type AuditLogUser {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    email: String!
+  }
+
+  type AuditLogEntry {
+    id: ID!
+    user: AuditLogUser
+    action: String!
+    resource: String!
+    resourceId: String
+    incidentId: String
+    metadata: String
+    ipAddress: String
+    createdAt: String!
+  }
+
+  type AuditLogPage {
+    items: [AuditLogEntry!]!
+    total: Int!
+  }
+
+  # RÃ´le enrichi de ses permissions (pour l'admin uniquement)
+  type RoleDetail {
+    id: ID!
+    name: String!
+    description: String
+    isSystem: Boolean!
+    permissions: [Permission!]!
+  }
+
+  # Permission (resource + action)
+  type Permission {
+    id: ID!
+    resource: String!
+    action: String!
+  }
+
+  # â”€â”€ Inputs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  input AdminCreateUserInput {
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String!
+    phone: String
+    company: String
+    site: String
+  }
+
+  input AdminUpdateUserInput {
+    firstName: String
+    lastName: String
+    phone: String
+    company: String
+    site: String
+    isActive: Boolean
+  }
+
+  input AdminCreateRoleInput {
+    name: String!
+    description: String
+    permissionIds: [ID!]!
+  }
+
+  # â”€â”€ Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  extend type Query {
+    adminUsers: [User!]!
+    adminRoles: [RoleDetail!]!
+    adminPermissions: [Permission!]!
+    adminAuditLogs(incidentId: ID, limit: Int, offset: Int): AuditLogPage!
+  }
+
+  # â”€â”€ Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  extend type Mutation {
+    adminCreateUser(input: AdminCreateUserInput!, roleIds: [ID!]): User!
+    adminUpdateUser(id: ID!, input: AdminUpdateUserInput!): User!
+    adminDeleteUser(id: ID!): Boolean!
+    adminAssignRole(userId: ID!, roleId: ID!): Boolean!
+    adminRemoveRole(userId: ID!, roleId: ID!): Boolean!
+    adminCreateRole(input: AdminCreateRoleInput!): RoleDetail!
+    adminDeleteRole(id: ID!): Boolean!
+    adminUpdateRolePermissions(roleId: ID!, permissionIds: [ID!]!): RoleDetail!
+    adminResetPassword(userId: ID!, newPassword: String!): Boolean!
+  }
+
+

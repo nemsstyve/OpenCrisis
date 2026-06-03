@@ -16,6 +16,7 @@ export interface GqlUser {
   email: string;
   firstName: string;
   lastName: string;
+  mustChangePassword: boolean;
   roles: GqlRole[];
   permissions: GqlPermission[];
 }

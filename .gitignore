@@ -13,8 +13,8 @@ dist/
 .pnpm-store/
 
 # ─── PRISMA ───────────────────────────────────────────────────────────────────
-02-backend/prisma/migrations/*/migration.sql
-# Ne pas ignorer le dossier migrations lui-même (versionné)
+# Les migration.sql DOIVENT être versionnées — prisma migrate deploy en a besoin en CI/prod
+# (Q8 audit 2026-05-31 : bug corrigé le 2026-06-03)
 
 # ─── GRAPHQL CODEGEN ──────────────────────────────────────────────────────────
 01-frontend/src/types/generated.ts
@@ -40,4 +40,3 @@ pnpm-debug.log*
 
 # ─── Autres ──────────────────────────────────────────────────────────────────
 .claude/
-CLAUDE.md

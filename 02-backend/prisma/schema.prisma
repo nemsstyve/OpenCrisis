@@ -19,10 +19,11 @@ model User {
   phone        String?
   company      String?
   site         String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  isActive            Boolean   @default(true)
+  mustChangePassword  Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   roleAssignments RoleAssignment[]
   logEntries      LogEntry[]

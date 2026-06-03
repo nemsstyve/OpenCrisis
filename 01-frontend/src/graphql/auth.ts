@@ -6,8 +6,15 @@ export const USER_FIELDS = gql`
     email
     firstName
     lastName
+    mustChangePassword
     roles { name }
     permissions { resource action }
+  }
+`;
+
+export const CHANGE_PASSWORD_MUTATION = gql`
+  mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+    changePassword(currentPassword: $currentPassword, newPassword: $newPassword)
   }
 `;
 

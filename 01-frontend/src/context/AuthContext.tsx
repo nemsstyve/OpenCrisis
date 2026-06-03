@@ -18,7 +18,7 @@ import type { GqlUser } from "../types/api";
 interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<GqlUser>;
   logout: () => Promise<void>;
 }
 
@@ -51,15 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function login(email: string, password: string): Promise<void> {
+  async function login(email: string, password: string): Promise<GqlUser> {
     const { data } = await apolloClient.mutate({
       mutation: LOGIN_MUTATION,
       variables: { email, password },
       fetchPolicy: "no-cache",
     });
     if (!data?.login) throw new Error("Réponse invalide du serveur");
+    const user = data.login.user as GqlUser;
     tokenStore.set(data.login.accessToken);
-    setCurrentUser(data.login.user as GqlUser);
+    setCurrentUser(user);
+    return user;
   }
 
   async function logout(): Promise<void> {

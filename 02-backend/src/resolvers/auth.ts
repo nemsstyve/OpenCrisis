@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
 import type { UserWithRoles } from '../services/auth';
-import { login, logout, rotateRefreshToken, getMe } from '../services/auth';
+import { login, logout, rotateRefreshToken, getMe, changePassword } from '../services/auth';
 
 function flattenPermissions(user: UserWithRoles) {
   const seen = new Set<string>();
@@ -55,11 +55,23 @@ export const authResolvers = {
       }
       return rotateRefreshToken(token, ctx.res);
     },
+
+    changePassword: async (
+      _: unknown,
+      { currentPassword, newPassword }: { currentPassword: string; newPassword: string },
+      ctx: GraphQLContext,
+    ) => {
+      if (!ctx.userId) {
+        throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      return changePassword(ctx.userId, currentPassword, newPassword, ctx.req?.ip);
+    },
   },
 
   User: {
     roles: (parent: UserWithRoles) => parent.roleAssignments.map(ra => ra.role),
     permissions: (parent: UserWithRoles) => flattenPermissions(parent),
+    mustChangePassword: (parent: UserWithRoles) => parent.mustChangePassword,
     createdAt: (parent: UserWithRoles) => parent.createdAt.toISOString(),
   },
 };

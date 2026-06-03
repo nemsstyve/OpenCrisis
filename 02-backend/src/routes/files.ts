@@ -5,17 +5,16 @@ import path from 'path';
 import fs from 'fs/promises';
 import type { DocumentCategory } from '@prisma/client';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
+import { requireHttpPermission, type AuthRequest } from '../middleware/httpPermission';
 import { createDocument, getDocument, UPLOADS_DIR } from '../services/document';
-
-type AuthRequest = Request & { userId: string };
+import { prisma } from '../prisma';
 
 const router = Router();
 
-// ─── Multer — stockage sur disque ─────────────────────────────────────────────
+// ─── Multer — stockage temporaire sur disque ──────────────────────────────────
+// Le fichier est d'abord écrit dans tmp/, puis déplacé vers le bon dossier cible
+// une fois que req.body (incidentId, category…) est disponible.
 
-// Les fichiers sont d'abord écrits dans un dossier temporaire.
-// Le gestionnaire de route les déplace ensuite dans le bon dossier
-// (incidents/:id/ ou global/) une fois que req.body est disponible.
 const TEMP_DIR = path.join(UPLOADS_DIR, 'tmp');
 
 const storage = multer.diskStorage({
@@ -34,7 +33,7 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 Mo
 });
 
-// ─── Auth middleware ───────────────────────────────────────────────────────────
+// ─── Middleware d'authentification ────────────────────────────────────────────
 
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const token = extractBearerToken(req.headers.authorization);
@@ -49,7 +48,12 @@ function requireAuth(req: Request, res: Response, next: NextFunction): void {
 
 // ─── POST /api/files/upload ───────────────────────────────────────────────────
 
-router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
+router.post('/upload', requireAuth, async (req, res, next) => {
+  // B2 — vérifier DOCUMENTS:WRITE avant d'accepter le fichier
+  const allowed = await requireHttpPermission(req as AuthRequest, res, 'DOCUMENTS', 'WRITE');
+  if (!allowed) return;
+  next();
+}, upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) { res.status(400).json({ error: 'Fichier manquant' }); return; }
@@ -59,7 +63,20 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
     const timelineEventId = req.body?.timelineEventId as string | undefined;
     const category = (req.body?.category as DocumentCategory | undefined) ?? 'OTHER';
 
-    // Déplacer le fichier du dossier tmp vers le bon dossier cible
+    // B1 — valider que l'incidentId existe avant d'écrire sur disque
+    if (incidentId) {
+      const incident = await prisma.incident.findFirst({
+        where: { id: incidentId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!incident) {
+        await fs.unlink(file.path).catch(() => undefined);
+        res.status(400).json({ error: 'Incident introuvable' });
+        return;
+      }
+    }
+
+    // Déplacer vers le dossier cible
     const targetDir = incidentId
       ? path.join(UPLOADS_DIR, 'incidents', incidentId)
       : path.join(UPLOADS_DIR, 'global');
@@ -91,12 +108,16 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
 
 router.get('/:id', requireAuth, async (req, res) => {
   try {
+    // A2 — vérifier DOCUMENTS:READ avant de servir le fichier
+    const allowed = await requireHttpPermission(req as AuthRequest, res, 'DOCUMENTS', 'READ');
+    if (!allowed) return;
+
     const doc = await getDocument(req.params.id);
     const filePath = path.join(UPLOADS_DIR, doc.filePath);
     res.setHeader('Content-Type', doc.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.name)}"`);
     res.sendFile(filePath);
-  } catch (err) {
+  } catch {
     res.status(404).json({ error: 'Document introuvable' });
   }
 });

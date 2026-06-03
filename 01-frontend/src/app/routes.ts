@@ -2,6 +2,7 @@ import { createBrowserRouter, redirect } from "react-router";
 import RootLayout from "./layouts/RootLayout";
 import ProtectedOutlet from "./components/ProtectedOutlet";
 import Login from "./pages/Login";
+import ChangePassword from "./pages/ChangePassword";
 import IncidentSelector from "./pages/IncidentSelector";
 import Dashboard from "./pages/Dashboard";
 import Annuaire from "./pages/Annuaire";
@@ -20,6 +21,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/change-password",
+    Component: ChangePassword,
   },
   // ─── Routes protégées ──────────────────────────────────────────────────────
   {

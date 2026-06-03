@@ -1,12 +1,14 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { useAppStore } from "../../store/useAppStore";
 
 /**
- * Route parente protégée : redirige vers /login si non authentifié.
- * Utilisé comme layout englobant toutes les routes qui nécessitent une session.
+ * Route parente protégée : redirige vers /login si non authentifié,
+ * ou vers /change-password si le changement de mot de passe est requis.
  */
 export default function ProtectedOutlet() {
   const { isAuthenticated, isLoading } = useAuth();
+  const currentUser = useAppStore((s) => s.currentUser);
   const location = useLocation();
 
   if (isLoading) {
@@ -22,6 +24,11 @@ export default function ProtectedOutlet() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  // C3 — forcer le changement de mot de passe avant tout accès
+  if (currentUser?.mustChangePassword && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
   }
 
   return <Outlet />;

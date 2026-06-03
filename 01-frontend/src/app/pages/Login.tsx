@@ -25,7 +25,11 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
+      if (user.mustChangePassword) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
       const from = (location.state as { from?: string })?.from ?? "/incidents";
       navigate(from, { replace: true });
     } catch (err: unknown) {

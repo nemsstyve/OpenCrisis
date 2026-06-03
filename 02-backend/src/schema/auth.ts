@@ -20,6 +20,7 @@ export const authTypeDefs = `#graphql
     company: String
     site: String
     isActive: Boolean!
+    mustChangePassword: Boolean!
     createdAt: String!
     roles: [Role!]!
     permissions: [UserPermission!]!
@@ -38,5 +39,6 @@ export const authTypeDefs = `#graphql
     login(email: String!, password: String!): AuthPayload!
     logout: Boolean!
     refreshToken: AuthPayload!
+    changePassword(currentPassword: String!, newPassword: String!): Boolean!
   }
 `;

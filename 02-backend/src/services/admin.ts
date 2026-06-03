@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
+import { GraphQLError } from 'graphql';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from './auth';
+import { passwordSchema } from '../utils/validation';
 
 // ── Users ──────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,14 @@ export async function createUser(
   },
   roleIds?: string[] | null,
 ) {
+  // C3 — validation de la complexité du mot de passe
+  const result = passwordSchema.safeParse(data.password);
+  if (!result.success) {
+    throw new GraphQLError(result.error.errors[0].message, {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
+
   const passwordHash = await bcrypt.hash(data.password, 12);
   return prisma.user.create({
     data: {
@@ -34,6 +44,7 @@ export async function createUser(
       phone: data.phone ?? null,
       company: data.company ?? null,
       site: data.site ?? null,
+      mustChangePassword: true, // C3 — changement forcé au 1er login
       ...(roleIds && roleIds.length > 0
         ? { roleAssignments: { create: roleIds.map((roleId) => ({ roleId })) } }
         : {}),
@@ -70,8 +81,15 @@ export async function deleteUser(id: string): Promise<boolean> {
 }
 
 export async function resetPassword(userId: string, newPassword: string): Promise<boolean> {
+  // C3 — valider la complexité et forcer le changement au prochain login
+  const result = passwordSchema.safeParse(newPassword);
+  if (!result.success) {
+    throw new GraphQLError(result.error.errors[0].message, {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: true } });
   return true;
 }
 

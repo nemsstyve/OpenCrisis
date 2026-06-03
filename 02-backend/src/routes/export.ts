@@ -2,12 +2,14 @@ import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
+import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
-
-type AuthRequest = Request & { userId: string };
+import { getUserReadableResources, type AuthRequest } from '../middleware/httpPermission';
 
 const router = Router();
+
+// ─── Middleware d'authentification ────────────────────────────────────────────
 
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const token = extractBearerToken(req.headers.authorization);
@@ -17,17 +19,42 @@ function requireAuth(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+// ─── Helper : cellules accessibles en lecture ─────────────────────────────────
+
+async function getAccessibleCells(userId: string): Promise<Cell[]> {
+  const resources = await getUserReadableResources(userId);
+  const cells: Cell[] = [];
+  if (resources.has('MAIN_COURANTE_DIR')) cells.push('DIRECTIONAL');
+  if (resources.has('MAIN_COURANTE_OPS')) cells.push('OPERATIONAL');
+  // SHARED visible dès qu'on a accès à au moins une cellule
+  if (cells.length > 0) cells.push('SHARED');
+  return cells;
+}
+
+const CELL_LABELS: Record<string, string> = {
+  DIRECTIONAL: 'Cellule de Direction',
+  OPERATIONAL: 'Cellule Opérationnelle',
+  SHARED: 'Partagé',
+};
+
 // ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────
-// Export de la main courante complète en PDF (toutes cellules, tri chronologique)
+// Export de la main courante — filtré sur les cellules accessibles (DÉC-1)
 
 router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
+    const userId = (req as AuthRequest).userId;
+
+    const accessibleCells = await getAccessibleCells(userId);
+    if (accessibleCells.length === 0) {
+      res.status(403).json({ error: 'Permission refusée' });
+      return;
+    }
 
     const [incident, entries] = await Promise.all([
       prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
       prisma.logEntry.findMany({
-        where: { incidentId, deletedAt: null },
+        where: { incidentId, deletedAt: null, cell: { in: accessibleCells } },
         include: {
           author: { select: { firstName: true, lastName: true } },
           tags: { include: { tag: { select: { name: true } } } },
@@ -56,6 +83,14 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
       .text(`Statut : ${incident.status}  |  Sévérité : ${incident.severity}`, { align: 'center' });
     doc.text(`Ouvert le : ${new Date(incident.startedAt).toLocaleString('fr-FR')}`, { align: 'center' });
     doc.text(`Exporté le : ${new Date().toLocaleString('fr-FR')}`, { align: 'center' });
+
+    // Indiquer les cellules exportées
+    const cellLabels = accessibleCells
+      .filter(c => c !== 'SHARED')
+      .map(c => CELL_LABELS[c] ?? c)
+      .join(', ');
+    doc.text(`Cellules : ${cellLabels}`, { align: 'center' });
+
     doc.fillColor('#000000');
     doc.moveDown(0.8);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#333333').lineWidth(1).stroke();
@@ -64,14 +99,7 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
     if (entries.length === 0) {
       doc.font('Helvetica').fontSize(11).text('Aucune entrée dans la main courante.', { align: 'center' });
     } else {
-      const CELL_LABELS: Record<string, string> = {
-        DIRECTIONAL: 'Cellule de Direction',
-        OPERATIONAL: 'Cellule Opérationnelle',
-        SHARED: 'Partagé',
-      };
-
       for (const entry of entries) {
-        // Méta-ligne
         const cell = CELL_LABELS[entry.cell] ?? entry.cell;
         const ts = new Date(entry.createdAt).toLocaleString('fr-FR', {
           day: '2-digit', month: '2-digit', year: 'numeric',
@@ -83,20 +111,17 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
           .text(`${ts}  •  ${author}  •  ${cell}`, { continued: false });
 
         if (entry.tags.length > 0) {
-          const tagStr = entry.tags.map((t) => t.tag.name).join(', ');
-          doc.fontSize(8).text(`Tags : ${tagStr}`);
+          doc.fontSize(8).text(`Tags : ${entry.tags.map((t) => t.tag.name).join(', ')}`);
         }
 
         doc.moveDown(0.1);
         doc.font('Helvetica').fontSize(10.5).fillColor('#111111').text(entry.content);
-
         doc.moveDown(0.4);
         doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
         doc.moveDown(0.4);
       }
     }
 
-    // Pied de page
     const totalPages = doc.bufferedPageRange ? doc.bufferedPageRange().count : 1;
     doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
       .text(`OpenCrisis — ${entries.length} entrée${entries.length > 1 ? 's' : ''}  |  Page 1/${totalPages}`, 50, 790, { align: 'center' });
@@ -109,16 +134,23 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
 });
 
 // ─── GET /api/export/:incidentId/xlsx ─────────────────────────────────────────
-// Export complet de l'incident en Excel (3 feuilles : résumé, main courante, timeline)
+// Export de l'incident — main courante filtrée sur les cellules accessibles (DÉC-1)
 
 router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
+    const userId = (req as AuthRequest).userId;
+
+    const accessibleCells = await getAccessibleCells(userId);
+    if (accessibleCells.length === 0) {
+      res.status(403).json({ error: 'Permission refusée' });
+      return;
+    }
 
     const [incident, entries, timelineEvents] = await Promise.all([
       prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
       prisma.logEntry.findMany({
-        where: { incidentId, deletedAt: null },
+        where: { incidentId, deletedAt: null, cell: { in: accessibleCells } },
         include: {
           author: { select: { firstName: true, lastName: true } },
           tags: { include: { tag: { select: { name: true } } } },
@@ -155,7 +187,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       { label: 'Exporté le', value: new Date().toLocaleString('fr-FR') },
     ]);
 
-    // ── Feuille 2 : Main Courante ──
+    // ── Feuille 2 : Main Courante (filtrée) ──
     const logSheet = workbook.addWorksheet('Main Courante');
     logSheet.columns = [
       { header: 'Horodatage', key: 'createdAt', width: 22 },
@@ -169,7 +201,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     logHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     logHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
 
-    const CELL_LABELS: Record<string, string> = {
+    const CELL_LABELS_SHORT: Record<string, string> = {
       DIRECTIONAL: 'Direction',
       OPERATIONAL: 'Opérationnelle',
       SHARED: 'Partagé',
@@ -179,7 +211,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       const row = logSheet.addRow({
         createdAt: new Date(entry.createdAt).toLocaleString('fr-FR'),
         author: `${entry.author.firstName} ${entry.author.lastName}`,
-        cell: CELL_LABELS[entry.cell] ?? entry.cell,
+        cell: CELL_LABELS_SHORT[entry.cell] ?? entry.cell,
         content: entry.content,
         tags: entry.tags.map((t) => t.tag.name).join(', '),
         isEdited: entry.isEdited ? 'Oui' : 'Non',

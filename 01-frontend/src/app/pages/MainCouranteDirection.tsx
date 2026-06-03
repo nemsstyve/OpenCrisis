@@ -15,7 +15,7 @@ import {
 import { TAGS_QUERY, CREATE_TAG_MUTATION } from "../../graphql/tag";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
-import type { GqlLogEntry, GqlTag } from "../../types/api";
+import type { GqlLogEntry, GqlTag } from "../../types/generated";
 
 const CELL = "DIRECTIONAL" as const;
 

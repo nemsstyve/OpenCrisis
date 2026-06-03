@@ -3,7 +3,7 @@ import { useParams } from "react-router";
 import { useQuery } from "@apollo/client";
 import { useAppStore } from "../store/useAppStore";
 import { INCIDENT_QUERY } from "../graphql/incident";
-import type { GqlIncident } from "../types/api";
+import type { GqlIncident } from "../types/generated";
 
 /**
  * Provides the current incident from the URL params.

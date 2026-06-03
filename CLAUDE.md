@@ -182,7 +182,7 @@ opencrisis/
 - **Export scoped (DÉC-1)** — `GET /api/export/:id/pdf` et `/xlsx` filtrent les entrées sur les cellules que l'utilisateur peut lire. Appliqué dans `routes/export.ts`.
 - **Politique mot de passe (DÉC-3)** — validation zod dans `utils/validation.ts` : 8 chars min, 1 maj, 1 chiffre, 1 spécial. Appliquée à `createUser` et `changePassword`. Tout nouveau compte a `mustChangePassword: true`.
 - **Rate-limiting login** — 10 tentatives / 15 min par IP, en mémoire dans `services/auth.ts`. Les échecs de login sont audités.
-- **`01-frontend/src/types/generated.ts` ne se modifie jamais à la main** — relancer `pnpm codegen` après tout changement de schéma GraphQL. **État actuel (Lot UI-0 non encore appliqué) :** le code importe depuis `src/types/api.ts` (types manuels) — migration vers `generated.ts` prévue dans le Lot UI-0.
+- **`01-frontend/src/types/generated.ts` ne se modifie jamais à la main** — régénérer avec `pnpm codegen` (requiert Node.js local) après tout changement du schéma GraphQL. Le schéma source est `01-frontend/schema.graphql` (extrait depuis `02-backend/src/schema/` via le script PowerShell en bas). `src/types/api.ts` a été supprimé (Lot UI-0, DÉC-UI-2).
 - **Toute mutation GraphQL doit appeler `requirePermission(ctx, resource, action)`** avant d'agir
 - **Toute mutation doit appeler `logAudit(...)`** — fire-and-forget, ne pas await
 - **Les fichiers uploadés vont dans `/app/uploads/incidents/:incidentId/`** — jamais à la racine du volume

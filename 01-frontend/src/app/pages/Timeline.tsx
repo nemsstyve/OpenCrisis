@@ -10,7 +10,7 @@ import {
 } from "../../graphql/timeline";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
-import type { GqlTimelineEvent, TimelineEventType } from "../../types/api";
+import type { GqlTimelineEvent, TimelineEventType } from "../../types/generated";
 
 // ── Types d'événements ────────────────────────────────────────────────────────
 const EVENT_TYPES: TimelineEventType[] = [

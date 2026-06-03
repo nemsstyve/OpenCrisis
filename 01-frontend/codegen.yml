@@ -1,11 +1,13 @@
 overwrite: true
-schema: "http://localhost/api/graphql"
-documents: "src/graphql/**/*.graphql"
+schema: schema.graphql
 generates:
   src/types/generated.ts:
     plugins:
       - typescript
-      - typescript-operations
     config:
-      withHooks: true
-      withComponent: false
+      skipTypename: true
+      enumsAsTypes: true
+      typesPrefix: Gql
+      scalars:
+        DateTime: string
+        JSON: unknown

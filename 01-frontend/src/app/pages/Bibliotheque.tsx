@@ -9,7 +9,7 @@ import {
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
 import { downloadFile, uploadFile, formatBytes } from "../../lib/fileUtils";
-import type { GqlDocument, DocumentCategory } from "../../types/api";
+import type { GqlDocument, DocumentCategory } from "../../types/generated";
 
 // ── Catégories ────────────────────────────────────────────────────────────────
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {

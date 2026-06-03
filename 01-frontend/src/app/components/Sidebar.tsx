@@ -5,13 +5,10 @@ import {
   Library,
   FileText,
   Clock,
-  Sun,
-  Moon,
   ChevronLeft,
   LogOut,
   Settings,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../context/AuthContext";
 
@@ -64,7 +61,6 @@ export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { incidentId } = useParams<{ incidentId: string }>();
-  const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const currentUser = useAppStore((s) => s.currentUser);
   const currentIncident = useAppStore((s) => s.currentIncident);
@@ -164,15 +160,6 @@ export default function Sidebar() {
         )}
 
         <div className="p-4 space-y-1">
-          {/* Mode clair/sombre */}
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#13151a] hover:text-gray-900 dark:hover:text-white transition-colors text-sm"
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span>{theme === "dark" ? "Mode clair" : "Mode sombre"}</span>
-          </button>
-
           {/* Déconnexion */}
           <button
             onClick={handleLogout}

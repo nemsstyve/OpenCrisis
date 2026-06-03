@@ -14,7 +14,7 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GqlAdminUser, GqlRoleDetail, GqlAdminPermission, GqlAuditLogPage, GqlAuditLogEntry,
-} from "../../types/api";
+} from "../../types/generated";
 
 type Tab = "users" | "roles" | "audit";
 

@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@apollo/client";
 import { AlertTriangle, Plus, Loader2, RefreshCw } from "lucide-react";
 import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
 import { useAppStore } from "../../store/useAppStore";
-import type { GqlIncident, Severity } from "../../types/api";
+import type { GqlIncident, Severity } from "../../types/generated";
 
 const SEVERITY_COLORS: Record<Severity, string> = {
   LOW: "text-green-400 bg-green-400/10",

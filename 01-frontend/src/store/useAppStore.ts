@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GqlUser, GqlIncident } from "../types/api";
+import type { GqlUser, GqlIncident } from "../types/generated";
 
 interface AppStore {
   currentUser: GqlUser | null;

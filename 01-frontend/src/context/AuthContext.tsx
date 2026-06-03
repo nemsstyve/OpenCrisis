@@ -13,7 +13,8 @@ import {
   LOGOUT_MUTATION,
   REFRESH_TOKEN_MUTATION,
 } from "../graphql/auth";
-import type { GqlUser } from "../types/api";
+import { scheduleProactiveRefresh } from "../lib/apolloClient";
+import type { GqlUser } from "../types/generated";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled && data?.refreshToken) {
           tokenStore.set(data.refreshToken.accessToken);
           setCurrentUser(data.refreshToken.user as GqlUser);
+          scheduleProactiveRefresh();
         }
       } catch {
         // Pas de session valide — l'utilisateur devra se reconnecter
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const user = data.login.user as GqlUser;
     tokenStore.set(data.login.accessToken);
     setCurrentUser(user);
+    scheduleProactiveRefresh();
     return user;
   }
 

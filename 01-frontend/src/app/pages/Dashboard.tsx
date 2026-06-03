@@ -1,10 +1,11 @@
 import type { ComponentType } from "react";
-import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock } from "lucide-react";
 import { useQuery } from "@apollo/client";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
+import { useAppStore } from "../../store/useAppStore";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
-import type { GqlLogEntry, GqlTimelineEvent, IncidentStatus, Severity, TimelineEventType } from "../../types/api";
+import type { GqlLogEntry, GqlTimelineEvent, IncidentStatus, Severity, TimelineEventType } from "../../types/generated";
 
 // ── Constantes de présentation ────────────────────────────────────────────────
 
@@ -133,22 +134,39 @@ function ContributorsWidget({
   );
 }
 
+// ── Bloc "Accès restreint" ────────────────────────────────────────────────────
+
+function AccessRestricted({ label }: { label: string }) {
+  return (
+    <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6 flex flex-col items-center justify-center gap-2 min-h-[120px]">
+      <Lock className="w-5 h-5 text-gray-600" />
+      <p className="text-gray-500 text-sm">{label} — accès restreint</p>
+    </div>
+  );
+}
+
 // ── Page Dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { incidentId, incident } = useCurrentIncident();
+  const hasPermission = useAppStore((s) => s.hasPermission);
+
+  // III1 — ne requête que les cellules accessibles
+  const canReadDir = hasPermission("MAIN_COURANTE_DIR", "READ");
+  const canReadOps = hasPermission("MAIN_COURANTE_OPS", "READ");
+  const canReadTimeline = hasPermission("TIMELINE", "READ");
 
   const { data: dirData, loading: dirLoading } = useQuery<{ logEntries: GqlLogEntry[] }>(
     LOG_ENTRIES_QUERY,
-    { variables: { incidentId, cell: "DIRECTIONAL" }, skip: !incidentId }
+    { variables: { incidentId, cell: "DIRECTIONAL" }, skip: !incidentId || !canReadDir }
   );
   const { data: opsData, loading: opsLoading } = useQuery<{ logEntries: GqlLogEntry[] }>(
     LOG_ENTRIES_QUERY,
-    { variables: { incidentId, cell: "OPERATIONAL" }, skip: !incidentId }
+    { variables: { incidentId, cell: "OPERATIONAL" }, skip: !incidentId || !canReadOps }
   );
   const { data: tlData, loading: tlLoading } = useQuery<{ timelineEvents: GqlTimelineEvent[] }>(
     TIMELINE_EVENTS_QUERY,
-    { variables: { incidentId }, skip: !incidentId }
+    { variables: { incidentId }, skip: !incidentId || !canReadTimeline }
   );
 
   const dirEntries = dirData?.logEntries ?? [];
@@ -157,7 +175,7 @@ export default function Dashboard() {
     (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime()
   );
 
-  const isLoading = dirLoading || opsLoading || tlLoading;
+  const isLoading = (canReadDir && dirLoading) || (canReadOps && opsLoading) || (canReadTimeline && tlLoading);
 
   // Build timeline bar: real events + "now" marker
   const now = new Date();
@@ -189,19 +207,22 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: "Entrées direction", value: dirEntries.length, loading: dirLoading, color: "text-purple-400" },
-          { label: "Entrées opérationnelles", value: opsEntries.length, loading: opsLoading, color: "text-blue-400" },
-          { label: "Événements timeline", value: tlEvents.length, loading: tlLoading, color: "text-green-400" },
+          { label: "Entrées direction", value: dirEntries.length, loading: dirLoading, color: "text-purple-400", allowed: canReadDir },
+          { label: "Entrées opérationnelles", value: opsEntries.length, loading: opsLoading, color: "text-blue-400", allowed: canReadOps },
+          { label: "Événements timeline", value: tlEvents.length, loading: tlLoading, color: "text-green-400", allowed: canReadTimeline },
           {
             label: "Contributeurs",
             value: new Set([...dirEntries, ...opsEntries].map((e) => e.author.id)).size,
             loading: isLoading,
             color: "text-yellow-400",
+            allowed: canReadDir || canReadOps,
           },
         ].map((stat) => (
           <div key={stat.label} className="bg-[#13151a] border border-[#1e2229] rounded-lg p-5">
             <p className="text-gray-400 text-sm mb-2">{stat.label}</p>
-            {stat.loading ? (
+            {!stat.allowed ? (
+              <Lock className="w-4 h-4 text-gray-600" />
+            ) : stat.loading ? (
               <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
             ) : (
               <p className={`text-3xl font-light ${stat.color}`}>{stat.value}</p>
@@ -213,18 +234,23 @@ export default function Dashboard() {
       {/* Frise chronologique */}
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-8 mb-8">
         <h2 className="text-xl text-white mb-8">Frise chronologique</h2>
-        {tlLoading && (
+        {!canReadTimeline ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-8">
+            <Lock className="w-5 h-5 text-gray-600" />
+            <p className="text-gray-500 text-sm">Timeline — accès restreint</p>
+          </div>
+        ) : tlLoading ? (
           <div className="flex items-center justify-center py-8 text-gray-500 gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">Chargement…</span>
           </div>
-        )}
-        {!tlLoading && allPoints.length <= 1 && (
+        ) : null}
+        {canReadTimeline && !tlLoading && allPoints.length <= 1 && (
           <p className="text-center text-gray-500 text-sm py-4">
             Aucun événement timeline pour cet incident.
           </p>
         )}
-        {!tlLoading && allPoints.length > 1 && (
+        {canReadTimeline && !tlLoading && allPoints.length > 1 && (
           <div className="relative">
             {/* Ligne horizontale */}
             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#1e2229] -translate-y-1/2" />
@@ -266,16 +292,16 @@ export default function Dashboard() {
 
       {/* Widgets contributeurs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <ContributorsWidget
-          title="Cellule de Direction"
-          entries={dirEntries}
-          color="text-purple-500"
-        />
-        <ContributorsWidget
-          title="Cellule opérationnelle"
-          entries={opsEntries}
-          color="text-blue-500"
-        />
+        {canReadDir ? (
+          <ContributorsWidget title="Cellule de Direction" entries={dirEntries} color="text-purple-500" />
+        ) : (
+          <AccessRestricted label="Cellule de Direction" />
+        )}
+        {canReadOps ? (
+          <ContributorsWidget title="Cellule opérationnelle" entries={opsEntries} color="text-blue-500" />
+        ) : (
+          <AccessRestricted label="Cellule opérationnelle" />
+        )}
       </div>
     </div>
   );

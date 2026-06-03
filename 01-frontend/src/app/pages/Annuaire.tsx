@@ -8,7 +8,7 @@ import {
   DELETE_CONTACT_MUTATION,
 } from "../../graphql/contact";
 import { useAppStore } from "../../store/useAppStore";
-import type { GqlContact } from "../../types/api";
+import type { GqlContact } from "../../types/generated";
 
 // ── Formulaire contact (création / édition) ───────────────────────────────────
 

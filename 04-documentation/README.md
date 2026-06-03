@@ -15,6 +15,10 @@ Documentation technique du projet OpenCrisis — application web de gestion de c
 | [04-configuration.md](04-configuration.md) | Variables d'environnement, secrets, paramétrage |
 | [05-guide-demarrage.md](05-guide-demarrage.md) | Prérequis, démarrage, workflow de développement |
 | [06-verification.md](06-verification.md) | Tests effectués, procédures de vérification |
+| [07-audit-securite.md](07-audit-securite.md) | Audit sécurité OWASP (WSTG + Top 10) — constats S1-S20, plan A-F |
+| [08-audit-interface.md](08-audit-interface.md) | Audit interface (UI/UX) — constats U1-U27, plan I-VII, test live navigateur |
+| [09-plan-actions-consolide.md](09-plan-actions-consolide.md) | **Plan d'actions consolidé** — point d'entrée de la session dédiée (lots P0/P1/P2 + décisions) |
+| [10-propositions-evolutions.md](10-propositions-evolutions.md) | Propositions d'évolution — nouvelles fonctions, UX, UI, intégrations (Top 10 + phasage P8-P11) |
 
 ---
 

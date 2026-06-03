@@ -1,6 +1,0 @@
-# --- IDE / PyCharm ---
-.idea/
-.vscode/
-
-# --- Environnements ---
-node_modules/

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Download, Plus, Clock, Tag, Filter, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import { exportPdf } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
@@ -220,6 +221,7 @@ export default function MainCouranteDirection() {
   const [submitting, setSubmitting] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [showNewTagInput, setShowNewTagInput] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   // ── Queries ───────────────────────────────────────────────────────────────
@@ -554,10 +556,7 @@ export default function MainCouranteDirection() {
                   availableTags={tags}
                   canWrite={canWrite}
                   currentUserId={currentUser?.id}
-                  onDelete={(id) => {
-                    if (confirm("Supprimer cette entrée ?"))
-                      deleteLogEntry({ variables: { id } });
-                  }}
+                  onDelete={(id) => setConfirmDeleteId(id)}
                   onAddTag={(entryId, tagId) => addTag({ variables: { logEntryId: entryId, tagId } })}
                   onRemoveTag={(entryId, tagId) => removeTag({ variables: { logEntryId: entryId, tagId } })}
                 />
@@ -566,6 +565,15 @@ export default function MainCouranteDirection() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        description="Supprimer cette entrée de la main courante ?"
+        onConfirm={() => {
+          if (confirmDeleteId) deleteLogEntry({ variables: { id: confirmDeleteId } });
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

@@ -12,6 +12,9 @@ import {
   ADMIN_CREATE_ROLE_MUTATION, ADMIN_DELETE_ROLE_MUTATION, ADMIN_UPDATE_ROLE_PERMISSIONS_MUTATION,
 } from "../../graphql/admin";
 import { useAppStore } from "../../store/useAppStore";
+import { useCurrentIncident } from "../../hooks/useCurrentIncident";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { toast } from "sonner";
 import type {
   GqlAdminUser, GqlRoleDetail, GqlAdminPermission, GqlAuditLogPage, GqlAuditLogEntry,
 } from "../../types/generated";
@@ -233,6 +236,7 @@ function UsersTab() {
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPwd, setResetPwd] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<GqlAdminUser | null>(null);
 
   const { data, loading, error } = useQuery<{ adminUsers: GqlAdminUser[] }>(ADMIN_USERS_QUERY, {
     fetchPolicy: "cache-and-network",
@@ -253,9 +257,14 @@ function UsersTab() {
   );
   const [resetPassword] = useMutation(ADMIN_RESET_PASSWORD_MUTATION);
 
-  async function handleDelete(user: GqlAdminUser) {
-    if (!confirm(`Supprimer ${user.firstName} ${user.lastName} ?`)) return;
-    await deleteUser({ variables: { id: user.id } });
+  async function handleDeleteConfirmed(user: GqlAdminUser) {
+    setConfirmDelete(null);
+    try {
+      await deleteUser({ variables: { id: user.id } });
+      toast.success("Utilisateur supprimé");
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
   }
 
   async function handleResetPwd() {
@@ -323,7 +332,7 @@ function UsersTab() {
                     <button onClick={() => setModal({ open: true, user })} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Modifier"><Pencil className="w-3.5 h-3.5" /></button>
                     <button onClick={() => setResetUserId(user.id)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-yellow-400" title="Réinitialiser le mot de passe"><Key className="w-3.5 h-3.5" /></button>
                     {user.id !== currentUser?.id && (
-                      <button onClick={() => handleDelete(user)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setConfirmDelete(user)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                   </div>
                 </td>
@@ -359,6 +368,12 @@ function UsersTab() {
           onSuccess={() => {}}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        description={confirmDelete ? `Supprimer ${confirmDelete.firstName} ${confirmDelete.lastName} ?` : ""}
+        onConfirm={() => confirmDelete && handleDeleteConfirmed(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
@@ -372,6 +387,7 @@ function RolesTab() {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteRole, setConfirmDeleteRole] = useState<GqlRoleDetail | null>(null);
 
   const { data: rolesData, loading: rolesLoading } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY, {
     fetchPolicy: "cache-and-network",
@@ -472,7 +488,7 @@ function RolesTab() {
               {!role.isSystem && (
                 <div className="flex gap-1">
                   <button onClick={() => startEdit(role)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Éditer les permissions"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => confirm(`Supprimer le rôle "${role.name}" ?`) && deleteRole({ variables: { id: role.id } })} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setConfirmDeleteRole(role)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               )}
             </div>
@@ -524,6 +540,15 @@ function RolesTab() {
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={!!confirmDeleteRole}
+        description={confirmDeleteRole ? `Supprimer le rôle "${confirmDeleteRole.name}" ?` : ""}
+        onConfirm={() => {
+          if (confirmDeleteRole) deleteRole({ variables: { id: confirmDeleteRole.id } });
+          setConfirmDeleteRole(null);
+        }}
+        onCancel={() => setConfirmDeleteRole(null)}
+      />
     </div>
   );
 }
@@ -620,6 +645,7 @@ function AuditTab() {
 // ── Page Administration ───────────────────────────────────────────────────────
 
 export default function Administration() {
+  useCurrentIncident();
   const [activeTab, setActiveTab] = useState<Tab>("users");
 
   const tabs: { key: Tab; label: string; icon: ComponentType<{ className?: string }> }[] = [

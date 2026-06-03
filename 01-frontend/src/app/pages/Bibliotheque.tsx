@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Download, Search, Upload, Trash2, ChevronDown, X, Loader2, Plus, FileText } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import {
@@ -334,6 +336,7 @@ export default function Bibliotheque() {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [showUpload, setShowUpload] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<GqlDocument | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   // Global docs: incidentId omitted → null → library documents
@@ -401,9 +404,14 @@ export default function Bibliotheque() {
     }
   }
 
-  async function handleDelete(doc: GqlDocument) {
-    if (!confirm(`Supprimer "${doc.name}" ?`)) return;
-    await deleteDocument({ variables: { id: doc.id } });
+  async function handleDeleteConfirmed(doc: GqlDocument) {
+    setConfirmDelete(null);
+    try {
+      await deleteDocument({ variables: { id: doc.id } });
+      toast.success("Document supprimé");
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
   }
 
   function toggleFilter(col: string) {
@@ -540,7 +548,7 @@ export default function Bibliotheque() {
         documents={searchedDocs}
         loading={isLoading}
         canWrite={canWrite}
-        onDelete={handleDelete}
+        onDelete={(doc) => setConfirmDelete(doc)}
         onDownload={handleDownload}
         filters={filters}
         activeFilters={activeFilters}
@@ -560,6 +568,12 @@ export default function Bibliotheque() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        description={confirmDelete ? `Supprimer "${confirmDelete.name}" ?` : ""}
+        onConfirm={() => confirmDelete && handleDeleteConfirmed(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

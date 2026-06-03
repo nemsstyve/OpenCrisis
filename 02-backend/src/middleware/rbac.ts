@@ -3,6 +3,7 @@ import type { PermissionResource, PermissionAction } from '@prisma/client';
 import type { GraphQLContext } from '../context';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from '../services/auth';
+import { logAudit } from './audit';
 
 /**
  * Vérifie sans lever d'exception si l'utilisateur possède une permission.
@@ -54,6 +55,14 @@ export async function requirePermission(
   );
 
   if (!hasPermission) {
+    // E1 — journaliser chaque refus de permission
+    logAudit({
+      userId: ctx.userId,
+      action: 'PERMISSION_DENIED',
+      resource,
+      metadata: { action, userId: ctx.userId },
+      ipAddress: ctx.req?.ip ?? null,
+    });
     throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
   }
 }

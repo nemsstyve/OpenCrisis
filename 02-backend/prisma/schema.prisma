@@ -32,6 +32,9 @@ model User {
   contacts        Contact[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+
+  @@index([deletedAt])
+  @@index([isActive])
 }
 
 model Role {
@@ -86,6 +89,9 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ─── INCIDENT (WORKSPACE CENTRAL) ─────────────────────────────────────────────
@@ -109,6 +115,10 @@ model Incident {
   documents      Document[]
   contacts       IncidentContact[]
   auditLogs      AuditLog[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@index([createdById])
 }
 
 // ─── MAIN COURANTE ────────────────────────────────────────────────────────────
@@ -129,6 +139,10 @@ model LogEntry {
   incident Incident      @relation(fields: [incidentId], references: [id])
   author   User          @relation(fields: [authorId], references: [id])
   tags     LogEntryTag[]
+
+  @@index([incidentId, cell, deletedAt])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model Tag {
@@ -170,6 +184,8 @@ model TimelineEvent {
   incident  Incident   @relation(fields: [incidentId], references: [id])
   actor     User?      @relation(fields: [actorId], references: [id])
   documents Document[]
+
+  @@index([incidentId, occurredAt])
 }
 
 // ─── DOCUMENTS, BIBLIOTHÈQUE & ARTEFACTS ──────────────────────────────────────
@@ -192,6 +208,9 @@ model Document {
   incident      Incident?      @relation(fields: [incidentId], references: [id])
   timelineEvent TimelineEvent? @relation(fields: [timelineEventId], references: [id])
   uploadedBy    User           @relation(fields: [uploadedById], references: [id])
+
+  @@index([incidentId, deletedAt])
+  @@index([uploadedById])
 }
 
 // ─── ANNUAIRE ─────────────────────────────────────────────────────────────────
@@ -214,6 +233,9 @@ model Contact {
 
   createdBy User              @relation(fields: [createdById], references: [id])
   incidents IncidentContact[]
+
+  @@index([deletedAt])
+  @@index([isGlobal])
 }
 
 model IncidentContact {
@@ -241,6 +263,11 @@ model AuditLog {
 
   user     User?     @relation(fields: [userId], references: [id])
   incident Incident? @relation(fields: [incidentId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([incidentId])
+  @@index([resource, action])
 }
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────

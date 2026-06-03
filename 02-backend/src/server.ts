@@ -1,13 +1,16 @@
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ApolloServer } from '@apollo/server';
+import { ApolloServerPluginDisableSchemaIntrospection } from '@apollo/server/plugin/disabled';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import depthLimit from 'graphql-depth-limit';
 import { typeDefs } from './schema';
 import { resolvers } from './resolvers';
 import { prisma } from './prisma';
@@ -16,6 +19,8 @@ import { verifyAccessToken, extractBearerToken } from './middleware/auth';
 import filesRouter from './routes/files';
 import exportRouter from './routes/export';
 import type { GraphQLContext } from './context';
+
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
 for (const key of REQUIRED_ENV) {
@@ -32,9 +37,12 @@ async function main() {
   const app = express();
   const httpServer = createServer(app);
 
+  // D5 — helmet (sécurité headers) + body size limit 1 MB
+  app.use(helmet({ contentSecurityPolicy: IS_PROD }));
+  app.set('trust proxy', 1); // D3 — IP réelle derrière nginx
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
   app.use(cookieParser());
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'opencrisis-backend', timestamp: new Date().toISOString() });
@@ -61,20 +69,29 @@ async function main() {
     wsServer,
   );
 
+  const apolloPlugins = [
+    ApolloServerPluginDrainHttpServer({ httpServer }),
+    {
+      async serverWillStart() {
+        return {
+          async drainServer() {
+            await wsCleanup.dispose();
+          },
+        };
+      },
+    },
+  ];
+
+  // D4 — désactiver l'introspection en production
+  if (IS_PROD) {
+    apolloPlugins.push(ApolloServerPluginDisableSchemaIntrospection() as never);
+  }
+
   const server = new ApolloServer<GraphQLContext>({
     schema,
-    plugins: [
-      ApolloServerPluginDrainHttpServer({ httpServer }),
-      {
-        async serverWillStart() {
-          return {
-            async drainServer() {
-              await wsCleanup.dispose();
-            },
-          };
-        },
-      },
-    ],
+    // D4 — limiter la profondeur des requêtes GraphQL
+    validationRules: [depthLimit(10)],
+    plugins: apolloPlugins,
   });
 
   await server.start();

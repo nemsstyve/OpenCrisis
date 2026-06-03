@@ -24,7 +24,8 @@ export async function getDocuments(incidentId?: string | null, category?: Docume
   return prisma.document.findMany({
     where: {
       deletedAt: null,
-      ...(incidentId != null ? { incidentId } : {}),
+      // III5 — undefined → bibliothèque globale (incidentId = null) ; string → docs incident
+      incidentId: incidentId !== undefined ? incidentId : null,
       ...(category != null ? { category } : {}),
     },
     orderBy: { createdAt: 'desc' },

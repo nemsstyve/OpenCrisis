@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { toast } from "sonner";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Users, Phone, Mail, Search, Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import {
@@ -8,6 +10,7 @@ import {
   DELETE_CONTACT_MUTATION,
 } from "../../graphql/contact";
 import { useAppStore } from "../../store/useAppStore";
+import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import type { GqlContact } from "../../types/generated";
 
 // ── Formulaire contact (création / édition) ───────────────────────────────────
@@ -162,6 +165,7 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
 // ── Page Annuaire ─────────────────────────────────────────────────────────────
 
 export default function Annuaire() {
+  useCurrentIncident();
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("ANNUAIRE", "WRITE");
 
@@ -169,6 +173,7 @@ export default function Annuaire() {
   const [modal, setModal] = useState<{ open: boolean; contact?: GqlContact | null }>({ open: false });
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<GqlContact | null>(null);
 
   // ── Queries & mutations ───────────────────────────────────────────────────
   const { data, loading, error } = useQuery<{ contacts: GqlContact[] }>(CONTACTS_QUERY, {
@@ -231,12 +236,13 @@ export default function Annuaire() {
     }
   }
 
-  async function handleDelete(contact: GqlContact) {
-    if (!confirm(`Supprimer ${contact.firstName} ${contact.lastName} ?`)) return;
+  async function handleDeleteConfirmed(contact: GqlContact) {
+    setConfirmDelete(null);
     try {
       await deleteContact({ variables: { id: contact.id } });
+      toast.success("Contact supprimé");
     } catch {
-      // error handled silently — contact stays in list
+      toast.error("Erreur lors de la suppression");
     }
   }
 
@@ -381,7 +387,7 @@ export default function Annuaire() {
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDelete(contact)}
+                              onClick={() => setConfirmDelete(contact)}
                               className="p-1.5 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
                               title="Supprimer"
                             >
@@ -414,6 +420,12 @@ export default function Annuaire() {
           error={modalError}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        description={confirmDelete ? `Supprimer ${confirmDelete.firstName} ${confirmDelete.lastName} ?` : ""}
+        onConfirm={() => confirmDelete && handleDeleteConfirmed(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

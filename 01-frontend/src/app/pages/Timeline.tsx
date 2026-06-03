@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ChevronDown, X, Plus, Loader2, Trash2, Download } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
@@ -202,6 +203,7 @@ export default function Timeline() {
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("TIMELINE", "WRITE");
   const [exporting, setExporting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<Record<string, string>>({
     occurredAt: "",
@@ -533,10 +535,7 @@ export default function Timeline() {
                     <td className="px-4 py-4">
                       {canWrite && (
                         <button
-                          onClick={() => {
-                            if (confirm("Supprimer cet événement ?"))
-                              deleteTimelineEvent({ variables: { id: event.id } });
-                          }}
+                          onClick={() => setConfirmDeleteId(event.id)}
                           className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
                           title="Supprimer"
                         >
@@ -567,6 +566,15 @@ export default function Timeline() {
           error={modalError}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        description="Supprimer cet événement de la timeline ?"
+        onConfirm={() => {
+          if (confirmDeleteId) deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

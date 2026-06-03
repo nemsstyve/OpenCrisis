@@ -57,7 +57,7 @@ function checkLoginRateLimit(ip: string): void {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function generateAccessToken(userId: string, email: string): string {
-  return jwt.sign({ userId, email }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL });
+  return jwt.sign({ userId, email }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL, algorithm: 'HS256' });
 }
 
 async function findActiveUser(filter: { id?: string; email?: string }): Promise<UserWithRoles | null> {
@@ -78,6 +78,7 @@ function setRefreshCookie(res: Response, token: string): void {
 async function issueRefreshToken(userId: string, res: Response): Promise<void> {
   const token = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET!, {
     expiresIn: `${REFRESH_TTL_DAYS}d`,
+    algorithm: 'HS256',
   });
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
   await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
@@ -97,7 +98,13 @@ export async function login(
 
   const user = await findActiveUser({ email });
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  // C4 — anti-timing : toujours exécuter bcrypt même si l'utilisateur est introuvable
+  const DUMMY_HASH = '$2a$12$invalidhashpaddingtoconstanttime000000000000000000000000';
+  const passwordValid = user
+    ? await bcrypt.compare(password, user.passwordHash)
+    : (await bcrypt.compare(password, DUMMY_HASH), false);
+
+  if (!user || !passwordValid) {
     logAudit({ action: 'LOGIN_FAILED', resource: 'AUTH', metadata: { email }, ipAddress });
     throw new GraphQLError('Email ou mot de passe incorrect', {
       extensions: { code: 'UNAUTHENTICATED' },
@@ -129,7 +136,7 @@ export async function rotateRefreshToken(
 ): Promise<{ accessToken: string; user: UserWithRoles }> {
   let payload: { userId: string };
   try {
-    payload = jwt.verify(currentToken, process.env.JWT_REFRESH_SECRET!) as { userId: string };
+    payload = jwt.verify(currentToken, process.env.JWT_REFRESH_SECRET!, { algorithms: ['HS256'] }) as { userId: string };
   } catch {
     throw new GraphQLError('Session expirée', { extensions: { code: 'UNAUTHENTICATED' } });
   }

@@ -573,6 +573,39 @@ opencrisis/
 - Boutons Export câblés sur Main Courante (PDF) et Timeline (Excel)
 - Lien Administration dans sidebar (permission ADMIN uniquement)
 
+### ✅ Lot 0 — Sécurité P0 *(terminé 2026-06-03)*
+- RBAC complet sur resolvers logEntry, tag, routes REST /files, /export
+- Path traversal corrigé (validation incidentId en base avant écriture disque)
+- Rate-limiting login (10 tentatives / 15 min / IP, en mémoire)
+- Politique mot de passe : complexité Zod (8 chars, 1 maj, 1 chiffre, 1 spécial)
+- Changement forcé au 1er login (mustChangePassword + page /change-password)
+- Export scoped : OPS → MC OPS, DIR → MC DIR, Admin → tout (DÉC-1)
+- Édition/suppression MC : auteur OU Pilote/Admin (DÉC-2)
+
+### ✅ Lot UI-0 — Interface P0 *(terminé 2026-06-03)*
+- Refresh token Apollo : errorLink 401 + refresh proactif 14 min + reconnexion WS
+- Dashboard filtré par permissions (cadenas si accès restreint)
+- Thème sombre forcé forcedTheme="dark", bouton bascule supprimé (DÉC-UI-1)
+- Migration codegen : api.ts supprimé, generated.ts unique source de vérité (DÉC-UI-2)
+
+### ✅ Sprint P1 — Avant mise en production *(terminé 2026-06-03)*
+**Backend :**
+- C4 : anti-timing login (bcrypt dummy hash si user absent)
+- C5 : épinglage algorithme JWT HS256 sur access + refresh tokens
+- D3 : trust proxy activé (IP réelle derrière nginx)
+- D4 : GraphQL depth-limit 10 + introspection off en prod (ApolloServerPluginDisableSchemaIntrospection)
+- D5 : helmet + body size limit 1 MB
+- E1 : journal des refus de permission (PERMISSION_DENIED dans AuditLog)
+- F6 : index DB sur FK principales, AuditLog.createdAt, colonnes deletedAt et statuts
+- III5 : bibliothèque globale filtrée sur incidentId = null (bug corrigé)
+
+**Frontend :**
+- IV1 : Toaster sonner monté dans App.tsx (position top-right, richColors)
+- IV2/IV3 : toasts sur mutations destructives + ConfirmDialog (AlertDialog shadcn) remplace tous les confirm() natifs (7 occurrences)
+- III2 : PermissionGuard + garde RBAC de route sur toutes les pages de contenu
+- VI4 : useCurrentIncident() ajouté sur Annuaire et Administration (fix UUID dans sidebar)
+- VII5 : cycle de vie incident — dropdown statut (ACTIVE/CONTAINED/CLOSED) + modale édition (nom, description, sévérité) depuis le Dashboard
+
 ---
 
 ## Vérification end-to-end

@@ -76,7 +76,7 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
           <h2 className="text-white font-medium">Télécharger un fichier</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -213,12 +213,14 @@ function DocumentTable({
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className={`px-4 py-3 text-left ${col.width}`}>
+                <th key={col.key} scope="col" className={`px-4 py-3 text-left ${col.width}${col.key === "_actions" ? " sr-only" : ""}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-400 uppercase tracking-wider">{col.label}</span>
                     {col.key !== "_actions" && (
                       <button
                         onClick={() => onToggleFilter(col.key)}
+                        aria-label={`Filtrer par ${col.label}`}
+                        aria-pressed={activeFilters.has(col.key)}
                         className={`p-1 rounded transition-colors ${
                           activeFilters.has(col.key)
                             ? "bg-blue-500/20 text-blue-400"
@@ -469,7 +471,7 @@ export default function Bibliotheque() {
       {downloadError && (
         <div className="mb-4 bg-red-400/10 border border-red-400/20 rounded-lg p-3 flex items-center justify-between">
           <span className="text-red-400 text-sm">{downloadError}</span>
-          <button onClick={() => setDownloadError(null)} className="text-red-400 hover:text-red-300">
+          <button onClick={() => setDownloadError(null)} aria-label="Fermer l'erreur" className="text-red-400 hover:text-red-300">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -513,6 +515,7 @@ export default function Bibliotheque() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Rechercher un document"
             placeholder="Rechercher un document…"
             className="w-full pl-12 pr-4 py-3 bg-[#13151a] border border-[#1e2229] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
           />

@@ -92,7 +92,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           <h2 className="text-white font-medium">
             {mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -469,6 +469,7 @@ export default function Timeline() {
                   <span className="font-medium">{value}</span>
                   <button
                     onClick={() => clearFilter(key)}
+                    aria-label={`Retirer le filtre ${columns.find((c) => c.key === key)?.label ?? key}`}
                     className="hover:bg-blue-500/20 rounded p-0.5 transition-colors"
                   >
                     <X className="w-3 h-3" />
@@ -493,7 +494,7 @@ export default function Timeline() {
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
                 {columns.map((column) => (
-                  <th key={column.key} className={`px-4 py-3 text-left ${column.width}`}>
+                  <th key={column.key} scope="col" className={`px-4 py-3 text-left ${column.width}${column.key === "_actions" ? " sr-only" : ""}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-400 uppercase tracking-wider">
                         {column.label}
@@ -501,6 +502,8 @@ export default function Timeline() {
                       {column.key !== "_actions" && (
                         <button
                           onClick={() => toggleFilter(column.key)}
+                          aria-label={`Filtrer par ${column.label}`}
+                          aria-pressed={activeFilters.has(column.key)}
                           className={`p-1 rounded transition-colors ${
                             activeFilters.has(column.key)
                               ? "bg-blue-500/20 text-blue-400"
@@ -518,7 +521,8 @@ export default function Timeline() {
                         onChange={(e) =>
                           setFilters((prev) => ({ ...prev, [column.key]: e.target.value }))
                         }
-                        placeholder={`Filtrer…`}
+                        aria-label={`Valeur du filtre ${column.label}`}
+                        placeholder="Filtrer…"
                         className="mt-2 w-full px-2 py-1 bg-[#13151a] border border-[#1e2229] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                       />
                     )}
@@ -529,7 +533,7 @@ export default function Timeline() {
             <tbody className="divide-y divide-[#1e2229]">
               {loading && !data ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={`sk-${i}`}>
+                  <tr key={`sk-${i}`} role="status" aria-label="Chargement">
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-4">
                         <Skeleton className="h-4 w-full bg-[#1e2229]" />

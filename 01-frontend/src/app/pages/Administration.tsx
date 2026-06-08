@@ -129,7 +129,7 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
           <h2 className="text-white font-medium">{user ? "Modifier l'utilisateur" : "Créer un utilisateur"}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-3">
@@ -300,7 +300,7 @@ function UsersTab() {
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {["Nom", "Email", "Rôles", "Statut", "Actions"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider">{h}</th>
+                <th key={h} scope="col" className={`px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -592,7 +592,7 @@ function AuditTab() {
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
                 {["Date", "Utilisateur", "Action", "Ressource", "ID Ressource"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider">{h}</th>
+                  <th key={h} scope="col" className="px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>

@@ -58,7 +58,7 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
           <h2 className="text-white font-medium">
             {initial ? "Modifier le contact" : "Ajouter un contact"}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -269,6 +269,7 @@ export default function Annuaire() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Rechercher un contact"
             placeholder="Rechercher un contact…"
             className="w-full bg-[#13151a] border border-[#1e2229] rounded-lg pl-10 pr-4 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
           />
@@ -277,13 +278,14 @@ export default function Annuaire() {
 
       {/* États */}
       {loading && !data && (
-        <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-4 space-y-3">
+        <div role="status" aria-label="Chargement des contacts" className="bg-[#13151a] border border-[#1e2229] rounded-lg p-4 space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={`sk-${i}`} className="flex items-center gap-3">
               <Skeleton className="w-10 h-10 rounded-full bg-[#1e2229] flex-shrink-0" />
               <Skeleton className="h-4 flex-1 bg-[#1e2229]" />
             </div>
           ))}
+          <span className="sr-only">Chargement en cours…</span>
         </div>
       )}
 
@@ -295,15 +297,16 @@ export default function Annuaire() {
 
       {/* Tableau */}
       {data && (
-        <div className="bg-[#13151a] border border-[#1e2229] rounded-lg overflow-hidden">
+        <div aria-live="polite" className="bg-[#13151a] border border-[#1e2229] rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
                 <tr>
-                  {["Nom", "Rôle", "Organisation", "Site", "Téléphone", "Email", ""].map((h) => (
+                  {["Nom", "Rôle", "Organisation", "Site", "Téléphone", "Email", "Actions"].map((h) => (
                     <th
                       key={h}
-                      className="px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider"
+                      scope="col"
+                      className={`px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}
                     >
                       {h}
                     </th>

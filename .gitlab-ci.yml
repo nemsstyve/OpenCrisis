@@ -13,7 +13,7 @@ install_front:
   stage: install
   script:
     - echo "Installation frontend"
-    - cd /01-frontend 
+    - cd 01-frontend 
     - npm install
   artifacts:
     paths:

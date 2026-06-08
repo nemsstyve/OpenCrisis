@@ -5,10 +5,6 @@ import { USER_INCLUDE } from '../services/auth';
 
 export type AuthRequest = Request & { userId: string };
 
-/**
- * Vérifie qu'un utilisateur HTTP authentifié possède la permission requise.
- * Écrit la réponse d'erreur et renvoie false si refusé, true si autorisé.
- */
 export async function requireHttpPermission(
   req: AuthRequest,
   res: Response,
@@ -39,10 +35,6 @@ export async function requireHttpPermission(
   return true;
 }
 
-/**
- * Retourne l'ensemble des ressources sur lesquelles l'utilisateur a un accès READ.
- * Utilisé pour filtrer les exports et les requêtes selon les cellules autorisées.
- */
 export async function getUserReadableResources(userId: string): Promise<Set<PermissionResource>> {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null, isActive: true },

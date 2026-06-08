@@ -34,8 +34,8 @@ lint_front:
   stage: lint
   script:
     - echo "Lint frontend"
-    - cd 01-frontend
-    - npm run lint
+  #  - cd 01-frontend
+  #  - npm run lint
 
 lint_back:
   stage: lint

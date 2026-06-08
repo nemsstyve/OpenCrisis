@@ -12,6 +12,7 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useDebounce } from "../../hooks/useDebounce";
+import { Skeleton } from "../components/ui/skeleton";
 import type { GqlContact } from "../../types/generated";
 
 // ── Formulaire contact (création / édition) ───────────────────────────────────
@@ -87,7 +88,7 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Prénom *</label>
               <input {...field("firstName")} required className={inputCls} placeholder="Jean" />
@@ -108,7 +109,7 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
             <input {...field("organization")} className={inputCls} placeholder="TechCorp SA" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Téléphone</label>
               <input {...field("phone")} type="tel" className={inputCls} placeholder="+33 6 12 34 56 78" />
@@ -296,9 +297,13 @@ export default function Annuaire() {
 
       {/* États */}
       {loading && !data && (
-        <div className="flex items-center justify-center py-16 text-gray-500 gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span>Chargement des contacts…</span>
+        <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-4 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={`sk-${i}`} className="flex items-center gap-3">
+              <Skeleton className="w-10 h-10 rounded-full bg-[#1e2229] flex-shrink-0" />
+              <Skeleton className="h-4 flex-1 bg-[#1e2229]" />
+            </div>
+          ))}
         </div>
       )}
 

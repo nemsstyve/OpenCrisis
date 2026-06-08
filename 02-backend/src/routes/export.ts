@@ -171,7 +171,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
         orderBy: { createdAt: 'asc' },
       }),
       prisma.timelineEvent.findMany({
-        where: { incidentId },
+        where: { incidentId, deletedAt: null },
         include: { actor: { select: { firstName: true, lastName: true } } },
         orderBy: { occurredAt: 'asc' },
       }),

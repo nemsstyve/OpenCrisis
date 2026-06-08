@@ -179,12 +179,14 @@ model TimelineEvent {
   openctiEntityType String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
 
   incident  Incident   @relation(fields: [incidentId], references: [id])
   actor     User?      @relation(fields: [actorId], references: [id])
   documents Document[]
 
   @@index([incidentId, occurredAt])
+  @@index([deletedAt])
 }
 
 // ─── DOCUMENTS, BIBLIOTHÈQUE & ARTEFACTS ──────────────────────────────────────

@@ -134,7 +134,8 @@ docker_front:
   services:
     - docker:24-dind
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: "" #"/certs"
+    DOCKER_HOST: tcp://docker:2375
   <<: *docker_rules
   script:
     - echo "Build Docker image — frontend"
@@ -148,7 +149,8 @@ docker_back:
   services:
     - docker:24-dind
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: "" #"/certs"
+    DOCKER_HOST: tcp://docker:2375
   <<: *docker_rules
   script:
     - echo "Build Docker image — backend"
@@ -162,7 +164,8 @@ trivy_image_scan:
   services:
     - docker:24-dind
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: "" #"/certs"
+    DOCKER_HOST: tcp://docker:2375
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"
   needs:

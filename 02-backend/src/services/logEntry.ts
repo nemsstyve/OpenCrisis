@@ -17,9 +17,13 @@ async function getEntry(id: string) {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getLogEntries(incidentId: string, cell?: Cell | null) {
+export async function getLogEntries(incidentId: string, cells?: Cell[] | null) {
   return prisma.logEntry.findMany({
-    where: { incidentId, ...(cell ? { cell } : {}), deletedAt: null },
+    where: {
+      incidentId,
+      ...(cells && cells.length > 0 ? { cell: { in: cells } } : {}),
+      deletedAt: null,
+    },
     orderBy: { createdAt: 'asc' },
     include: LOG_ENTRY_INCLUDE,
   });

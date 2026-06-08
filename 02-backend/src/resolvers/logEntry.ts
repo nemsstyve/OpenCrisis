@@ -14,6 +14,16 @@ function cellToResource(cell: Cell) {
   return cell === 'OPERATIONAL' ? 'MAIN_COURANTE_OPS' : 'MAIN_COURANTE_DIR';
 }
 
+// Cellules de main courante réellement lisibles par l'utilisateur courant.
+// SHARED n'est visible que si au moins une cellule l'est.
+async function readableCells(ctx: GraphQLContext): Promise<Cell[]> {
+  const cells: Cell[] = [];
+  if (await hasPermission(ctx, 'MAIN_COURANTE_DIR', 'READ')) cells.push('DIRECTIONAL');
+  if (await hasPermission(ctx, 'MAIN_COURANTE_OPS', 'READ')) cells.push('OPERATIONAL');
+  if (cells.length > 0) cells.push('SHARED');
+  return cells;
+}
+
 async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string) {
   const entry = await prisma.logEntry.findFirst({ where: { id: entryId, deletedAt: null } });
   if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
@@ -32,9 +42,18 @@ export const logEntryResolvers = {
       { incidentId, cell }: { incidentId: string; cell?: Cell },
       ctx: GraphQLContext,
     ) => {
-      const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
-      await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
-      return getLogEntries(incidentId, cell);
+      // Cellule explicite : vérifier la permission sur cette seule cellule.
+      if (cell) {
+        await requirePermission(ctx, cellToResource(cell), 'READ');
+        return getLogEntries(incidentId, [cell]);
+      }
+      // S3/DÉC-1 — sans cellule : ne renvoyer que les cellules réellement lisibles
+      // (un membre Directionnel ne doit pas lire la main courante Opérationnelle, et inversement).
+      const cells = await readableCells(ctx);
+      if (cells.length === 0) {
+        throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
+      }
+      return getLogEntries(incidentId, cells);
     },
   },
 

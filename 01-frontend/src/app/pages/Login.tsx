@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "../../context/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
+import { loginSchema, type LoginForm } from "../../lib/formSchemas";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -9,10 +12,12 @@ export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const currentUser = useAppStore((s) => s.currentUser);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
   // Déjà connecté → rediriger via composant (pas d'appel navigate pendant le rendu)
   if (isAuthenticated && currentUser) {
@@ -20,12 +25,10 @@ export default function Login() {
     return <Navigate to={from} replace />;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: LoginForm) {
     setError(null);
-    setLoading(true);
     try {
-      const user = await login(email, password);
+      const user = await login(values.email, values.password);
       if (user.mustChangePassword) {
         navigate("/change-password", { replace: true });
         return;
@@ -35,13 +38,10 @@ export default function Login() {
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Erreur de connexion";
-      // Extraire le message GraphQL si disponible
       const graphqlMsg =
         (err as { graphQLErrors?: Array<{ message: string }> })
           ?.graphQLErrors?.[0]?.message;
       setError(graphqlMsg ?? msg);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -53,20 +53,19 @@ export default function Login() {
           <p className="text-gray-400 mt-1 text-sm">Connectez-vous à votre espace</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">
               Adresse e-mail
             </label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register("email")}
               placeholder="admin@opencrisis.local"
-              required
               autoComplete="email"
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
             />
+            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
           </div>
 
           <div>
@@ -75,13 +74,12 @@ export default function Login() {
             </label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...register("password")}
               placeholder="••••••••"
-              required
               autoComplete="current-password"
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
             />
+            {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
           </div>
 
           {error && (
@@ -92,13 +90,13 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-md px-3 py-2 text-sm font-medium transition-colors mt-2 flex items-center justify-center gap-2"
           >
-            {loading && (
+            {isSubmitting && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             )}
-            {loading ? "Connexion…" : "Se connecter"}
+            {isSubmitting ? "Connexion…" : "Se connecter"}
           </button>
         </form>
       </div>

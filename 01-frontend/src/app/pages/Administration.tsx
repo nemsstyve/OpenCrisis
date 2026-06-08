@@ -1,5 +1,8 @@
 import { useState } from "react";
-import type { ChangeEvent, ComponentType, FormEvent } from "react";
+import type { ComponentType, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { userSchema, type UserForm } from "../../lib/formSchemas";
 import {
   Users, Shield, ScrollText, Plus, Pencil, Trash2,
   Loader2, X, Key, Check, ChevronLeft, ChevronRight,
@@ -48,20 +51,27 @@ interface UserModalProps {
 }
 
 function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
-  const [form, setForm] = useState({
-    email: user?.email ?? "",
-    password: "",
-    firstName: user?.firstName ?? "",
-    lastName: user?.lastName ?? "",
-    phone: user?.phone ?? "",
-    company: user?.company ?? "",
-    site: user?.site ?? "",
-    isActive: user?.isActive ?? true,
+  const isEdit = !!user;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<UserForm>({
+    resolver: zodResolver(userSchema(isEdit)),
+    defaultValues: {
+      email: user?.email ?? "",
+      password: "",
+      firstName: user?.firstName ?? "",
+      lastName: user?.lastName ?? "",
+      phone: user?.phone ?? "",
+      company: user?.company ?? "",
+      site: user?.site ?? "",
+      isActive: user?.isActive ?? true,
+    },
   });
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>(
     user?.roles.map((r) => r.id) ?? []
   );
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [createUser] = useMutation(ADMIN_CREATE_USER_MUTATION, {
@@ -71,21 +81,10 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
   const [assignRole] = useMutation(ADMIN_ASSIGN_ROLE_MUTATION);
   const [removeRole] = useMutation(ADMIN_REMOVE_ROLE_MUTATION);
 
-  function field(key: keyof typeof form) {
-    return {
-      value: String(form[key]),
-      onChange: (e: ChangeEvent<HTMLInputElement>) =>
-        setForm((p) => ({ ...p, [key]: e.target.value })),
-    };
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function onSubmit(form: UserForm) {
     setError(null);
-    setSubmitting(true);
     try {
       if (user) {
-        // Update user
         await updateUser({
           variables: {
             id: user.id,
@@ -106,8 +105,6 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
           if (!newIds.has(id)) await removeRole({ variables: { userId: user.id, roleId: id } });
         }
       } else {
-        // Create user
-        if (!form.password) { setError("Le mot de passe est requis"); setSubmitting(false); return; }
         await createUser({
           variables: {
             input: {
@@ -124,8 +121,6 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
       onClose();
     } catch (err) {
       setError(gqlError(err));
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -136,50 +131,53 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
           <h2 className="text-white font-medium">{user ? "Modifier l'utilisateur" : "Créer un utilisateur"}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Prénom *</label>
-              <input {...field("firstName")} required className={inputCls} />
+              <input {...register("firstName")} className={inputCls} />
+              {errors.firstName && <p className="text-red-400 text-xs mt-1">{errors.firstName.message}</p>}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
-              <input {...field("lastName")} required className={inputCls} />
+              <input {...register("lastName")} className={inputCls} />
+              {errors.lastName && <p className="text-red-400 text-xs mt-1">{errors.lastName.message}</p>}
             </div>
           </div>
           {!user && (
             <>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Email *</label>
-                <input {...field("email")} type="email" required className={inputCls} />
+                <input {...register("email")} type="email" className={inputCls} />
+                {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Mot de passe *</label>
-                <input {...field("password")} type="password" required className={inputCls} placeholder="Min. 8 caractères" />
+                <input {...register("password")} type="password" className={inputCls} placeholder="Min. 8 caractères" />
+                {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
               </div>
             </>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Téléphone</label>
-              <input {...field("phone")} type="tel" className={inputCls} />
+              <input {...register("phone")} type="tel" className={inputCls} />
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Entreprise</label>
-              <input {...field("company")} className={inputCls} />
+              <input {...register("company")} className={inputCls} />
             </div>
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Site</label>
-            <input {...field("site")} className={inputCls} />
+            <input {...register("site")} className={inputCls} />
           </div>
 
           {user && (
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))}
+                {...register("isActive")}
                 className="w-4 h-4 accent-blue-600"
               />
               <span className="text-sm text-gray-300">Compte actif</span>
@@ -217,9 +215,9 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors">Annuler</button>
-            <button type="submit" disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {submitting ? "Enregistrement…" : user ? "Modifier" : "Créer"}
+            <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSubmitting ? "Enregistrement…" : user ? "Modifier" : "Créer"}
             </button>
           </div>
         </form>

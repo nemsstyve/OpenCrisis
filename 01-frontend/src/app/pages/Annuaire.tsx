@@ -12,68 +12,44 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { contactSchema, type ContactForm } from "../../lib/formSchemas";
 import { Skeleton } from "../components/ui/skeleton";
 import type { GqlContact } from "../../types/generated";
 
 // ── Formulaire contact (création / édition) ───────────────────────────────────
 
-interface ContactFormData {
-  firstName: string;
-  lastName: string;
-  role: string;
-  organization: string;
-  phone: string;
-  email: string;
-  site: string;
-  notes: string;
-}
-
-const EMPTY_FORM: ContactFormData = {
-  firstName: "",
-  lastName: "",
-  role: "",
-  organization: "",
-  phone: "",
-  email: "",
-  site: "",
-  notes: "",
-};
-
 interface ContactModalProps {
   initial?: GqlContact | null;
   onClose: () => void;
-  onSubmit: (data: ContactFormData) => Promise<void>;
+  onSubmit: (data: ContactForm) => Promise<void>;
   submitting: boolean;
   error: string | null;
 }
 
 function ContactModal({ initial, onClose, onSubmit, submitting, error }: ContactModalProps) {
-  const [form, setForm] = useState<ContactFormData>({
-    firstName: initial?.firstName ?? "",
-    lastName: initial?.lastName ?? "",
-    role: initial?.role ?? "",
-    organization: initial?.organization ?? "",
-    phone: initial?.phone ?? "",
-    email: initial?.email ?? "",
-    site: initial?.site ?? "",
-    notes: initial?.notes ?? "",
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ContactForm>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: {
+      firstName: initial?.firstName ?? "",
+      lastName: initial?.lastName ?? "",
+      role: initial?.role ?? "",
+      organization: initial?.organization ?? "",
+      phone: initial?.phone ?? "",
+      email: initial?.email ?? "",
+      site: initial?.site ?? "",
+      notes: initial?.notes ?? "",
+    },
   });
-
-  function field(key: keyof ContactFormData) {
-    return {
-      value: form[key],
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-        setForm((prev) => ({ ...prev, [key]: e.target.value })),
-    };
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await onSubmit(form);
-  }
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
+  const errCls = "text-red-400 text-xs mt-1";
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
@@ -87,48 +63,52 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Prénom *</label>
-              <input {...field("firstName")} required className={inputCls} placeholder="Jean" />
+              <input {...register("firstName")} className={inputCls} placeholder="Jean" />
+              {errors.firstName && <p className={errCls}>{errors.firstName.message}</p>}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
-              <input {...field("lastName")} required className={inputCls} placeholder="Martin" />
+              <input {...register("lastName")} className={inputCls} placeholder="Martin" />
+              {errors.lastName && <p className={errCls}>{errors.lastName.message}</p>}
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Rôle *</label>
-            <input {...field("role")} required className={inputCls} placeholder="Chef cellule opérationnelle" />
+            <input {...register("role")} className={inputCls} placeholder="Chef cellule opérationnelle" />
+            {errors.role && <p className={errCls}>{errors.role.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Organisation</label>
-            <input {...field("organization")} className={inputCls} placeholder="TechCorp SA" />
+            <input {...register("organization")} className={inputCls} placeholder="TechCorp SA" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Téléphone</label>
-              <input {...field("phone")} type="tel" className={inputCls} placeholder="+33 6 12 34 56 78" />
+              <input {...register("phone")} type="tel" className={inputCls} placeholder="+33 6 12 34 56 78" />
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Email</label>
-              <input {...field("email")} type="email" className={inputCls} placeholder="jean@company.com" />
+              <input {...register("email")} type="email" className={inputCls} placeholder="jean@company.com" />
+              {errors.email && <p className={errCls}>{errors.email.message}</p>}
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Site / Localisation</label>
-            <input {...field("site")} className={inputCls} placeholder="Paris - Siège" />
+            <input {...register("site")} className={inputCls} placeholder="Paris - Siège" />
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Notes</label>
             <textarea
-              {...field("notes")}
+              {...register("notes")}
               rows={3}
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
               placeholder="Informations complémentaires…"
@@ -208,7 +188,7 @@ export default function Annuaire() {
   );
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  async function handleSubmit(formData: ContactFormData) {
+  async function handleSubmit(formData: ContactForm) {
     setModalError(null);
     setModalSubmitting(true);
     try {

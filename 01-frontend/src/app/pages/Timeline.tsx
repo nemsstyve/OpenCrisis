@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { timelineEventSchema } from "../../lib/formSchemas";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
@@ -69,19 +72,18 @@ interface EventModalProps {
 }
 
 function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: EventModalProps) {
-  const [form, setForm] = useState<NewEventForm>(initial ?? EMPTY_FORM);
-
-  function set(key: keyof NewEventForm, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await onSubmit(form);
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<NewEventForm>({
+    resolver: zodResolver(timelineEventSchema),
+    defaultValues: initial ?? EMPTY_FORM,
+  });
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
+  const errCls = "text-red-400 text-xs mt-1";
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
@@ -95,14 +97,10 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Type *</label>
-            <select
-              value={form.type}
-              onChange={(e) => set("type", e.target.value)}
-              className={inputCls}
-            >
+            <select {...register("type")} className={inputCls}>
               {EVENT_TYPES.map((t) => (
                 <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
               ))}
@@ -112,30 +110,27 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
             <input
-              value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              required
+              {...register("title")}
               className={inputCls}
               placeholder="Ex : Détection d'un accès non autorisé"
             />
+            {errors.title && <p className={errCls}>{errors.title.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Date / Heure *</label>
             <input
               type="datetime-local"
-              value={form.occurredAt}
-              onChange={(e) => set("occurredAt", e.target.value)}
-              required
+              {...register("occurredAt")}
               className={inputCls}
             />
+            {errors.occurredAt && <p className={errCls}>{errors.occurredAt.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Description</label>
             <textarea
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
+              {...register("description")}
               rows={3}
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
               placeholder="Description détaillée de l'événement…"
@@ -146,8 +141,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
               <input
-                value={form.assetName}
-                onChange={(e) => set("assetName", e.target.value)}
+                {...register("assetName")}
                 className={inputCls}
                 placeholder="Serveur-DB-01"
               />
@@ -155,8 +149,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
               <input
-                value={form.ipAddress}
-                onChange={(e) => set("ipAddress", e.target.value)}
+                {...register("ipAddress")}
                 className={inputCls}
                 placeholder="10.0.1.15"
               />
@@ -166,8 +159,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
             <input
-              value={form.affectedUser}
-              onChange={(e) => set("affectedUser", e.target.value)}
+              {...register("affectedUser")}
               className={inputCls}
               placeholder="jean.martin@company.com"
             />

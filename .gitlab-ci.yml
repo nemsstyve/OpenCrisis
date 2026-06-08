@@ -13,28 +13,28 @@ install_front:
   stage: install
   script:
     - echo "Installation frontend"
-    - cd Application/client/application
+    - cd Application/01-frontend 
     - npm install
   artifacts:
     paths:
-      - Application/client/application/node_modules/
+      - Application/01-frontend/node_modules/
 
 install_back:
   stage: install
   script:
     - echo "Installation backend"
-    - cd Application/server
+    - cd Application/02-backend
     - npm install
   artifacts:
     paths:
-      - Application/server/node_modules/
+      - Application/02-backend/node_modules/
 
 #Lint
 lint_front:
   stage: lint
   script:
     - echo "Lint frontend"
-    - cd Application/client/application
+    - cd Application/01-frontend
     - npm run lint
 
 lint_back:
@@ -64,7 +64,7 @@ build_front:
   stage: build
   script:
     - echo "Build frontend"
-    - cd Application/client/application
+    - cd Application/01-frontend
     - npm run build
 
 # Test
@@ -72,7 +72,7 @@ test_front:
   stage: test
   script:
     - echo "Test frontend"
-    - cd Application/client/application
+    - cd Application/01-frontend
     - npm run preview & sleep 5
     - echo "Frontend lance"
 
@@ -80,7 +80,7 @@ test_back:
   stage: test
   script:
     - echo "Test backend"
-    - cd Application/server
+    - cd Application/02-backend
     - npm start & sleep 5
     - echo "Backend lance"
 
@@ -171,12 +171,12 @@ trivy_image_scan:
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - trivy image $CI_REGISTRY_IMAGE/client:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-client-report.json --no-progress || true
-    - trivy image $CI_REGISTRY_IMAGE/server:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-server-report.json --no-progress || true
+    - trivy image $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-01-frontend-report.json --no-progress || true
+    - trivy image $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-02-backend-report.json --no-progress || true
   artifacts:
     when: always
     paths:
-      - trivy-client-report.json
-      - trivy-server-report.json
+      - trivy-01-frontend-report.json
+      - trivy-02-backend-report.json
     expire_in: 1 week
   allow_failure: true

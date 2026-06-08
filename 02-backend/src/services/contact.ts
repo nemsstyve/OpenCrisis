@@ -10,16 +10,8 @@ async function getContact(id: string) {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getContacts(incidentId?: string | null) {
-  if (incidentId) {
-    // Contacts liés à cet incident + contacts globaux
-    const links = await prisma.incidentContact.findMany({
-      where: { incidentId },
-      include: { contact: true },
-    });
-    return links.map(l => l.contact).filter(c => c.deletedAt === null);
-  }
-  return prisma.contact.findMany({ where: { deletedAt: null, isGlobal: true }, orderBy: { lastName: 'asc' } });
+export async function getContacts() {
+  return prisma.contact.findMany({ where: { deletedAt: null }, orderBy: { lastName: 'asc' } });
 }
 
 export async function getContactById(id: string) {
@@ -37,32 +29,23 @@ type ContactInput = {
   email?: string | null;
   site?: string | null;
   notes?: string | null;
-  isGlobal?: boolean | null;
 };
 
 export async function createContact(
   input: ContactInput,
   createdById: string,
-  incidentId?: string | null,
   ipAddress?: string | null,
 ) {
   const contact = await prisma.contact.create({
-    data: {
-      ...input,
-      isGlobal: input.isGlobal ?? true,
-      createdById,
-    },
+    data: { ...input, createdById },
   });
-  if (incidentId) {
-    await prisma.incidentContact.create({ data: { incidentId, contactId: contact.id } });
-  }
-  logAudit({ userId: createdById, action: 'CREATE', resource: 'CONTACT', resourceId: contact.id, incidentId: incidentId ?? undefined, ipAddress });
+  logAudit({ userId: createdById, action: 'CREATE', resource: 'CONTACT', resourceId: contact.id, ipAddress });
   return contact;
 }
 
 export async function updateContact(
   id: string,
-  input: Partial<Omit<ContactInput, 'isGlobal'>>,
+  input: Partial<ContactInput>,
   userId: string,
   ipAddress?: string | null,
 ) {
@@ -76,21 +59,5 @@ export async function deleteContact(id: string, userId: string, ipAddress?: stri
   await getContact(id);
   await prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } });
   logAudit({ userId, action: 'DELETE', resource: 'CONTACT', resourceId: id, ipAddress });
-  return true;
-}
-
-export async function linkContactToIncident(contactId: string, incidentId: string, userId: string) {
-  await prisma.incidentContact.upsert({
-    where: { incidentId_contactId: { incidentId, contactId } },
-    create: { incidentId, contactId },
-    update: {},
-  });
-  logAudit({ userId, action: 'LINK', resource: 'CONTACT', resourceId: contactId, incidentId });
-  return true;
-}
-
-export async function unlinkContactFromIncident(contactId: string, incidentId: string, userId: string) {
-  await prisma.incidentContact.deleteMany({ where: { incidentId, contactId } });
-  logAudit({ userId, action: 'UNLINK', resource: 'CONTACT', resourceId: contactId, incidentId });
   return true;
 }

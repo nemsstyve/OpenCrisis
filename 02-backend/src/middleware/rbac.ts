@@ -6,6 +6,17 @@ import { USER_INCLUDE } from '../services/auth';
 import { logAudit } from './audit';
 
 /**
+ * Exige une session authentifiée et renvoie l'identifiant utilisateur garanti non-null.
+ * Remplace les vérifications `if (!ctx.userId)` répétées dans les resolvers.
+ */
+export function requireAuth(ctx: GraphQLContext): string {
+  if (!ctx.userId) {
+    throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+  }
+  return ctx.userId;
+}
+
+/**
  * Vérifie sans lever d'exception si l'utilisateur possède une permission.
  * Utile pour les vérifications conditionnelles (ex. auteur OU pilote).
  */

@@ -38,7 +38,6 @@ const ROLE_DEFINITIONS: Array<{
       PermissionResource.TIMELINE,
       PermissionResource.ANNUAIRE,
       PermissionResource.DOCUMENTS,
-      PermissionResource.CARTOGRAPHIE,
     ].flatMap(r => ALL_ACTIONS.map(a => ({ resource: r, action: a }))),
   },
   {

@@ -16,7 +16,15 @@ export async function createTag(name: string, color: string | null | undefined, 
 }
 
 export async function deleteTag(id: string, userId: string) {
-  await prisma.tag.delete({ where: { id } });
+  const tag = await prisma.tag.findUnique({ where: { id } });
+  if (!tag) throw new GraphQLError('Tag introuvable', { extensions: { code: 'NOT_FOUND' } });
+
+  // VI9 — détacher les associations puis supprimer le tag, dans une transaction
+  await prisma.$transaction([
+    prisma.logEntryTag.deleteMany({ where: { tagId: id } }),
+    prisma.tag.delete({ where: { id } }),
+  ]);
+
   logAudit({ userId, action: 'DELETE', resource: 'TAG', resourceId: id });
   return true;
 }

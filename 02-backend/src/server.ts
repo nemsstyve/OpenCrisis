@@ -4,7 +4,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ApolloServer } from '@apollo/server';
-import { ApolloServerPluginDisableSchemaIntrospection } from '@apollo/server/plugin/disabled';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { WebSocketServer } from 'ws';
@@ -18,20 +17,13 @@ import { pubsub } from './pubsub';
 import { verifyAccessToken, extractBearerToken } from './middleware/auth';
 import filesRouter from './routes/files';
 import exportRouter from './routes/export';
+import { loadEnv } from './utils/env';
 import type { GraphQLContext } from './context';
 
-const IS_PROD = process.env.NODE_ENV === 'production';
-
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
-for (const key of REQUIRED_ENV) {
-  if (!process.env[key]) {
-    console.error(`[startup] Missing required environment variable: ${key}`);
-    process.exit(1);
-  }
-}
-
-const PORT = parseInt(process.env.PORT ?? '4000', 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const env = loadEnv();
+const IS_PROD = env.NODE_ENV === 'production';
+const PORT = env.PORT;
+const CORS_ORIGIN = env.CORS_ORIGIN;
 
 async function main() {
   const app = express();
@@ -82,14 +74,10 @@ async function main() {
     },
   ];
 
-  // D4 — désactiver l'introspection en production
-  if (IS_PROD) {
-    apolloPlugins.push(ApolloServerPluginDisableSchemaIntrospection() as never);
-  }
-
   const server = new ApolloServer<GraphQLContext>({
     schema,
-    // D4 — limiter la profondeur des requêtes GraphQL
+    // D4 — introspection désactivée en prod + profondeur limitée
+    introspection: !IS_PROD,
     validationRules: [depthLimit(10)],
     plugins: apolloPlugins,
   });

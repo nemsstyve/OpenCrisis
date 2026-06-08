@@ -1,7 +1,8 @@
 import { GraphQLError } from 'graphql';
 import type { Cell } from '@prisma/client';
 import type { GraphQLContext } from '../context';
-import { requirePermission, hasPermission } from '../middleware/rbac';
+import { requirePermission, hasPermission, requireAuth } from '../middleware/rbac';
+import { validate, createLogEntrySchema } from '../utils/validation';
 import { prisma } from '../prisma';
 import { pubsub, TOPICS } from '../pubsub';
 import {
@@ -34,8 +35,9 @@ export const logEntryResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, cellToResource(cell) as Parameters<typeof requirePermission>[1], 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return createLogEntry(incidentId, cell, content, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(createLogEntrySchema, { content });
+      return createLogEntry(incidentId, cell, data.content, userId, ctx.req?.ip);
     },
 
     editLogEntry: async (
@@ -43,35 +45,36 @@ export const logEntryResolvers = {
       { id, content }: { id: string; content: string },
       ctx: GraphQLContext,
     ) => {
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+      const userId = requireAuth(ctx);
+      const data = validate(createLogEntrySchema, { content });
 
       const entry = await prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
 
       // DÉC-2 : auteur OU utilisateur avec WRITE sur la cellule (Pilote / Admin)
-      const isAuthor = entry.authorId === ctx.userId;
+      const isAuthor = entry.authorId === userId;
       if (!isAuthor) {
         const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
         if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
       }
 
-      return editLogEntry(id, content, ctx.userId, ctx.req?.ip);
+      return editLogEntry(id, data.content, userId, ctx.req?.ip);
     },
 
     deleteLogEntry: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+      const userId = requireAuth(ctx);
 
       const entry = await prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
 
       // DÉC-2 : auteur OU utilisateur avec WRITE sur la cellule (Pilote / Admin)
-      const isAuthor = entry.authorId === ctx.userId;
+      const isAuthor = entry.authorId === userId;
       if (!isAuthor) {
         const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
         if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
       }
 
-      return deleteLogEntry(id, ctx.userId, ctx.req?.ip);
+      return deleteLogEntry(id, userId, ctx.req?.ip);
     },
 
     addTagToLogEntry: async (
@@ -79,13 +82,13 @@ export const logEntryResolvers = {
       { logEntryId, tagId }: { logEntryId: string; tagId: string },
       ctx: GraphQLContext,
     ) => {
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+      const userId = requireAuth(ctx);
 
       const entry = await prisma.logEntry.findFirst({ where: { id: logEntryId, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
       await requirePermission(ctx, cellToResource(entry.cell), 'WRITE');
 
-      return addTagToLogEntry(logEntryId, tagId, ctx.userId);
+      return addTagToLogEntry(logEntryId, tagId, userId);
     },
 
     removeTagFromLogEntry: async (
@@ -93,13 +96,13 @@ export const logEntryResolvers = {
       { logEntryId, tagId }: { logEntryId: string; tagId: string },
       ctx: GraphQLContext,
     ) => {
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+      const userId = requireAuth(ctx);
 
       const entry = await prisma.logEntry.findFirst({ where: { id: logEntryId, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
       await requirePermission(ctx, cellToResource(entry.cell), 'WRITE');
 
-      return removeTagFromLogEntry(logEntryId, tagId, ctx.userId);
+      return removeTagFromLogEntry(logEntryId, tagId, userId);
     },
   },
 

@@ -113,7 +113,6 @@ model Incident {
   logEntries     LogEntry[]
   timelineEvents TimelineEvent[]
   documents      Document[]
-  contacts       IncidentContact[]
   auditLogs      AuditLog[]
 
   @@index([status])
@@ -225,27 +224,14 @@ model Contact {
   email        String?
   site         String?
   notes        String?
-  isGlobal     Boolean   @default(true)
   createdById  String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  createdBy User              @relation(fields: [createdById], references: [id])
-  incidents IncidentContact[]
+  createdBy User @relation(fields: [createdById], references: [id])
 
   @@index([deletedAt])
-  @@index([isGlobal])
-}
-
-model IncidentContact {
-  incidentId String
-  contactId  String
-
-  incident Incident @relation(fields: [incidentId], references: [id])
-  contact  Contact  @relation(fields: [contactId], references: [id])
-
-  @@id([incidentId, contactId])
 }
 
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
@@ -321,6 +307,5 @@ enum PermissionResource {
   DOCUMENTS
   BIBLIOTHEQUE
   ANNUAIRE
-  CARTOGRAPHIE
   ADMIN
 }

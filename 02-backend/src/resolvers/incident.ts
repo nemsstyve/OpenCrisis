@@ -1,6 +1,6 @@
-import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAuth } from '../middleware/rbac';
+import { validate, createIncidentSchema, updateIncidentSchema } from '../utils/validation';
 import { pubsub, TOPICS } from '../pubsub';
 import {
   getIncidents, getIncident,
@@ -27,8 +27,9 @@ export const incidentResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'DASHBOARD', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return createIncident(input as Parameters<typeof createIncident>[0], ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(createIncidentSchema, input);
+      return createIncident(data as Parameters<typeof createIncident>[0], userId, ctx.req?.ip);
     },
 
     updateIncident: async (
@@ -37,14 +38,15 @@ export const incidentResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'DASHBOARD', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return updateIncident(id, input as Parameters<typeof updateIncident>[1], ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(updateIncidentSchema, input);
+      return updateIncident(id, data as Parameters<typeof updateIncident>[1], userId, ctx.req?.ip);
     },
 
     deleteIncident: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return deleteIncident(id, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      return deleteIncident(id, userId, ctx.req?.ip);
     },
   },
 

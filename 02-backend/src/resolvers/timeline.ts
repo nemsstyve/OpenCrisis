@@ -1,6 +1,6 @@
-import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAuth } from '../middleware/rbac';
+import { validate, createTimelineEventSchema, updateTimelineEventSchema } from '../utils/validation';
 import { pubsub, TOPICS } from '../pubsub';
 import {
   getTimelineEvents, getTimelineEvent,
@@ -26,8 +26,9 @@ export const timelineResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return createTimelineEvent(incidentId, input, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(createTimelineEventSchema, input);
+      return createTimelineEvent(incidentId, data as Parameters<typeof createTimelineEvent>[1], userId, ctx.req?.ip);
     },
 
     updateTimelineEvent: async (
@@ -36,14 +37,15 @@ export const timelineResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return updateTimelineEvent(id, input, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(updateTimelineEventSchema, input);
+      return updateTimelineEvent(id, data as Parameters<typeof updateTimelineEvent>[1], userId, ctx.req?.ip);
     },
 
     deleteTimelineEvent: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return deleteTimelineEvent(id, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      return deleteTimelineEvent(id, userId, ctx.req?.ip);
     },
   },
 

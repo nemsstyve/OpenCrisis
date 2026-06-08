@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
 import type { UserWithRoles } from '../services/auth';
+import { requireAuth } from '../middleware/rbac';
 import { login, logout, rotateRefreshToken, getMe, changePassword } from '../services/auth';
 
 function flattenPermissions(user: UserWithRoles) {
@@ -61,10 +62,8 @@ export const authResolvers = {
       { currentPassword, newPassword }: { currentPassword: string; newPassword: string },
       ctx: GraphQLContext,
     ) => {
-      if (!ctx.userId) {
-        throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      }
-      return changePassword(ctx.userId, currentPassword, newPassword, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      return changePassword(userId, currentPassword, newPassword, ctx.req?.ip);
     },
   },
 

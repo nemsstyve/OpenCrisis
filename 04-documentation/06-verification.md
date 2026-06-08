@@ -639,3 +639,29 @@ Phase 7 — Fonctionnalités transverses : page Administration (CRUD users/rôle
 - [x] **A01** — queries admin sans token → "Non authentifié" ✅
 - [x] **A03** — aucun `$queryRaw`, bcrypt 12 rounds pour création/reset password ✅
 - [x] **A09** — CREATE/DELETE ADMIN tracés dans AuditLog avec metadata ✅
+
+---
+
+## Sprint P2 — Dette & nettoyage (2026-06-08)
+
+### Build & migration
+- [x] `docker compose up --build` → backend + frontend `Built`, 5 conteneurs `healthy` ✅
+- [x] `tsc` backend + frontend : 0 erreur (2 bugs de build P1 corrigés au passage) ✅
+- [x] Migration `drop_cartographie_incident_contact` appliquée via `migrate deploy` ✅
+- [x] Re-seed : 16 permissions (8 ressources × 2), 5 rôles, admin ✅
+- [x] Schéma DB : table `IncidentContact` absente, colonne `Contact.isGlobal` absente, enum `PermissionResource` sans CARTOGRAPHIE ✅
+
+### Fonctionnel (via `POST /api/graphql`)
+- [x] Login admin → `accessToken` ✅
+- [x] `contacts` / `createContact` sans `isGlobal`/`incidentId` ✅
+- [x] **F1** — `createContact` email invalide → « Email invalide » (`BAD_USER_INPUT`) ✅
+- [x] **F1** — `createContact` prénom vide → « Le prénom est requis » ✅
+- [x] **F1** — `createLogEntry` contenu vide → « Le contenu est requis » ✅
+- [x] **F5** — export PDF multi-pages (40 entrées) → « Page 1/2 » + « Page 2/2 » sur chaque page physique ✅
+- [x] **VI9** — `deleteTag` avec `LogEntryTag` associé → succès, entrée conservée (tags détachés) ✅
+
+### Sécurité (OWASP, non-régression)
+- [x] **A01/A07** — `requireAuth(ctx)` couvre les resolvers ; requête sans token → « Non authentifié » (`UNAUTHENTICATED`) ✅
+- [x] **A03** — inputs malformés rejetés par zod avant traitement ✅
+- [x] **F4** — `DATABASE_URL` invalide → `[startup] Configuration d'environnement invalide` + exit 1 ✅
+- [x] Audit toujours écrit, aucune permission retirée par erreur (seul CARTOGRAPHIE supprimé) ✅

@@ -117,3 +117,32 @@ Rien de ce qui en dépend ne doit être codé avant arbitrage.
 - Après P0-b : plus de fuite inter-cellules à l'export, plus de path traversal, mots de passe faibles rejetés.
 - Après P1 : RBAC de route effectif (`/admin` → écran « Accès refusé »), TLS/HSTS/CSP en place, feedback utilisateur unifié (toasts).
 - Après P2 : couverture de tests RBAC ≥ 90 %, passe a11y validée.
+
+---
+
+## 4. Sprint P2 — avancement (2026-06-08)
+
+### ✅ Livré et vérifié
+- **VI7** — CARTOGRAPHIE retiré (enum Prisma, seed, matrice admin) + migration `drop_cartographie_incident_contact`.
+- **VI8** — `IncidentContact` retiré (modèle, service, resolver, typeDefs, front) + colonne `Contact.isGlobal` supprimée.
+- **F2** — helper `requireAuth(ctx)` ; 21 `if (!ctx.userId)` redondants supprimés.
+- **F1** — schémas zod centralisés (`utils/validation.ts` + `validate()`) sur toutes les mutations (incident, contact, logEntry, timeline, tag). Vérifié : « Email invalide », « Le prénom est requis », « Le contenu est requis » → `BAD_USER_INPUT`.
+- **F4** — validation zod des variables d'env (`utils/env.ts`). Vérifié : URL invalide → exit 1.
+- **F5** — pagination PDF corrigée. Vérifié : « Page 1/2 » + « Page 2/2 » sur PDF multi-pages.
+- **VI9** — `deleteTag` transactionnel (détache `LogEntryTag` puis supprime). Vérifié : suppression avec association OK, entrée conservée.
+- **VI3** — terminologie « Bibliothèque » harmonisée.
+- **VII3** — filtre Actifs/Clos/Tous dans le sélecteur d'incidents.
+- **VII4** — hook `useDebounce` sur recherches Annuaire + Bibliothèque.
+- **Bonus** — correction de 2 bugs de build P1 révélés par le `tsc` de prod (plugin Apollo inexistant → `introspection: !IS_PROD` ; types `graphql-depth-limit`).
+
+> **Note** : VI2 (`onClearFilter`) était en réalité utilisé → aucun changement.
+
+### ⏳ Reste P2 (sprint suivant, build requis pour itérer)
+- **VII1** — migration react-hook-form + zod des 5 formulaires.
+- **VII6** — modale d'édition d'un événement timeline.
+- **V4** — skeletons sur listes/tableaux.
+- **V2 / V3** — responsive + passe a11y.
+- **F3** — suite de tests RBAC (sprint test dédié, décision utilisateur).
+
+### Reporté
+- **VII2** — écran « Mon compte » self-service (décision utilisateur).

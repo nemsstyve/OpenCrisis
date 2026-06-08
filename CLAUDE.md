@@ -158,7 +158,7 @@ opencrisis/
 - **Tag** — tags libres sur les entrées main courante (relation M2M via `LogEntryTag`)
 - **TimelineEvent** — événement chronologique de la crise
 - **Document** — fichier. `incidentId null` = bibliothèque globale ; sinon rattaché à l'incident. `category` distingue ARTIFACT / FICHE_REFLEXE / RAPPORT / PROCEDURE / OTHER
-- **Contact** — annuaire. `isGlobal=true` = contact permanent ; `false` = spécifique à un incident
+- **Contact** — annuaire de l'organisation. Le rattachement par incident (`IncidentContact`) et le champ `isGlobal` ont été retirés au Sprint P2
 - **AuditLog** — trace automatique de toutes les mutations (ne jamais supprimer)
 - **RefreshToken** — tokens de renouvellement JWT stockés en base
 
@@ -171,7 +171,7 @@ opencrisis/
 | `Administrateur` | Tout + ADMIN |
 | `Pilote de crise` | Tout sauf ADMIN |
 | `Cellule Directionnelle` | DASHBOARD, MAIN_COURANTE_DIR, TIMELINE, ANNUAIRE, DOCUMENTS |
-| `Cellule Opérationnelle` | DASHBOARD, MAIN_COURANTE_OPS, TIMELINE, ANNUAIRE, DOCUMENTS, CARTOGRAPHIE |
+| `Cellule Opérationnelle` | DASHBOARD, MAIN_COURANTE_OPS, TIMELINE, ANNUAIRE, DOCUMENTS |
 | `Observateur` | DASHBOARD, TIMELINE, BIBLIOTHEQUE, DOCUMENTS (READ only) |
 
 ---
@@ -184,6 +184,9 @@ opencrisis/
 - **Rate-limiting login** — 10 tentatives / 15 min par IP, en mémoire dans `services/auth.ts`. Les échecs de login sont audités.
 - **`01-frontend/src/types/generated.ts` ne se modifie jamais à la main** — régénérer avec `pnpm codegen` (requiert Node.js local) après tout changement du schéma GraphQL. Le schéma source est `01-frontend/schema.graphql` (extrait depuis `02-backend/src/schema/` via le script PowerShell en bas). `src/types/api.ts` a été supprimé (Lot UI-0, DÉC-UI-2).
 - **Toute mutation GraphQL doit appeler `requirePermission(ctx, resource, action)`** avant d'agir
+- **Authentification des resolvers (F2)** — utiliser le helper `requireAuth(ctx)` de `middleware/rbac.ts` (retourne le `userId` non-null) plutôt que des `if (!ctx.userId)` répétés
+- **Validation des inputs (F1)** — schémas zod centralisés dans `utils/validation.ts`, appliqués via `validate(schema, input)` en tête de chaque mutation (lève `BAD_USER_INPUT`)
+- **Validation des variables d'env (F4)** — schéma zod dans `utils/env.ts`, `loadEnv()` appelé au démarrage de `server.ts` (exit 1 si invalide)
 - **Toute mutation doit appeler `logAudit(...)`** — fire-and-forget, ne pas await
 - **Les fichiers uploadés vont dans `/app/uploads/incidents/:incidentId/`** — jamais à la racine du volume
 - **Soft delete uniquement** sur User, Incident, LogEntry, Document, Contact — utiliser `deletedAt`, ne jamais `DELETE` en base

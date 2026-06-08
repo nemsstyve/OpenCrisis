@@ -7,6 +7,7 @@ import type { DocumentCategory } from '@prisma/client';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
 import { requireHttpPermission, type AuthRequest } from '../middleware/httpPermission';
 import { createDocument, getDocument, UPLOADS_DIR } from '../services/document';
+import { logAudit } from '../middleware/audit';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -113,6 +114,17 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!allowed) return;
 
     const doc = await getDocument(req.params.id);
+
+    // A09 — tracer chaque téléchargement de document (accès à une ressource sensible)
+    logAudit({
+      userId: (req as AuthRequest).userId,
+      action: 'DOWNLOAD',
+      resource: 'DOCUMENT',
+      resourceId: doc.id,
+      incidentId: doc.incidentId ?? undefined,
+      ipAddress: req.ip,
+    });
+
     const filePath = path.join(UPLOADS_DIR, doc.filePath);
     res.setHeader('Content-Type', doc.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.name)}"`);

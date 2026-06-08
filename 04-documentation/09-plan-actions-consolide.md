@@ -133,15 +133,16 @@ Rien de ce qui en dépend ne doit être codé avant arbitrage.
 - **VI3** — terminologie « Bibliothèque » harmonisée.
 - **VII3** — filtre Actifs/Clos/Tous dans le sélecteur d'incidents.
 - **VII4** — hook `useDebounce` sur recherches Annuaire + Bibliothèque.
+- **VII6** — modale réutilisable `EventModal` (création/édition) + bouton éditer par ligne, câblage `updateTimelineEvent`.
+- **V4** — skeletons de chargement (composant `Skeleton`) sur Timeline et Annuaire.
+- **V2** — grilles de modale responsives (`grid-cols-1 sm:grid-cols-2`).
+- **VII1** — migration react-hook-form + zod des **5 formulaires** (Login, IncidentSelector, ContactModal, EventModal, UserModal) ; schémas centralisés dans `src/lib/formSchemas.ts` ; ajout `zod` + `@hookform/resolvers`. Vérifié : build tsc OK + rendu live.
 - **Bonus** — correction de 2 bugs de build P1 révélés par le `tsc` de prod (plugin Apollo inexistant → `introspection: !IS_PROD` ; types `graphql-depth-limit`).
 
 > **Note** : VI2 (`onClearFilter`) était en réalité utilisé → aucun changement.
 
-### ⏳ Reste P2 (sprint suivant, build requis pour itérer)
-- **VII1** — migration react-hook-form + zod des 5 formulaires.
-- **VII6** — modale d'édition d'un événement timeline.
-- **V4** — skeletons sur listes/tableaux.
-- **V2 / V3** — responsive + passe a11y.
+### ⏳ Reste P2 (sprint suivant)
+- **V3** — passe a11y approfondie (aria-label, contrastes, `scope`) au-delà des grilles responsives.
 - **F3** — suite de tests RBAC (sprint test dédié, décision utilisateur).
 
 ### Reporté

@@ -665,3 +665,10 @@ Phase 7 — Fonctionnalités transverses : page Administration (CRUD users/rôle
 - [x] **A03** — inputs malformés rejetés par zod avant traitement ✅
 - [x] **F4** — `DATABASE_URL` invalide → `[startup] Configuration d'environnement invalide` + exit 1 ✅
 - [x] Audit toujours écrit, aucune permission retirée par erreur (seul CARTOGRAPHIE supprimé) ✅
+
+### Lot C — vague 2 (UI)
+- [x] **VII6** — édition d'un événement timeline (modale create/edit + bouton par ligne) ✅
+- [x] **V4** — skeletons de chargement (Timeline, Annuaire) ✅
+- [x] **V2** — grilles de modale responsives ✅
+- [x] **VII1** — 5 formulaires migrés react-hook-form + zod (build tsc OK, deps `zod`/`@hookform/resolvers` ajoutées, lockfile régénéré) ✅
+- [x] Rendu live confirmé via navigateur (filtre Actifs/Clos/Tous VII3 + front rebuild) ✅

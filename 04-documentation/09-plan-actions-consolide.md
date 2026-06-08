@@ -141,9 +141,11 @@ Rien de ce qui en dépend ne doit être codé avant arbitrage.
 
 > **Note** : VI2 (`onClearFilter`) était en réalité utilisé → aucun changement.
 
-### ⏳ Reste P2 (sprint suivant)
-- **V3** — passe a11y approfondie (aria-label, contrastes, `scope`) au-delà des grilles responsives.
+- **V3** — passe a11y : `scope="col"` sur tous les `<th>`, `aria-label` boutons icône/fermeture/filtres, `aria-pressed` toggles, `role="status"` skeletons, `aria-live="polite"` tableaux de résultats, `aria-label` inputs de recherche. Vérifié : tsc OK.
+
+### ⏳ Reste (sprint dédié)
 - **F3** — suite de tests RBAC (sprint test dédié, décision utilisateur).
+- **VII2** — écran « Mon compte » self-service (reporté sur décision utilisateur).
 
 ### Reporté
 - **VII2** — écran « Mon compte » self-service (décision utilisateur).

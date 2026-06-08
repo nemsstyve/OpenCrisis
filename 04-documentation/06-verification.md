@@ -672,3 +672,4 @@ Phase 7 — Fonctionnalités transverses : page Administration (CRUD users/rôle
 - [x] **V2** — grilles de modale responsives ✅
 - [x] **VII1** — 5 formulaires migrés react-hook-form + zod (build tsc OK, deps `zod`/`@hookform/resolvers` ajoutées, lockfile régénéré) ✅
 - [x] Rendu live confirmé via navigateur (filtre Actifs/Clos/Tous VII3 + front rebuild) ✅
+- [x] **V3** — `scope="col"` tableaux, `aria-label` boutons icône/filtres, `role="status"` skeletons, `aria-live` résultats, `aria-label` inputs de recherche — build tsc OK ✅

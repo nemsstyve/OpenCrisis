@@ -1,49 +1,24 @@
 import { tokenStore } from "./tokenStore";
+import { triggerBlobDownload } from "./fileUtils";
 
-/**
- * Télécharge le rapport PDF de la main courante d'un incident.
- * Endpoint : GET /api/export/:incidentId/pdf
- */
-export async function exportPdf(incidentId: string, incidentName: string): Promise<void> {
+async function fetchExport(url: string, errorPrefix: string): Promise<Blob> {
   const token = tokenStore.get();
-  const response = await fetch(`/api/export/${incidentId}/pdf`, {
+  const response = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(err.error ?? `Export PDF échoué (${response.status})`);
+    throw new Error(err.error ?? `${errorPrefix} (${response.status})`);
   }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `main-courante-${incidentName.replace(/\s+/g, "-").slice(0, 30)}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  return response.blob();
 }
 
-/**
- * Télécharge le rapport Excel complet d'un incident.
- * Endpoint : GET /api/export/:incidentId/xlsx
- */
+export async function exportPdf(incidentId: string, incidentName: string): Promise<void> {
+  const blob = await fetchExport(`/api/export/${incidentId}/pdf`, "Export PDF échoué");
+  triggerBlobDownload(blob, `main-courante-${incidentName.replace(/\s+/g, "-").slice(0, 30)}.pdf`);
+}
+
 export async function exportXlsx(incidentId: string, incidentName: string): Promise<void> {
-  const token = tokenStore.get();
-  const response = await fetch(`/api/export/${incidentId}/xlsx`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(err.error ?? `Export Excel échoué (${response.status})`);
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `rapport-${incidentName.replace(/\s+/g, "-").slice(0, 30)}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const blob = await fetchExport(`/api/export/${incidentId}/xlsx`, "Export Excel échoué");
+  triggerBlobDownload(blob, `rapport-${incidentName.replace(/\s+/g, "-").slice(0, 30)}.xlsx`);
 }

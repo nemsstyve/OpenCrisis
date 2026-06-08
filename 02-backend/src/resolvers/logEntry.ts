@@ -10,9 +10,19 @@ import {
   deleteLogEntry, addTagToLogEntry, removeTagFromLogEntry,
 } from '../services/logEntry';
 
-// Cellule → ressource RBAC
 function cellToResource(cell: Cell) {
   return cell === 'OPERATIONAL' ? 'MAIN_COURANTE_OPS' : 'MAIN_COURANTE_DIR';
+}
+
+async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string) {
+  const entry = await prisma.logEntry.findFirst({ where: { id: entryId, deletedAt: null } });
+  if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
+  const isAuthor = entry.authorId === ctx.userId;
+  if (!isAuthor) {
+    const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
+    if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
+  }
+  return entry;
 }
 
 export const logEntryResolvers = {
@@ -47,33 +57,13 @@ export const logEntryResolvers = {
     ) => {
       const userId = requireAuth(ctx);
       const data = validate(createLogEntrySchema, { content });
-
-      const entry = await prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
-      if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
-
-      // DÉC-2 : auteur OU utilisateur avec WRITE sur la cellule (Pilote / Admin)
-      const isAuthor = entry.authorId === userId;
-      if (!isAuthor) {
-        const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
-        if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
-      }
-
+      await checkCanModifyEntry(ctx, id);
       return editLogEntry(id, data.content, userId, ctx.req?.ip);
     },
 
     deleteLogEntry: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       const userId = requireAuth(ctx);
-
-      const entry = await prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
-      if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
-
-      // DÉC-2 : auteur OU utilisateur avec WRITE sur la cellule (Pilote / Admin)
-      const isAuthor = entry.authorId === userId;
-      if (!isAuthor) {
-        const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
-        if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
-      }
-
+      await checkCanModifyEntry(ctx, id);
       return deleteLogEntry(id, userId, ctx.req?.ip);
     },
 
@@ -83,11 +73,9 @@ export const logEntryResolvers = {
       ctx: GraphQLContext,
     ) => {
       const userId = requireAuth(ctx);
-
       const entry = await prisma.logEntry.findFirst({ where: { id: logEntryId, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
       await requirePermission(ctx, cellToResource(entry.cell), 'WRITE');
-
       return addTagToLogEntry(logEntryId, tagId, userId);
     },
 
@@ -97,11 +85,9 @@ export const logEntryResolvers = {
       ctx: GraphQLContext,
     ) => {
       const userId = requireAuth(ctx);
-
       const entry = await prisma.logEntry.findFirst({ where: { id: logEntryId, deletedAt: null } });
       if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
       await requirePermission(ctx, cellToResource(entry.cell), 'WRITE');
-
       return removeTagFromLogEntry(logEntryId, tagId, userId);
     },
   },
@@ -126,8 +112,8 @@ export const logEntryResolvers = {
   LogEntry: {
     author: (parent: { author: unknown }) => parent.author,
     tags: (parent: { tags: Array<{ tag: unknown }> }) => parent.tags.map(t => t.tag),
-    editedAt: (parent: { editedAt: Date | null }) => parent.editedAt?.toISOString() ?? null,
-    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
-    updatedAt: (parent: { updatedAt: Date }) => parent.updatedAt.toISOString(),
+    editedAt: (parent: { editedAt: Date | string | null }) => parent.editedAt ? new Date(parent.editedAt).toISOString() : null,
+    createdAt: (parent: { createdAt: Date | string }) => new Date(parent.createdAt).toISOString(),
+    updatedAt: (parent: { updatedAt: Date | string }) => new Date(parent.updatedAt).toISOString(),
   },
 };

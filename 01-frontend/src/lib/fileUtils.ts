@@ -1,10 +1,16 @@
 import { tokenStore } from "./tokenStore";
 
-/**
- * Downloads a document from the backend REST endpoint.
- * Uses the JWT access token from memory — never from localStorage.
- * The backend route is GET /api/files/:id (requires auth).
- */
+export function triggerBlobDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadFile(docId: string, fileName: string): Promise<void> {
   const token = tokenStore.get();
   const response = await fetch(`/api/files/${docId}`, {
@@ -16,15 +22,7 @@ export async function downloadFile(docId: string, fileName: string): Promise<voi
     throw new Error(`Téléchargement échoué (${response.status})${text ? `: ${text}` : ""}`);
   }
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(await response.blob(), fileName);
 }
 
 /**

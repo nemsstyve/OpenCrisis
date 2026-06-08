@@ -17,31 +17,31 @@ install_front:
     - npm install
   artifacts:
     paths:
-      - opencrisis/01-frontend/node_modules/
+      - 01-frontend/node_modules/
 
 install_back:
   stage: install
   script:
     - echo "Installation backend"
-    - cd opencrisis/02-backend
+    - cd 02-backend
     - npm install
   artifacts:
     paths:
-      - opencrisis/02-backend/node_modules/
+      - 02-backend/node_modules/
 
 #Lint
 lint_front:
   stage: lint
   script:
     - echo "Lint frontend"
-    - cd opencrisis/01-frontend
+    - cd 01-frontend
     - npm run lint
 
 lint_back:
   stage: lint
   script:
     - echo "Lint backend"
-#    - cd opencrisis/02-backend
+#    - cd 02-backend
 #    - npm run lint
 
 #Verification des secrets
@@ -64,7 +64,7 @@ build_front:
   stage: build
   script:
     - echo "Build frontend"
-    - cd opencrisis/01-frontend
+    - cd 01-frontend
     - npm run build
 
 # Test
@@ -72,7 +72,7 @@ test_front:
   stage: test
   script:
     - echo "Test frontend"
-    - cd opencrisis/01-frontend
+    - cd 01-frontend
     - npm run preview & sleep 5
     - echo "Frontend lance"
 
@@ -80,7 +80,7 @@ test_back:
   stage: test
   script:
     - echo "Test backend"
-    - cd opencrisis/02-backend
+    - cd 02-backend
     - npm start & sleep 5
     - echo "Backend lance"
 
@@ -138,7 +138,7 @@ docker_front:
   <<: *docker_rules
   script:
     - echo "Build Docker image — frontend"
-    - docker build -t $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/01-frontend:latest opencrisis/01-frontend
+    - docker build -t $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/01-frontend:latest 01-frontend
     - docker push $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA
     - docker push $CI_REGISTRY_IMAGE/01-frontend:latest
  
@@ -152,7 +152,7 @@ docker_back:
   <<: *docker_rules
   script:
     - echo "Build Docker image — backend"
-    - docker build -t $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/02-backend:latest opencrisis/02-backend
+    - docker build -t $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/02-backend:latest 02-backend
     - docker push $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA
     - docker push $CI_REGISTRY_IMAGE/02-backend:latest
 

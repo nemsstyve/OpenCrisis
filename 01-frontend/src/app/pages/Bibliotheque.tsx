@@ -10,6 +10,7 @@ import {
 } from "../../graphql/document";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
+import { useDebounce } from "../../hooks/useDebounce";
 import { downloadFile, uploadFile, formatBytes } from "../../lib/fileUtils";
 import type { GqlDocument, DocumentCategory } from "../../types/generated";
 
@@ -433,12 +434,13 @@ export default function Bibliotheque() {
   }
 
   // ── Données filtrées par recherche ────────────────────────────────────────
+  const debouncedSearch = useDebounce(searchQuery);
   const currentDocs = (activeTab === "global" ? globalData?.documents : incidentData?.documents) ?? [];
-  const searchedDocs = searchQuery
+  const searchedDocs = debouncedSearch
     ? currentDocs.filter(
         (d) =>
-          d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          CATEGORY_LABELS[d.category].toLowerCase().includes(searchQuery.toLowerCase())
+          d.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          CATEGORY_LABELS[d.category].toLowerCase().includes(debouncedSearch.toLowerCase())
       )
     : currentDocs;
 
@@ -449,7 +451,7 @@ export default function Bibliotheque() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl mb-2 text-white">Documents</h1>
+          <h1 className="text-3xl mb-2 text-white">Bibliothèque</h1>
           <p className="text-gray-400">Fiches réflexes, procédures, artefacts et pièces jointes</p>
         </div>
         {canWrite && (

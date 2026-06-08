@@ -27,7 +27,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   DASHBOARD: "Dashboard", MAIN_COURANTE_DIR: "MC Direction",
   MAIN_COURANTE_OPS: "MC Opérationnel", TIMELINE: "Timeline",
   DOCUMENTS: "Documents", BIBLIOTHEQUE: "Bibliothèque",
-  ANNUAIRE: "Annuaire", CARTOGRAPHIE: "Cartographie", ADMIN: "Administration",
+  ANNUAIRE: "Annuaire", ADMIN: "Administration",
 };
 
 const inputCls =

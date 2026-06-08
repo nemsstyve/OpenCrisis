@@ -11,6 +11,7 @@ import {
 } from "../../graphql/contact";
 import { useAppStore } from "../../store/useAppStore";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
+import { useDebounce } from "../../hooks/useDebounce";
 import type { GqlContact } from "../../types/generated";
 
 // ── Formulaire contact (création / édition) ───────────────────────────────────
@@ -223,7 +224,7 @@ export default function Annuaire() {
       if (modal.contact) {
         await updateContact({ variables: { id: modal.contact.id, input } });
       } else {
-        await createContact({ variables: { input: { ...input, isGlobal: true } } });
+        await createContact({ variables: { input } });
       }
       setModal({ open: false });
     } catch (err: unknown) {
@@ -247,10 +248,11 @@ export default function Annuaire() {
   }
 
   // ── Filtres ───────────────────────────────────────────────────────────────
+  const debouncedSearch = useDebounce(searchQuery);
   const contacts = data?.contacts ?? [];
   const filtered = contacts.filter((c) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedSearch) return true;
+    const q = debouncedSearch.toLowerCase();
     return (
       `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
       c.role.toLowerCase().includes(q) ||

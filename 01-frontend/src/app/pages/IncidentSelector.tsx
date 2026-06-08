@@ -36,6 +36,7 @@ export default function IncidentSelector() {
     refetchQueries: [{ query: INCIDENTS_QUERY }],
   });
 
+  const [statusFilter, setStatusFilter] = useState<"active" | "closed" | "all">("active");
   const [showModal, setShowModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -65,6 +66,18 @@ export default function IncidentSelector() {
   }
 
   const canCreate = hasPermission("DASHBOARD", "WRITE");
+
+  const visibleIncidents = (data?.incidents ?? []).filter((incident) => {
+    if (statusFilter === "active") return incident.status !== "CLOSED";
+    if (statusFilter === "closed") return incident.status === "CLOSED";
+    return true;
+  });
+
+  const FILTERS: Array<{ key: typeof statusFilter; label: string }> = [
+    { key: "active", label: "Actifs" },
+    { key: "closed", label: "Clos" },
+    { key: "all", label: "Tous" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0f1116] flex items-center justify-center p-6">
@@ -100,15 +113,36 @@ export default function IncidentSelector() {
           </div>
         )}
 
+        {/* Filtre par statut */}
+        {data && (
+          <div className="mb-4 flex gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  statusFilter === f.key
+                    ? "bg-blue-500/15 text-blue-400"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-[#13151a]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Incident list */}
         {data && (
           <div className="space-y-3">
-            {data.incidents.length === 0 && (
+            {visibleIncidents.length === 0 && (
               <p className="text-gray-500 text-sm text-center py-8">
-                Aucun incident en cours. Déclarez-en un.
+                {statusFilter === "closed"
+                  ? "Aucun incident clos."
+                  : "Aucun incident en cours. Déclarez-en un."}
               </p>
             )}
-            {data.incidents.map((incident) => (
+            {visibleIncidents.map((incident) => (
               <button
                 key={incident.id}
                 onClick={() => selectIncident(incident)}

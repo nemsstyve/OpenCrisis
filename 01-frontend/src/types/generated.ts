@@ -155,7 +155,6 @@ export interface GqlContact {
   email?: string | null;
   site?: string | null;
   notes?: string | null;
-  isGlobal: boolean;
   createdAt: string;
   updatedAt: string;
 }

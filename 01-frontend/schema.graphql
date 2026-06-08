@@ -236,7 +236,6 @@ type Contact {
     email: String
     site: String
     notes: String
-    isGlobal: Boolean!
     createdAt: String!
     updatedAt: String!
   }
@@ -250,7 +249,6 @@ type Contact {
     email: String
     site: String
     notes: String
-    isGlobal: Boolean
   }
 
   input UpdateContactInput {
@@ -265,16 +263,14 @@ type Contact {
   }
 
   extend type Query {
-    contacts(incidentId: ID): [Contact!]!
+    contacts: [Contact!]!
     contact(id: ID!): Contact
   }
 
   extend type Mutation {
-    createContact(input: CreateContactInput!, incidentId: ID): Contact!
+    createContact(input: CreateContactInput!): Contact!
     updateContact(id: ID!, input: UpdateContactInput!): Contact!
     deleteContact(id: ID!): Boolean!
-    linkContactToIncident(contactId: ID!, incidentId: ID!): Boolean!
-    unlinkContactFromIncident(contactId: ID!, incidentId: ID!): Boolean!
   }
 
 # â”€â”€ Types spÃ©cifiques Ã  l'administration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

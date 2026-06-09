@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { Cell } from '@prisma/client';
 import type { GraphQLContext } from '../context';
-import { requirePermission, hasPermission, requireAuth } from '../middleware/rbac';
+import { requirePermission, hasPermission, requireAuth, authorizedIterator } from '../middleware/rbac';
 import { validate, createLogEntrySchema } from '../utils/validation';
 import { prisma } from '../prisma';
 import { pubsub, TOPICS } from '../pubsub';
@@ -116,14 +116,20 @@ export const logEntryResolvers = {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
-        return pubsub.asyncIterator(TOPICS.LOG_ENTRY_ADDED(incidentId, cell ?? 'ALL'));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.LOG_ENTRY_ADDED(incidentId, cell ?? 'ALL')),
+          () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
+        );
       },
     },
     logEntryUpdated: {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
-        return pubsub.asyncIterator(TOPICS.LOG_ENTRY_UPDATED(incidentId, cell ?? 'ALL'));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.LOG_ENTRY_UPDATED(incidentId, cell ?? 'ALL')),
+          () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
+        );
       },
     },
   },

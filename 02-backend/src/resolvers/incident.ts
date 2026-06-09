@@ -1,5 +1,5 @@
 import type { GraphQLContext } from '../context';
-import { requirePermission, requireAuth } from '../middleware/rbac';
+import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { validate, createIncidentSchema, updateIncidentSchema } from '../utils/validation';
 import { pubsub, TOPICS } from '../pubsub';
 import {
@@ -54,20 +54,28 @@ export const incidentResolvers = {
     incidentCreated: {
       subscribe: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'DASHBOARD', 'READ');
-        return pubsub.asyncIterator(TOPICS.INCIDENT_CREATED);
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.INCIDENT_CREATED),
+          () => hasPermission(ctx, 'DASHBOARD', 'READ'),
+        );
       },
     },
     incidentStatusChanged: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'DASHBOARD', 'READ');
-        return pubsub.asyncIterator(TOPICS.INCIDENT_STATUS_CHANGED(incidentId));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.INCIDENT_STATUS_CHANGED(incidentId)),
+          () => hasPermission(ctx, 'DASHBOARD', 'READ'),
+        );
       },
     },
   },
 
   Incident: {
-    createdBy: (parent: { createdById: string }) =>
-      prisma.user.findUnique({ where: { id: parent.createdById } }),
+    // N7 — réutilise le createdBy préchargé (getIncidents/getIncident) ; ne requête
+    // qu'en repli (payloads de mutation/abonnement non inclus).
+    createdBy: (parent: { createdById: string; createdBy?: unknown }) =>
+      parent.createdBy ?? prisma.user.findUnique({ where: { id: parent.createdById } }),
     startedAt: (parent: { startedAt: Date }) => parent.startedAt.toISOString(),
     resolvedAt: (parent: { resolvedAt: Date | null }) => parent.resolvedAt?.toISOString() ?? null,
     createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),

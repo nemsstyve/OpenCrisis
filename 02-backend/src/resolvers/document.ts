@@ -1,6 +1,6 @@
 import type { DocumentCategory } from '@prisma/client';
 import type { GraphQLContext } from '../context';
-import { requirePermission, requireAuth } from '../middleware/rbac';
+import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { pubsub, TOPICS } from '../pubsub';
 import { getDocuments, getDocument, deleteDocument } from '../services/document';
 
@@ -32,7 +32,10 @@ export const documentResolvers = {
     documentUploaded: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'DOCUMENTS', 'READ');
-        return pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId)),
+          () => hasPermission(ctx, 'DOCUMENTS', 'READ'),
+        );
       },
     },
   },

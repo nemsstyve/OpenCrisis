@@ -77,3 +77,30 @@ export async function requirePermission(
     throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
   }
 }
+
+/**
+ * N6 — ré-autorise un flux d'abonnement à CHAQUE événement.
+ * Un utilisateur dont la permission est révoquée (ou le compte désactivé) en cours
+ * de session cesse de recevoir les événements sans attendre l'expiration du token.
+ * Échec fermé : toute erreur d'autorisation supprime l'événement.
+ */
+export async function* authorizedIterator<T>(
+  source: AsyncIterator<T>,
+  authorize: () => Promise<boolean>,
+): AsyncGenerator<T> {
+  try {
+    while (true) {
+      const { value, done } = await source.next();
+      if (done) return;
+      let allowed = false;
+      try {
+        allowed = await authorize();
+      } catch {
+        allowed = false;
+      }
+      if (allowed) yield value;
+    }
+  } finally {
+    await source.return?.(undefined);
+  }
+}

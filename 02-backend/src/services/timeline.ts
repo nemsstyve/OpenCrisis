@@ -3,6 +3,7 @@ import type { TimelineEventType } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import { assertIncidentWritable } from './incident';
 
 const TIMELINE_INCLUDE = {
   actor: true,
@@ -45,6 +46,7 @@ export async function createTimelineEvent(
   userId: string,
   ipAddress?: string | null,
 ) {
+  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const event = await prisma.timelineEvent.create({
     data: {
       incidentId,

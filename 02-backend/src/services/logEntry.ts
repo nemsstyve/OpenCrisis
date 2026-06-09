@@ -3,6 +3,7 @@ import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import { assertIncidentWritable } from './incident';
 
 const LOG_ENTRY_INCLUDE = {
   author: true,
@@ -38,6 +39,7 @@ export async function createLogEntry(
   authorId: string,
   ipAddress?: string | null,
 ) {
+  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const entry = await prisma.logEntry.create({
     data: { incidentId, cell, content, authorId },
     include: LOG_ENTRY_INCLUDE,

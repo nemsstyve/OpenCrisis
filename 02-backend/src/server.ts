@@ -110,8 +110,19 @@ async function main() {
     console.log(`[backend] Health → http://localhost:${PORT}/health`);
   });
 
+  // N8 — purge périodique des refresh tokens expirés (au démarrage puis toutes les heures)
+  const purgeExpiredTokens = () => {
+    prisma.refreshToken
+      .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+      .catch((err) => console.error('[cleanup] purge des refresh tokens échouée:', err));
+  };
+  purgeExpiredTokens();
+  const purgeTimer = setInterval(purgeExpiredTokens, 60 * 60 * 1000);
+  purgeTimer.unref();
+
   // Cleanup on shutdown
   const shutdown = async () => {
+    clearInterval(purgeTimer);
     await server.stop();
     await prisma.$disconnect();
     await pubsub.close();

@@ -1,5 +1,5 @@
 import type { GraphQLContext } from '../context';
-import { requirePermission, requireAuth } from '../middleware/rbac';
+import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { validate, createTimelineEventSchema, updateTimelineEventSchema } from '../utils/validation';
 import { pubsub, TOPICS } from '../pubsub';
 import {
@@ -53,7 +53,10 @@ export const timelineResolvers = {
     timelineEventAdded: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'TIMELINE', 'READ');
-        return pubsub.asyncIterator(TOPICS.TIMELINE_EVENT_ADDED(incidentId));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.TIMELINE_EVENT_ADDED(incidentId)),
+          () => hasPermission(ctx, 'TIMELINE', 'READ'),
+        );
       },
     },
   },

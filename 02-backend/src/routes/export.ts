@@ -160,6 +160,9 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       return;
     }
 
+    // N2 — la timeline n'est exportée que si l'utilisateur dispose de TIMELINE:READ
+    const canReadTimeline = (await getUserReadableResources(userId)).has('TIMELINE');
+
     const [incident, entries, timelineEvents] = await Promise.all([
       prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
       prisma.logEntry.findMany({
@@ -170,11 +173,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
         },
         orderBy: { createdAt: 'asc' },
       }),
-      prisma.timelineEvent.findMany({
-        where: { incidentId, deletedAt: null },
-        include: { actor: { select: { firstName: true, lastName: true } } },
-        orderBy: { occurredAt: 'asc' },
-      }),
+      canReadTimeline
+        ? prisma.timelineEvent.findMany({
+            where: { incidentId, deletedAt: null },
+            include: { actor: { select: { firstName: true, lastName: true } } },
+            orderBy: { occurredAt: 'asc' },
+          })
+        : Promise.resolve([]),
     ]);
 
     if (!incident) { res.status(404).json({ error: 'Incident introuvable' }); return; }

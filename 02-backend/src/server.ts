@@ -79,6 +79,15 @@ async function main() {
     // D4 — introspection désactivée en prod + profondeur limitée
     introspection: !IS_PROD,
     validationRules: [depthLimit(10)],
+    // N4 — ne pas divulguer les détails d'erreurs internes (Prisma, etc.) en production.
+    // Les GraphQLError métier portent un code explicite et restent transmises.
+    formatError: (formattedError) => {
+      const code = formattedError.extensions?.code;
+      if (IS_PROD && (code === undefined || code === 'INTERNAL_SERVER_ERROR')) {
+        return { message: 'Une erreur interne est survenue', extensions: { code: 'INTERNAL_SERVER_ERROR' } };
+      }
+      return formattedError;
+    },
     plugins: apolloPlugins,
   });
 

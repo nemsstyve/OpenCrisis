@@ -7,7 +7,7 @@ import { login, logout, rotateRefreshToken, getMe, changePassword } from '../ser
 function flattenPermissions(user: UserWithRoles) {
   const seen = new Set<string>();
   const result: { resource: string; action: string }[] = [];
-  for (const ra of user.roleAssignments) {
+  for (const ra of user.roleAssignments ?? []) {
     for (const rp of ra.role.permissions) {
       const key = `${rp.permission.resource}:${rp.permission.action}`;
       if (!seen.has(key)) {
@@ -63,12 +63,14 @@ export const authResolvers = {
       ctx: GraphQLContext,
     ) => {
       const userId = requireAuth(ctx);
-      return changePassword(userId, currentPassword, newPassword, ctx.req?.ip);
+      return changePassword(userId, currentPassword, newPassword, ctx.req?.ip, ctx.res);
     },
   },
 
   User: {
-    roles: (parent: UserWithRoles) => parent.roleAssignments.map(ra => ra.role),
+    // N3 — les User imbriqués (createdBy, author, actor…) sont chargés sans
+    // roleAssignments : rester défensif pour ne pas crasher si roles/permissions est demandé.
+    roles: (parent: UserWithRoles) => (parent.roleAssignments ?? []).map(ra => ra.role),
     permissions: (parent: UserWithRoles) => flattenPermissions(parent),
     mustChangePassword: (parent: UserWithRoles) => parent.mustChangePassword,
     createdAt: (parent: UserWithRoles) => parent.createdAt.toISOString(),

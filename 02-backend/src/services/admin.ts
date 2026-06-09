@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { GraphQLError } from 'graphql';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from './auth';
 import { passwordSchema } from '../utils/validation';
@@ -35,22 +36,30 @@ export async function createUser(
   }
 
   const passwordHash = await bcrypt.hash(data.password, 12);
-  return prisma.user.create({
-    data: {
-      email: data.email,
-      passwordHash,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone ?? null,
-      company: data.company ?? null,
-      site: data.site ?? null,
-      mustChangePassword: true, // C3 — changement forcé au 1er login
-      ...(roleIds && roleIds.length > 0
-        ? { roleAssignments: { create: roleIds.map((roleId) => ({ roleId })) } }
-        : {}),
-    },
-    include: USER_INCLUDE,
-  });
+  try {
+    return await prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone ?? null,
+        company: data.company ?? null,
+        site: data.site ?? null,
+        mustChangePassword: true, // C3 — changement forcé au 1er login
+        ...(roleIds && roleIds.length > 0
+          ? { roleAssignments: { create: roleIds.map((roleId) => ({ roleId })) } }
+          : {}),
+      },
+      include: USER_INCLUDE,
+    });
+  } catch (e) {
+    // N4 — message lisible plutôt que l'erreur Prisma brute en cas d'email déjà utilisé
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new GraphQLError('Un compte existe déjà avec cet email', { extensions: { code: 'BAD_USER_INPUT' } });
+    }
+    throw e;
+  }
 }
 
 export async function updateUser(
@@ -90,6 +99,8 @@ export async function resetPassword(userId: string, newPassword: string): Promis
   }
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: true } });
+  // N1 — révoquer les sessions de l'utilisateur dont l'admin réinitialise le mot de passe
+  await prisma.refreshToken.deleteMany({ where: { userId } });
   return true;
 }
 
@@ -144,8 +155,8 @@ export async function createRole(data: {
 
 export async function deleteRole(id: string): Promise<boolean> {
   const role = await prisma.role.findFirst({ where: { id } });
-  if (!role) throw new Error('Rôle introuvable');
-  if (role.isSystem) throw new Error('Les rôles système ne peuvent pas être supprimés');
+  if (!role) throw new GraphQLError('Rôle introuvable', { extensions: { code: 'NOT_FOUND' } });
+  if (role.isSystem) throw new GraphQLError('Les rôles système ne peuvent pas être supprimés', { extensions: { code: 'FORBIDDEN' } });
 
   await prisma.$transaction([
     prisma.rolePermission.deleteMany({ where: { roleId: id } }),
@@ -157,8 +168,8 @@ export async function deleteRole(id: string): Promise<boolean> {
 
 export async function updateRolePermissions(roleId: string, permissionIds: string[]) {
   const role = await prisma.role.findFirst({ where: { id: roleId } });
-  if (!role) throw new Error('Rôle introuvable');
-  if (role.isSystem) throw new Error('Les permissions des rôles système ne peuvent pas être modifiées');
+  if (!role) throw new GraphQLError('Rôle introuvable', { extensions: { code: 'NOT_FOUND' } });
+  if (role.isSystem) throw new GraphQLError('Les permissions des rôles système ne peuvent pas être modifiées', { extensions: { code: 'FORBIDDEN' } });
 
   await prisma.$transaction([
     prisma.rolePermission.deleteMany({ where: { roleId } }),

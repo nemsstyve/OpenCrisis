@@ -170,6 +170,7 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string,
   ipAddress?: string | null,
+  res?: Response | null,
 ): Promise<boolean> {
   const result = passwordSchema.safeParse(newPassword);
   if (!result.success) {
@@ -193,6 +194,11 @@ export async function changePassword(
     where: { id: userId },
     data: { passwordHash, mustChangePassword: false },
   });
+
+  // N1 — révoquer toutes les sessions existantes après changement de mot de passe,
+  // puis ré-émettre un token pour la session courante (continuité côté front).
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+  if (res) await issueRefreshToken(userId, res);
 
   logAudit({ userId, action: 'CHANGE_PASSWORD', resource: 'AUTH', ipAddress });
   return true;

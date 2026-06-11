@@ -1,4 +1,5 @@
 import { GraphQLError } from 'graphql';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 
@@ -16,15 +17,19 @@ export async function createTag(name: string, color: string | null | undefined, 
 }
 
 export async function deleteTag(id: string, userId: string) {
-  const tag = await prisma.tag.findUnique({ where: { id } });
-  if (!tag) throw new GraphQLError('Tag introuvable', { extensions: { code: 'NOT_FOUND' } });
-
-  // VI9 — détacher les associations puis supprimer le tag, dans une transaction
-  await prisma.$transaction([
-    prisma.logEntryTag.deleteMany({ where: { tagId: id } }),
-    prisma.tag.delete({ where: { id } }),
-  ]);
-
+  try {
+    // Détacher les associations puis supprimer le tag de façon atomique.
+    // Si le tag a déjà été supprimé entre temps, Prisma lève P2025.
+    await prisma.$transaction([
+      prisma.logEntryTag.deleteMany({ where: { tagId: id } }),
+      prisma.tag.delete({ where: { id } }),
+    ]);
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+      throw new GraphQLError('Tag introuvable', { extensions: { code: 'NOT_FOUND' } });
+    }
+    throw e;
+  }
   logAudit({ userId, action: 'DELETE', resource: 'TAG', resourceId: id });
   return true;
 }

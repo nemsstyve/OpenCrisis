@@ -124,10 +124,15 @@ router.get('/:id', requireAuth, async (req, res) => {
       ipAddress: req.ip,
     });
 
-    const filePath = path.join(UPLOADS_DIR, doc.filePath);
+    // F5 — garantir que le chemin résolu reste dans UPLOADS_DIR (path traversal)
+    const resolved = path.resolve(UPLOADS_DIR, doc.filePath);
+    if (!resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep) && resolved !== path.resolve(UPLOADS_DIR)) {
+      res.status(400).json({ error: 'Chemin de fichier invalide' });
+      return;
+    }
     res.setHeader('Content-Type', doc.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.name)}"`);
-    res.sendFile(filePath);
+    res.sendFile(resolved);
   } catch {
     res.status(404).json({ error: 'Document introuvable' });
   }

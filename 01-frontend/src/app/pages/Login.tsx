@@ -36,12 +36,11 @@ export default function Login() {
       const from = (location.state as { from?: string })?.from ?? "/incidents";
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Erreur de connexion";
       const graphqlMsg =
         (err as { graphQLErrors?: Array<{ message: string }> })
           ?.graphQLErrors?.[0]?.message;
-      setError(graphqlMsg ?? msg);
+      // N'afficher que les messages intentionnels du backend ; masquer tout message technique
+      setError(graphqlMsg ?? "Identifiants incorrects ou service indisponible.");
     }
   }
 

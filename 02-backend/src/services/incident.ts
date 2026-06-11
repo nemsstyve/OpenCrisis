@@ -22,7 +22,8 @@ export async function getIncidents() {
 export async function getIncident(id: string) {
   const incident = await prisma.incident.findFirst({ where: { id, deletedAt: null } });
   if (!incident) throw new GraphQLError('Incident introuvable', { extensions: { code: 'NOT_FOUND' } });
-  return incident;
+  const createdBy = await prisma.user.findFirst({ where: { id: incident.createdById } });
+  return { ...incident, createdBy: createdBy ?? null };
 }
 
 /**

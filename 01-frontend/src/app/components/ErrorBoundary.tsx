@@ -31,8 +31,8 @@ export class ErrorBoundary extends Component<Props, State> {
           <h1 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
             Une erreur est survenue
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-mono break-all">
-            {this.state.error?.message ?? "Erreur inconnue"}
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Veuillez recharger la page. Si le problème persiste, contactez votre administrateur.
           </p>
           <button
             onClick={() => window.location.reload()}

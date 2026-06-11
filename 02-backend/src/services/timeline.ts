@@ -80,7 +80,8 @@ export async function updateTimelineEvent(
   userId: string,
   ipAddress?: string | null,
 ) {
-  await getEvent(id); // garantit que l'événement existe et n'est pas supprimé
+  const existing = await getEvent(id); // garantit que l'événement existe et n'est pas supprimé
+  await assertIncidentWritable(existing.incidentId); // F1 — refuser l'édition sur un incident clôturé
   const event = await prisma.timelineEvent.update({
     where: { id },
     data: {

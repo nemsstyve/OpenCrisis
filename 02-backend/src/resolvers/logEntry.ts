@@ -17,17 +17,21 @@ function cellToResource(cell: Cell) {
 // Cellules de main courante réellement lisibles par l'utilisateur courant.
 // SHARED n'est visible que si au moins une cellule l'est.
 async function readableCells(ctx: GraphQLContext): Promise<Cell[]> {
+  const [canDir, canOps] = await Promise.all([
+    hasPermission(ctx, 'MAIN_COURANTE_DIR', 'READ'),
+    hasPermission(ctx, 'MAIN_COURANTE_OPS', 'READ'),
+  ]);
   const cells: Cell[] = [];
-  if (await hasPermission(ctx, 'MAIN_COURANTE_DIR', 'READ')) cells.push('DIRECTIONAL');
-  if (await hasPermission(ctx, 'MAIN_COURANTE_OPS', 'READ')) cells.push('OPERATIONAL');
+  if (canDir) cells.push('DIRECTIONAL');
+  if (canOps) cells.push('OPERATIONAL');
   if (cells.length > 0) cells.push('SHARED');
   return cells;
 }
 
-async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string) {
+async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string, userId: string) {
   const entry = await prisma.logEntry.findFirst({ where: { id: entryId, deletedAt: null } });
   if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
-  const isAuthor = entry.authorId === ctx.userId;
+  const isAuthor = entry.authorId === userId;
   if (!isAuthor) {
     const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
     if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
@@ -76,13 +80,13 @@ export const logEntryResolvers = {
     ) => {
       const userId = requireAuth(ctx);
       const data = validate(createLogEntrySchema, { content });
-      await checkCanModifyEntry(ctx, id);
+      await checkCanModifyEntry(ctx, id, userId);
       return editLogEntry(id, data.content, userId, ctx.req?.ip);
     },
 
     deleteLogEntry: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       const userId = requireAuth(ctx);
-      await checkCanModifyEntry(ctx, id);
+      await checkCanModifyEntry(ctx, id, userId);
       return deleteLogEntry(id, userId, ctx.req?.ip);
     },
 
@@ -116,8 +120,12 @@ export const logEntryResolvers = {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
+        // F4 — sans filtre cell, souscrire aux 3 topics réels au lieu du topic _ALL inexistant
+        const topics = cell
+          ? TOPICS.LOG_ENTRY_ADDED(incidentId, cell)
+          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_ADDED(incidentId, c));
         return authorizedIterator(
-          pubsub.asyncIterator(TOPICS.LOG_ENTRY_ADDED(incidentId, cell ?? 'ALL')),
+          pubsub.asyncIterator(topics),
           () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
         );
       },
@@ -126,8 +134,12 @@ export const logEntryResolvers = {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
+        // F4 — même correction pour logEntryUpdated
+        const topics = cell
+          ? TOPICS.LOG_ENTRY_UPDATED(incidentId, cell)
+          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_UPDATED(incidentId, c));
         return authorizedIterator(
-          pubsub.asyncIterator(TOPICS.LOG_ENTRY_UPDATED(incidentId, cell ?? 'ALL')),
+          pubsub.asyncIterator(topics),
           () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
         );
       },

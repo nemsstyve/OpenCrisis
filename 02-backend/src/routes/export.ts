@@ -6,6 +6,7 @@ import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
 import { getUserReadableResources, type AuthRequest } from '../middleware/httpPermission';
+import { logAudit } from '../middleware/audit';
 
 const router = Router();
 
@@ -139,6 +140,7 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
       doc.page.margins.bottom = bottom;
     }
 
+    logAudit({ userId, action: 'EXPORT', resource: 'MAIN_COURANTE', incidentId, ipAddress: req.ip });
     doc.end();
   } catch (err) {
     console.error('[export/pdf]', err);
@@ -284,6 +286,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       `attachment; filename="rapport-${incidentId.slice(0, 8)}.xlsx"`,
     );
 
+    logAudit({ userId, action: 'EXPORT', resource: 'INCIDENT', incidentId, ipAddress: req.ip });
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {

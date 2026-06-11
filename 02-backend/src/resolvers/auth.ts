@@ -62,6 +62,9 @@ export const authResolvers = {
       { currentPassword, newPassword }: { currentPassword: string; newPassword: string },
       ctx: GraphQLContext,
     ) => {
+      if (!ctx.res) {
+        throw new GraphQLError('Contexte HTTP requis', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
       const userId = requireAuth(ctx);
       return changePassword(userId, currentPassword, newPassword, ctx.req?.ip, ctx.res);
     },

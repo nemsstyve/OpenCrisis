@@ -55,6 +55,9 @@ export async function editLogEntry(
   editedById: string,
   ipAddress?: string | null,
 ) {
+  const existing = await prisma.logEntry.findFirst({ where: { id, deletedAt: null }, select: { incidentId: true } });
+  if (!existing) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
+  await assertIncidentWritable(existing.incidentId); // F1 — refuser l'édition sur un incident clôturé
   const entry = await prisma.logEntry.update({
     where: { id },
     data: { content, isEdited: true, editedAt: new Date(), editedById },

@@ -7,8 +7,8 @@ import type { DocumentCategory } from '@prisma/client';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
 import { requireHttpPermission, type AuthRequest } from '../middleware/httpPermission';
 import { createDocument, getDocument, UPLOADS_DIR } from '../services/document';
+import { assertIncidentWritable } from '../services/incident';
 import { logAudit } from '../middleware/audit';
-import { prisma } from '../prisma';
 
 const router = Router();
 
@@ -64,15 +64,14 @@ router.post('/upload', requireAuth, async (req, res, next) => {
     const timelineEventId = req.body?.timelineEventId as string | undefined;
     const category = (req.body?.category as DocumentCategory | undefined) ?? 'OTHER';
 
-    // B1 — valider que l'incidentId existe avant d'écrire sur disque
+    // B1 — valider que l'incidentId existe et est ouvert avant d'écrire sur disque
     if (incidentId) {
-      const incident = await prisma.incident.findFirst({
-        where: { id: incidentId, deletedAt: null },
-        select: { id: true },
-      });
-      if (!incident) {
+      try {
+        await assertIncidentWritable(incidentId); // F1 — bloque l'upload sur un incident clôturé ou supprimé
+      } catch (err: unknown) {
         await fs.unlink(file.path).catch(() => undefined);
-        res.status(400).json({ error: 'Incident introuvable' });
+        const msg = err instanceof Error ? err.message : 'Incident introuvable ou clôturé';
+        res.status(400).json({ error: msg });
         return;
       }
     }

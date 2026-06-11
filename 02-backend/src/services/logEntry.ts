@@ -76,17 +76,21 @@ export async function deleteLogEntry(id: string, userId: string, ipAddress?: str
 }
 
 export async function addTagToLogEntry(logEntryId: string, tagId: string, userId: string) {
+  const entry = await getEntry(logEntryId);
+  await assertIncidentWritable(entry.incidentId);
   await prisma.logEntryTag.upsert({
     where: { logEntryId_tagId: { logEntryId, tagId } },
     create: { logEntryId, tagId },
     update: {},
   });
-  logAudit({ userId, action: 'TAG_ADD', resource: 'MAIN_COURANTE', resourceId: logEntryId });
+  logAudit({ userId, action: 'TAG_ADD', resource: 'MAIN_COURANTE', resourceId: logEntryId, incidentId: entry.incidentId });
   return getEntry(logEntryId);
 }
 
 export async function removeTagFromLogEntry(logEntryId: string, tagId: string, userId: string) {
+  const entry = await getEntry(logEntryId);
+  await assertIncidentWritable(entry.incidentId);
   await prisma.logEntryTag.deleteMany({ where: { logEntryId, tagId } });
-  logAudit({ userId, action: 'TAG_REMOVE', resource: 'MAIN_COURANTE', resourceId: logEntryId });
+  logAudit({ userId, action: 'TAG_REMOVE', resource: 'MAIN_COURANTE', resourceId: logEntryId, incidentId: entry.incidentId });
   return getEntry(logEntryId);
 }

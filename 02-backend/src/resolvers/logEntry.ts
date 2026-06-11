@@ -24,10 +24,10 @@ async function readableCells(ctx: GraphQLContext): Promise<Cell[]> {
   return cells;
 }
 
-async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string) {
+async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string, userId: string) {
   const entry = await prisma.logEntry.findFirst({ where: { id: entryId, deletedAt: null } });
   if (!entry) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
-  const isAuthor = entry.authorId === ctx.userId;
+  const isAuthor = entry.authorId === userId;
   if (!isAuthor) {
     const canEdit = await hasPermission(ctx, cellToResource(entry.cell), 'WRITE');
     if (!canEdit) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
@@ -76,13 +76,13 @@ export const logEntryResolvers = {
     ) => {
       const userId = requireAuth(ctx);
       const data = validate(createLogEntrySchema, { content });
-      await checkCanModifyEntry(ctx, id);
+      await checkCanModifyEntry(ctx, id, userId);
       return editLogEntry(id, data.content, userId, ctx.req?.ip);
     },
 
     deleteLogEntry: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       const userId = requireAuth(ctx);
-      await checkCanModifyEntry(ctx, id);
+      await checkCanModifyEntry(ctx, id, userId);
       return deleteLogEntry(id, userId, ctx.req?.ip);
     },
 

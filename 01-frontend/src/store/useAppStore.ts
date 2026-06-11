@@ -21,7 +21,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   hasPermission: (resource, action = "READ") => {
     const { currentUser } = get();
     if (!currentUser) return false;
-    return currentUser.permissions.some(
+    return (currentUser.permissions ?? []).some(
       (p) => p.resource === resource && p.action === action
     );
   },

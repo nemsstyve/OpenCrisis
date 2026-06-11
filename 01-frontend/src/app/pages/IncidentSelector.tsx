@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
 import { AlertTriangle, Plus, Loader2, RefreshCw } from "lucide-react";
 import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
 import { useAppStore } from "../../store/useAppStore";
+import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
 import type { GqlIncident, Severity } from "../../types/generated";
 
 const SEVERITY_COLORS: Record<Severity, string> = {
@@ -36,26 +39,38 @@ export default function IncidentSelector() {
     refetchQueries: [{ query: INCIDENTS_QUERY }],
   });
 
+  const [statusFilter, setStatusFilter] = useState<"active" | "closed" | "all">("active");
   const [showModal, setShowModal] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDesc, setNewDesc] = useState("");
-  const [newSeverity, setNewSeverity] = useState<Severity>("MEDIUM");
   const [createError, setCreateError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<IncidentForm>({
+    resolver: zodResolver(incidentSchema),
+    defaultValues: { name: "", description: "", severity: "MEDIUM" },
+  });
 
   function selectIncident(incident: GqlIncident) {
     setCurrentIncident(incident);
     navigate(`/incidents/${incident.id}/dashboard`);
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  function closeModal() {
+    setShowModal(false);
+    setCreateError(null);
+    reset();
+  }
+
+  async function onCreate(values: IncidentForm) {
     setCreateError(null);
     try {
       const { data: d } = await createIncident({
-        variables: { input: { name: newName, description: newDesc || null, severity: newSeverity } },
+        variables: { input: { name: values.name, description: values.description || null, severity: values.severity } },
       });
       setShowModal(false);
-      setNewName(""); setNewDesc(""); setNewSeverity("MEDIUM");
+      reset();
       if (d?.createIncident) selectIncident(d.createIncident);
     } catch (err: unknown) {
       const msg = (err as { graphQLErrors?: Array<{ message: string }> })?.graphQLErrors?.[0]?.message
@@ -65,6 +80,18 @@ export default function IncidentSelector() {
   }
 
   const canCreate = hasPermission("DASHBOARD", "WRITE");
+
+  const visibleIncidents = (data?.incidents ?? []).filter((incident) => {
+    if (statusFilter === "active") return incident.status !== "CLOSED";
+    if (statusFilter === "closed") return incident.status === "CLOSED";
+    return true;
+  });
+
+  const FILTERS: Array<{ key: typeof statusFilter; label: string }> = [
+    { key: "active", label: "Actifs" },
+    { key: "closed", label: "Clos" },
+    { key: "all", label: "Tous" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0f1116] flex items-center justify-center p-6">
@@ -100,15 +127,36 @@ export default function IncidentSelector() {
           </div>
         )}
 
+        {/* Filtre par statut */}
+        {data && (
+          <div className="mb-4 flex gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  statusFilter === f.key
+                    ? "bg-blue-500/15 text-blue-400"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-[#13151a]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Incident list */}
         {data && (
           <div className="space-y-3">
-            {data.incidents.length === 0 && (
+            {visibleIncidents.length === 0 && (
               <p className="text-gray-500 text-sm text-center py-8">
-                Aucun incident en cours. Déclarez-en un.
+                {statusFilter === "closed"
+                  ? "Aucun incident clos."
+                  : "Aucun incident en cours. Déclarez-en un."}
               </p>
             )}
-            {data.incidents.map((incident) => (
+            {visibleIncidents.map((incident) => (
               <button
                 key={incident.id}
                 onClick={() => selectIncident(incident)}
@@ -161,23 +209,21 @@ export default function IncidentSelector() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6 w-full max-w-md">
             <h2 className="text-white font-medium mb-4">Déclarer un incident</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleSubmit(onCreate)} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
                 <input
                   type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
+                  {...register("name")}
                   placeholder="Ex : Ransomware infrastructure prod"
                   className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500"
                 />
+                {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>}
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Description</label>
                 <textarea
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
+                  {...register("description")}
                   rows={2}
                   placeholder="Description courte de l'incident"
                   className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none"
@@ -186,8 +232,7 @@ export default function IncidentSelector() {
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Sévérité</label>
                 <select
-                  value={newSeverity}
-                  onChange={(e) => setNewSeverity(e.target.value as Severity)}
+                  {...register("severity")}
                   className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
                 >
                   {SEVERITY_OPTIONS.map((s) => (
@@ -205,18 +250,18 @@ export default function IncidentSelector() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowModal(false); setCreateError(null); }}
+                  onClick={closeModal}
                   className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
+                  disabled={isSubmitting || creating}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {creating ? "Création…" : "Créer"}
+                  {(isSubmitting || creating) && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {(isSubmitting || creating) ? "Création…" : "Créer"}
                 </button>
               </div>
             </form>

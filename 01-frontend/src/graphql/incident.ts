@@ -40,3 +40,21 @@ export const CREATE_INCIDENT_MUTATION = gql`
     }
   }
 `;
+
+export const UPDATE_INCIDENT_MUTATION = gql`
+  mutation UpdateIncident($id: ID!, $input: UpdateIncidentInput!) {
+    updateIncident(id: $id, input: $input) {
+      id
+      name
+      description
+      status
+      severity
+    }
+  }
+`;
+
+export const DELETE_INCIDENT_MUTATION = gql`
+  mutation DeleteIncident($id: ID!) {
+    deleteIncident(id: $id)
+  }
+`;

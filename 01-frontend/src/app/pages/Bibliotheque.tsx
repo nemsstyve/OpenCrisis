@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Download, Search, Upload, Trash2, ChevronDown, X, Loader2, Plus, FileText } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import {
@@ -8,6 +10,7 @@ import {
 } from "../../graphql/document";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
+import { useDebounce } from "../../hooks/useDebounce";
 import { downloadFile, uploadFile, formatBytes } from "../../lib/fileUtils";
 import type { GqlDocument, DocumentCategory } from "../../types/generated";
 
@@ -73,7 +76,7 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
           <h2 className="text-white font-medium">Télécharger un fichier</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -210,12 +213,14 @@ function DocumentTable({
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className={`px-4 py-3 text-left ${col.width}`}>
+                <th key={col.key} scope="col" className={`px-4 py-3 text-left ${col.width}${col.key === "_actions" ? " sr-only" : ""}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-400 uppercase tracking-wider">{col.label}</span>
                     {col.key !== "_actions" && (
                       <button
                         onClick={() => onToggleFilter(col.key)}
+                        aria-label={`Filtrer par ${col.label}`}
+                        aria-pressed={activeFilters.has(col.key)}
                         className={`p-1 rounded transition-colors ${
                           activeFilters.has(col.key)
                             ? "bg-blue-500/20 text-blue-400"
@@ -334,6 +339,7 @@ export default function Bibliotheque() {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [showUpload, setShowUpload] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<GqlDocument | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   // Global docs: incidentId omitted → null → library documents
@@ -401,9 +407,14 @@ export default function Bibliotheque() {
     }
   }
 
-  async function handleDelete(doc: GqlDocument) {
-    if (!confirm(`Supprimer "${doc.name}" ?`)) return;
-    await deleteDocument({ variables: { id: doc.id } });
+  async function handleDeleteConfirmed(doc: GqlDocument) {
+    setConfirmDelete(null);
+    try {
+      await deleteDocument({ variables: { id: doc.id } });
+      toast.success("Document supprimé");
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
   }
 
   function toggleFilter(col: string) {
@@ -425,12 +436,13 @@ export default function Bibliotheque() {
   }
 
   // ── Données filtrées par recherche ────────────────────────────────────────
+  const debouncedSearch = useDebounce(searchQuery);
   const currentDocs = (activeTab === "global" ? globalData?.documents : incidentData?.documents) ?? [];
-  const searchedDocs = searchQuery
+  const searchedDocs = debouncedSearch
     ? currentDocs.filter(
         (d) =>
-          d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          CATEGORY_LABELS[d.category].toLowerCase().includes(searchQuery.toLowerCase())
+          d.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          CATEGORY_LABELS[d.category].toLowerCase().includes(debouncedSearch.toLowerCase())
       )
     : currentDocs;
 
@@ -441,7 +453,7 @@ export default function Bibliotheque() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl mb-2 text-white">Documents</h1>
+          <h1 className="text-3xl mb-2 text-white">Bibliothèque</h1>
           <p className="text-gray-400">Fiches réflexes, procédures, artefacts et pièces jointes</p>
         </div>
         {canWrite && (
@@ -459,7 +471,7 @@ export default function Bibliotheque() {
       {downloadError && (
         <div className="mb-4 bg-red-400/10 border border-red-400/20 rounded-lg p-3 flex items-center justify-between">
           <span className="text-red-400 text-sm">{downloadError}</span>
-          <button onClick={() => setDownloadError(null)} className="text-red-400 hover:text-red-300">
+          <button onClick={() => setDownloadError(null)} aria-label="Fermer l'erreur" className="text-red-400 hover:text-red-300">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -503,6 +515,7 @@ export default function Bibliotheque() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Rechercher un document"
             placeholder="Rechercher un document…"
             className="w-full pl-12 pr-4 py-3 bg-[#13151a] border border-[#1e2229] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
           />
@@ -540,7 +553,7 @@ export default function Bibliotheque() {
         documents={searchedDocs}
         loading={isLoading}
         canWrite={canWrite}
-        onDelete={handleDelete}
+        onDelete={(doc) => setConfirmDelete(doc)}
         onDownload={handleDownload}
         filters={filters}
         activeFilters={activeFilters}
@@ -560,6 +573,12 @@ export default function Bibliotheque() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        description={confirmDelete ? `Supprimer "${confirmDelete.name}" ?` : ""}
+        onConfirm={() => confirmDelete && handleDeleteConfirmed(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

@@ -1,17 +1,16 @@
-import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAuth } from '../middleware/rbac';
+import { validate, createContactSchema, updateContactSchema } from '../utils/validation';
 import {
   getContacts, getContactById,
   createContact, updateContact, deleteContact,
-  linkContactToIncident, unlinkContactFromIncident,
 } from '../services/contact';
 
 export const contactResolvers = {
   Query: {
-    contacts: async (_: unknown, { incidentId }: { incidentId?: string }, ctx: GraphQLContext) => {
+    contacts: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ANNUAIRE', 'READ');
-      return getContacts(incidentId);
+      return getContacts();
     },
     contact: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ANNUAIRE', 'READ');
@@ -22,12 +21,13 @@ export const contactResolvers = {
   Mutation: {
     createContact: async (
       _: unknown,
-      { input, incidentId }: { input: Parameters<typeof createContact>[0]; incidentId?: string },
+      { input }: { input: Parameters<typeof createContact>[0] },
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ANNUAIRE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return createContact(input, ctx.userId, incidentId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(createContactSchema, input);
+      return createContact(data, userId, ctx.req?.ip);
     },
 
     updateContact: async (
@@ -36,34 +36,15 @@ export const contactResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ANNUAIRE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return updateContact(id, input, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      const data = validate(updateContactSchema, input);
+      return updateContact(id, data, userId, ctx.req?.ip);
     },
 
     deleteContact: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ANNUAIRE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return deleteContact(id, ctx.userId, ctx.req?.ip);
-    },
-
-    linkContactToIncident: async (
-      _: unknown,
-      { contactId, incidentId }: { contactId: string; incidentId: string },
-      ctx: GraphQLContext,
-    ) => {
-      await requirePermission(ctx, 'ANNUAIRE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return linkContactToIncident(contactId, incidentId, ctx.userId);
-    },
-
-    unlinkContactFromIncident: async (
-      _: unknown,
-      { contactId, incidentId }: { contactId: string; incidentId: string },
-      ctx: GraphQLContext,
-    ) => {
-      await requirePermission(ctx, 'ANNUAIRE', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return unlinkContactFromIncident(contactId, incidentId, ctx.userId);
+      const userId = requireAuth(ctx);
+      return deleteContact(id, userId, ctx.req?.ip);
     },
   },
 

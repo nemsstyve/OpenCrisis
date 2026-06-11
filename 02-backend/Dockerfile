@@ -40,8 +40,10 @@ COPY --from=builder /app/dist ./dist
 COPY prisma/ ./prisma/
 COPY tsconfig.json ./
 
-# Répertoire des fichiers uploadés
-RUN mkdir -p /app/uploads
+# Répertoire des fichiers uploadés + exécution en utilisateur non privilégié
+# (l'utilisateur "node" est fourni par l'image officielle)
+RUN mkdir -p /app/uploads && chown -R node:node /app
+USER node
 
 EXPOSE 4000
 

@@ -1,11 +1,14 @@
 import type { ComponentType } from "react";
-import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock } from "lucide-react";
-import { useQuery } from "@apollo/client";
+import { useState } from "react";
+import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock, Settings, ChevronDown } from "lucide-react";
+import { useQuery, useMutation } from "@apollo/client";
+import { toast } from "sonner";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
-import type { GqlLogEntry, GqlTimelineEvent, IncidentStatus, Severity, TimelineEventType } from "../../types/generated";
+import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY } from "../../graphql/incident";
+import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, IncidentStatus, Severity, TimelineEventType } from "../../types/generated";
 
 // ── Constantes de présentation ────────────────────────────────────────────────
 
@@ -150,6 +153,24 @@ function AccessRestricted({ label }: { label: string }) {
 export default function Dashboard() {
   const { incidentId, incident } = useCurrentIncident();
   const hasPermission = useAppStore((s) => s.hasPermission);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+
+  const canWrite = hasPermission("DASHBOARD", "WRITE");
+
+  const [updateIncident, { loading: updating }] = useMutation<
+    { updateIncident: GqlIncident },
+    { id: string; input: { status?: IncidentStatus; name?: string; description?: string; severity?: Severity } }
+  >(UPDATE_INCIDENT_MUTATION, {
+    refetchQueries: [{ query: INCIDENT_QUERY, variables: { id: incidentId } }],
+    onError: () => toast.error("Erreur lors de la mise à jour"),
+  });
+
+  async function handleStatusChange(status: IncidentStatus) {
+    setShowStatusMenu(false);
+    await updateIncident({ variables: { id: incidentId, input: { status } } });
+    toast.success(`Statut mis à jour : ${STATUS_LABEL[status]}`);
+  }
 
   // III1 — ne requête que les cellules accessibles
   const canReadDir = hasPermission("MAIN_COURANTE_DIR", "READ");
@@ -194,12 +215,47 @@ export default function Dashboard() {
         </div>
         {incident && (
           <div className="flex items-center gap-3">
-            <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_COLOR[incident.status]}`}>
-              {STATUS_LABEL[incident.status]}
-            </span>
+            {canWrite ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowStatusMenu((v) => !v)}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1 hover:opacity-80 transition-opacity ${STATUS_COLOR[incident.status]}`}
+                  disabled={updating}
+                >
+                  {STATUS_LABEL[incident.status]}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showStatusMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-[#1a1d24] border border-[#1e2229] rounded-lg shadow-xl z-20 overflow-hidden w-36">
+                    {(["ACTIVE", "CONTAINED", "CLOSED"] as IncidentStatus[]).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => handleStatusChange(s)}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-[#2a2e39] transition-colors ${incident.status === s ? "text-white font-medium" : "text-gray-400"}`}
+                      >
+                        {STATUS_LABEL[s]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_COLOR[incident.status]}`}>
+                {STATUS_LABEL[incident.status]}
+              </span>
+            )}
             <span className={`text-sm font-medium ${SEVERITY_COLOR[incident.severity]}`}>
               {incident.severity}
             </span>
+            {canWrite && (
+              <button
+                onClick={() => setEditModal(true)}
+                className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] text-gray-400 hover:text-white transition-colors"
+                title="Modifier l'incident"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -302,6 +358,89 @@ export default function Dashboard() {
         ) : (
           <AccessRestricted label="Cellule opérationnelle" />
         )}
+      </div>
+
+      {/* Overlay fermeture menu statut */}
+      {showStatusMenu && (
+        <div className="fixed inset-0 z-10" onClick={() => setShowStatusMenu(false)} />
+      )}
+
+      {/* Modale édition incident */}
+      {editModal && incident && (
+        <EditIncidentModal
+          incident={incident}
+          onClose={() => setEditModal(false)}
+          onSave={async (input) => {
+            await updateIncident({ variables: { id: incidentId, input } });
+            toast.success("Incident mis à jour");
+            setEditModal(false);
+          }}
+          saving={updating}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modale édition incident ───────────────────────────────────────────────────
+
+const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_LABEL: Record<Severity, string> = {
+  LOW: "Faible", MEDIUM: "Moyen", HIGH: "Élevé", CRITICAL: "Critique",
+};
+
+function EditIncidentModal({
+  incident,
+  onClose,
+  onSave,
+  saving,
+}: {
+  incident: GqlIncident;
+  onClose: () => void;
+  onSave: (input: { name?: string; description?: string; severity?: Severity }) => Promise<void>;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(incident.name);
+  const [description, setDescription] = useState(incident.description ?? "");
+  const [severity, setSeverity] = useState<Severity>(incident.severity);
+
+  const inputCls = "w-full bg-[#1a1d24] border border-[#2a2e39] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500";
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
+          <h2 className="text-white font-medium">Modifier l'incident</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} required />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Sévérité</label>
+            <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} className={inputCls}>
+              {SEVERITY_OPTIONS.map((s) => (
+                <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#1e2229]">
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">Annuler</button>
+          <button
+            onClick={() => onSave({ name, description: description || undefined, severity })}
+            disabled={saving || !name.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enregistrer"}
+          </button>
+        </div>
       </div>
     </div>
   );

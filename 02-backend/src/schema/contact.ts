@@ -9,7 +9,6 @@ export const contactTypeDefs = `#graphql
     email: String
     site: String
     notes: String
-    isGlobal: Boolean!
     createdAt: String!
     updatedAt: String!
   }
@@ -23,7 +22,6 @@ export const contactTypeDefs = `#graphql
     email: String
     site: String
     notes: String
-    isGlobal: Boolean
   }
 
   input UpdateContactInput {
@@ -38,15 +36,13 @@ export const contactTypeDefs = `#graphql
   }
 
   extend type Query {
-    contacts(incidentId: ID): [Contact!]!
+    contacts: [Contact!]!
     contact(id: ID!): Contact
   }
 
   extend type Mutation {
-    createContact(input: CreateContactInput!, incidentId: ID): Contact!
+    createContact(input: CreateContactInput!): Contact!
     updateContact(id: ID!, input: UpdateContactInput!): Contact!
     deleteContact(id: ID!): Boolean!
-    linkContactToIncident(contactId: ID!, incidentId: ID!): Boolean!
-    unlinkContactFromIncident(contactId: ID!, incidentId: ID!): Boolean!
   }
 `;

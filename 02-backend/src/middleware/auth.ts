@@ -7,7 +7,8 @@ export interface JwtAccessPayload {
 
 export function verifyAccessToken(token: string): JwtAccessPayload | null {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as JwtAccessPayload;
+    // C5 — épingler l'algorithme pour éviter l'attaque "alg: none"
+    return jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as JwtAccessPayload;
   } catch {
     return null;
   }

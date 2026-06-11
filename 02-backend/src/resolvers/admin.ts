@@ -92,8 +92,9 @@ export const adminResolvers = {
           extensions: { code: 'FORBIDDEN' },
         });
       }
+      const deleted = await adminService.deleteUser(id);
       logAudit({ userId: ctx.userId, action: 'DELETE', resource: 'ADMIN', resourceId: id, metadata: { target: 'user' } });
-      return adminService.deleteUser(id);
+      return deleted;
     },
 
     adminAssignRole: async (
@@ -102,8 +103,9 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
+      const assigned = await adminService.assignRole(userId, roleId);
       logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'role_assign', roleId } });
-      return adminService.assignRole(userId, roleId);
+      return assigned;
     },
 
     adminRemoveRole: async (
@@ -112,8 +114,9 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
+      const removed = await adminService.removeRole(userId, roleId);
       logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'role_remove', roleId } });
-      return adminService.removeRole(userId, roleId);
+      return removed;
     },
 
     adminCreateRole: async (
@@ -129,8 +132,9 @@ export const adminResolvers = {
 
     adminDeleteRole: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
+      const deletedRole = await adminService.deleteRole(id);
       logAudit({ userId: ctx.userId, action: 'DELETE', resource: 'ADMIN', resourceId: id, metadata: { target: 'role' } });
-      return adminService.deleteRole(id);
+      return deletedRole;
     },
 
     adminUpdateRolePermissions: async (
@@ -150,8 +154,9 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
+      const reset = await adminService.resetPassword(userId, newPassword);
       logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'password_reset' } });
-      return adminService.resetPassword(userId, newPassword);
+      return reset;
     },
   },
 

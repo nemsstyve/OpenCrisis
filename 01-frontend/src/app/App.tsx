@@ -5,6 +5,7 @@ import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "../lib/apolloClient";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "../context/AuthContext";
+import { Toaster } from "sonner";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <RouterProvider router={router} />
+            <Toaster richColors position="top-right" />
           </AuthProvider>
         </ThemeProvider>
       </ApolloProvider>

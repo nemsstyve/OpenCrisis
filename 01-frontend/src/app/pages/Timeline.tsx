@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, X, Plus, Loader2, Trash2, Download } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { timelineEventSchema } from "../../lib/formSchemas";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
 import {
   TIMELINE_EVENTS_QUERY,
   CREATE_TIMELINE_EVENT_MUTATION,
+  UPDATE_TIMELINE_EVENT_MUTATION,
   DELETE_TIMELINE_EVENT_MUTATION,
   TIMELINE_EVENT_ADDED_SUBSCRIPTION,
 } from "../../graphql/timeline";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
+import { Skeleton } from "../components/ui/skeleton";
 import type { GqlTimelineEvent, TimelineEventType } from "../../types/generated";
 
 // ── Types d'événements ────────────────────────────────────────────────────────
@@ -56,46 +62,45 @@ const EMPTY_FORM: NewEventForm = {
   affectedUser: "",
 };
 
-interface AddEventModalProps {
+interface EventModalProps {
   onClose: () => void;
   onSubmit: (data: NewEventForm) => Promise<void>;
   submitting: boolean;
   error: string | null;
+  initial?: NewEventForm;
+  mode: "create" | "edit";
 }
 
-function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalProps) {
-  const [form, setForm] = useState<NewEventForm>(EMPTY_FORM);
-
-  function set(key: keyof NewEventForm, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await onSubmit(form);
-  }
+function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: EventModalProps) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<NewEventForm>({
+    resolver: zodResolver(timelineEventSchema),
+    defaultValues: initial ?? EMPTY_FORM,
+  });
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
+  const errCls = "text-red-400 text-xs mt-1";
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">Ajouter un événement</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <h2 className="text-white font-medium">
+            {mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
+          </h2>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Type *</label>
-            <select
-              value={form.type}
-              onChange={(e) => set("type", e.target.value)}
-              className={inputCls}
-            >
+            <select {...register("type")} className={inputCls}>
               {EVENT_TYPES.map((t) => (
                 <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
               ))}
@@ -105,42 +110,38 @@ function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalPr
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
             <input
-              value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              required
+              {...register("title")}
               className={inputCls}
               placeholder="Ex : Détection d'un accès non autorisé"
             />
+            {errors.title && <p className={errCls}>{errors.title.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Date / Heure *</label>
             <input
               type="datetime-local"
-              value={form.occurredAt}
-              onChange={(e) => set("occurredAt", e.target.value)}
-              required
+              {...register("occurredAt")}
               className={inputCls}
             />
+            {errors.occurredAt && <p className={errCls}>{errors.occurredAt.message}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Description</label>
             <textarea
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
+              {...register("description")}
               rows={3}
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
               placeholder="Description détaillée de l'événement…"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
               <input
-                value={form.assetName}
-                onChange={(e) => set("assetName", e.target.value)}
+                {...register("assetName")}
                 className={inputCls}
                 placeholder="Serveur-DB-01"
               />
@@ -148,8 +149,7 @@ function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalPr
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
               <input
-                value={form.ipAddress}
-                onChange={(e) => set("ipAddress", e.target.value)}
+                {...register("ipAddress")}
                 className={inputCls}
                 placeholder="10.0.1.15"
               />
@@ -159,8 +159,7 @@ function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalPr
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
             <input
-              value={form.affectedUser}
-              onChange={(e) => set("affectedUser", e.target.value)}
+              {...register("affectedUser")}
               className={inputCls}
               placeholder="jean.martin@company.com"
             />
@@ -186,7 +185,7 @@ function AddEventModal({ onClose, onSubmit, submitting, error }: AddEventModalPr
               className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {submitting ? "Création…" : "Ajouter"}
+              {submitting ? "Enregistrement…" : mode === "edit" ? "Enregistrer" : "Ajouter"}
             </button>
           </div>
         </form>
@@ -202,6 +201,7 @@ export default function Timeline() {
   const hasPermission = useAppStore((s) => s.hasPermission);
   const canWrite = hasPermission("TIMELINE", "WRITE");
   const [exporting, setExporting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<Record<string, string>>({
     occurredAt: "",
@@ -214,6 +214,7 @@ export default function Timeline() {
   });
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<GqlTimelineEvent | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSubmitting, setModalSubmitting] = useState(false);
 
@@ -284,7 +285,23 @@ export default function Timeline() {
     }
   );
 
+  const [updateTimelineEvent] = useMutation<{ updateTimelineEvent: GqlTimelineEvent }>(
+    UPDATE_TIMELINE_EVENT_MUTATION
+  );
+
   // ── Handlers ──────────────────────────────────────────────────────────────
+  function eventToForm(event: GqlTimelineEvent): NewEventForm {
+    return {
+      type: event.type,
+      title: event.title,
+      description: event.description ?? "",
+      occurredAt: new Date(event.occurredAt).toISOString().slice(0, 16),
+      ipAddress: event.ipAddress ?? "",
+      assetName: event.assetName ?? "",
+      affectedUser: event.affectedUser ?? "",
+    };
+  }
+
   async function handleCreateEvent(form: NewEventForm) {
     setModalError(null);
     setModalSubmitting(true);
@@ -308,6 +325,36 @@ export default function Timeline() {
       const msg =
         (err as { graphQLErrors?: Array<{ message: string }> })?.graphQLErrors?.[0]?.message ??
         "Erreur lors de la création";
+      setModalError(msg);
+    } finally {
+      setModalSubmitting(false);
+    }
+  }
+
+  async function handleUpdateEvent(form: NewEventForm) {
+    if (!editing) return;
+    setModalError(null);
+    setModalSubmitting(true);
+    try {
+      await updateTimelineEvent({
+        variables: {
+          id: editing.id,
+          input: {
+            type: form.type,
+            title: form.title,
+            description: form.description || null,
+            occurredAt: new Date(form.occurredAt).toISOString(),
+            ipAddress: form.ipAddress || null,
+            assetName: form.assetName || null,
+            affectedUser: form.affectedUser || null,
+          },
+        },
+      });
+      setEditing(null);
+    } catch (err: unknown) {
+      const msg =
+        (err as { graphQLErrors?: Array<{ message: string }> })?.graphQLErrors?.[0]?.message ??
+        "Erreur lors de la modification";
       setModalError(msg);
     } finally {
       setModalSubmitting(false);
@@ -422,6 +469,7 @@ export default function Timeline() {
                   <span className="font-medium">{value}</span>
                   <button
                     onClick={() => clearFilter(key)}
+                    aria-label={`Retirer le filtre ${columns.find((c) => c.key === key)?.label ?? key}`}
                     className="hover:bg-blue-500/20 rounded p-0.5 transition-colors"
                   >
                     <X className="w-3 h-3" />
@@ -433,12 +481,6 @@ export default function Timeline() {
       )}
 
       {/* États */}
-      {loading && !data && (
-        <div className="flex items-center justify-center py-12 text-gray-500 gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm">Chargement…</span>
-        </div>
-      )}
       {queryError && (
         <div className="bg-red-400/10 border border-red-400/20 rounded-lg p-4 text-red-400 text-sm mb-4">
           {queryError.message}
@@ -452,7 +494,7 @@ export default function Timeline() {
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
                 {columns.map((column) => (
-                  <th key={column.key} className={`px-4 py-3 text-left ${column.width}`}>
+                  <th key={column.key} scope="col" className={`px-4 py-3 text-left ${column.width}${column.key === "_actions" ? " sr-only" : ""}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-400 uppercase tracking-wider">
                         {column.label}
@@ -460,6 +502,8 @@ export default function Timeline() {
                       {column.key !== "_actions" && (
                         <button
                           onClick={() => toggleFilter(column.key)}
+                          aria-label={`Filtrer par ${column.label}`}
+                          aria-pressed={activeFilters.has(column.key)}
                           className={`p-1 rounded transition-colors ${
                             activeFilters.has(column.key)
                               ? "bg-blue-500/20 text-blue-400"
@@ -477,7 +521,8 @@ export default function Timeline() {
                         onChange={(e) =>
                           setFilters((prev) => ({ ...prev, [column.key]: e.target.value }))
                         }
-                        placeholder={`Filtrer…`}
+                        aria-label={`Valeur du filtre ${column.label}`}
+                        placeholder="Filtrer…"
                         className="mt-2 w-full px-2 py-1 bg-[#13151a] border border-[#1e2229] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                       />
                     )}
@@ -486,7 +531,17 @@ export default function Timeline() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2229]">
-              {filteredEvents.length === 0 ? (
+              {loading && !data ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`sk-${i}`} role="status" aria-label="Chargement">
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-4 py-4">
+                        <Skeleton className="h-4 w-full bg-[#1e2229]" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : filteredEvents.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-500">
                     {events.length === 0
@@ -532,16 +587,22 @@ export default function Timeline() {
                     </td>
                     <td className="px-4 py-4">
                       {canWrite && (
-                        <button
-                          onClick={() => {
-                            if (confirm("Supprimer cet événement ?"))
-                              deleteTimelineEvent({ variables: { id: event.id } });
-                          }}
-                          className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setEditing(event); setModalError(null); }}
+                            className="p-1 hover:bg-blue-500/10 rounded transition-colors text-gray-500 hover:text-blue-400"
+                            title="Modifier"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(event.id)}
+                            className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -560,13 +621,35 @@ export default function Timeline() {
 
       {/* Modal ajout */}
       {showModal && (
-        <AddEventModal
+        <EventModal
+          mode="create"
           onClose={() => setShowModal(false)}
           onSubmit={handleCreateEvent}
           submitting={modalSubmitting}
           error={modalError}
         />
       )}
+
+      {/* Modal édition */}
+      {editing && (
+        <EventModal
+          mode="edit"
+          initial={eventToForm(editing)}
+          onClose={() => setEditing(null)}
+          onSubmit={handleUpdateEvent}
+          submitting={modalSubmitting}
+          error={modalError}
+        />
+      )}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        description="Supprimer cet événement de la timeline ?"
+        onConfirm={() => {
+          if (confirmDeleteId) deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

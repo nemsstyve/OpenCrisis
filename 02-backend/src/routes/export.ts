@@ -65,7 +65,7 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
 
     if (!incident) { res.status(404).json({ error: 'Incident introuvable' }); return; }
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true, bufferPages: true });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
@@ -122,9 +122,22 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
       }
     }
 
-    const totalPages = doc.bufferedPageRange ? doc.bufferedPageRange().count : 1;
-    doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
-      .text(`OpenCrisis — ${entries.length} entrée${entries.length > 1 ? 's' : ''}  |  Page 1/${totalPages}`, 50, 790, { align: 'center' });
+    // F5 — pied de page numéroté sur chaque page.
+    // On neutralise la marge basse pendant l'écriture pour éviter un saut de page
+    // automatique (écrire près du bas de page déclencherait une page fantôme).
+    const range = doc.bufferedPageRange();
+    const summary = `OpenCrisis — ${entries.length} entrée${entries.length > 1 ? 's' : ''}`;
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      const bottom = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
+      doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
+        .text(`${summary}  |  Page ${i + 1}/${range.count}`, 50, doc.page.height - 35, {
+          align: 'center',
+          lineBreak: false,
+        });
+      doc.page.margins.bottom = bottom;
+    }
 
     doc.end();
   } catch (err) {
@@ -147,6 +160,9 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       return;
     }
 
+    // N2 — la timeline n'est exportée que si l'utilisateur dispose de TIMELINE:READ
+    const canReadTimeline = (await getUserReadableResources(userId)).has('TIMELINE');
+
     const [incident, entries, timelineEvents] = await Promise.all([
       prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
       prisma.logEntry.findMany({
@@ -157,11 +173,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
         },
         orderBy: { createdAt: 'asc' },
       }),
-      prisma.timelineEvent.findMany({
-        where: { incidentId },
-        include: { actor: { select: { firstName: true, lastName: true } } },
-        orderBy: { occurredAt: 'asc' },
-      }),
+      canReadTimeline
+        ? prisma.timelineEvent.findMany({
+            where: { incidentId, deletedAt: null },
+            include: { actor: { select: { firstName: true, lastName: true } } },
+            orderBy: { occurredAt: 'asc' },
+          })
+        : Promise.resolve([]),
     ]);
 
     if (!incident) { res.status(404).json({ error: 'Incident introuvable' }); return; }

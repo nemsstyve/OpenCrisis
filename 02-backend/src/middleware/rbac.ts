@@ -3,6 +3,18 @@ import type { PermissionResource, PermissionAction } from '@prisma/client';
 import type { GraphQLContext } from '../context';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from '../services/auth';
+import { logAudit } from './audit';
+
+/**
+ * Exige une session authentifiée et renvoie l'identifiant utilisateur garanti non-null.
+ * Remplace les vérifications `if (!ctx.userId)` répétées dans les resolvers.
+ */
+export function requireAuth(ctx: GraphQLContext): string {
+  if (!ctx.userId) {
+    throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+  }
+  return ctx.userId;
+}
 
 /**
  * Vérifie sans lever d'exception si l'utilisateur possède une permission.
@@ -54,6 +66,41 @@ export async function requirePermission(
   );
 
   if (!hasPermission) {
+    // E1 — journaliser chaque refus de permission
+    logAudit({
+      userId: ctx.userId,
+      action: 'PERMISSION_DENIED',
+      resource,
+      metadata: { action, userId: ctx.userId },
+      ipAddress: ctx.req?.ip ?? null,
+    });
     throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
+  }
+}
+
+/**
+ * N6 — ré-autorise un flux d'abonnement à CHAQUE événement.
+ * Un utilisateur dont la permission est révoquée (ou le compte désactivé) en cours
+ * de session cesse de recevoir les événements sans attendre l'expiration du token.
+ * Échec fermé : toute erreur d'autorisation supprime l'événement.
+ */
+export async function* authorizedIterator<T>(
+  source: AsyncIterator<T>,
+  authorize: () => Promise<boolean>,
+): AsyncGenerator<T> {
+  try {
+    while (true) {
+      const { value, done } = await source.next();
+      if (done) return;
+      let allowed = false;
+      try {
+        allowed = await authorize();
+      } catch {
+        allowed = false;
+      }
+      if (allowed) yield value;
+    }
+  } finally {
+    await source.return?.(undefined);
   }
 }

@@ -1,7 +1,6 @@
-import { GraphQLError } from 'graphql';
 import type { DocumentCategory } from '@prisma/client';
 import type { GraphQLContext } from '../context';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { pubsub, TOPICS } from '../pubsub';
 import { getDocuments, getDocument, deleteDocument } from '../services/document';
 
@@ -24,8 +23,8 @@ export const documentResolvers = {
   Mutation: {
     deleteDocument: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'DOCUMENTS', 'WRITE');
-      if (!ctx.userId) throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
-      return deleteDocument(id, ctx.userId, ctx.req?.ip);
+      const userId = requireAuth(ctx);
+      return deleteDocument(id, userId, ctx.req?.ip);
     },
   },
 
@@ -33,7 +32,10 @@ export const documentResolvers = {
     documentUploaded: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'DOCUMENTS', 'READ');
-        return pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId));
+        return authorizedIterator(
+          pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId)),
+          () => hasPermission(ctx, 'DOCUMENTS', 'READ'),
+        );
       },
     },
   },

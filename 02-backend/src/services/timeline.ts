@@ -3,13 +3,14 @@ import type { TimelineEventType } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import { assertIncidentWritable } from './incident';
 
 const TIMELINE_INCLUDE = {
   actor: true,
 } as const;
 
 async function getEvent(id: string) {
-  const event = await prisma.timelineEvent.findUnique({ where: { id }, include: TIMELINE_INCLUDE });
+  const event = await prisma.timelineEvent.findFirst({ where: { id, deletedAt: null }, include: TIMELINE_INCLUDE });
   if (!event) throw new GraphQLError('Événement introuvable', { extensions: { code: 'NOT_FOUND' } });
   return event;
 }
@@ -18,7 +19,7 @@ async function getEvent(id: string) {
 
 export async function getTimelineEvents(incidentId: string) {
   return prisma.timelineEvent.findMany({
-    where: { incidentId },
+    where: { incidentId, deletedAt: null },
     orderBy: { occurredAt: 'asc' },
     include: TIMELINE_INCLUDE,
   });
@@ -45,6 +46,7 @@ export async function createTimelineEvent(
   userId: string,
   ipAddress?: string | null,
 ) {
+  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const event = await prisma.timelineEvent.create({
     data: {
       incidentId,
@@ -78,6 +80,7 @@ export async function updateTimelineEvent(
   userId: string,
   ipAddress?: string | null,
 ) {
+  await getEvent(id); // garantit que l'événement existe et n'est pas supprimé
   const event = await prisma.timelineEvent.update({
     where: { id },
     data: {
@@ -97,7 +100,8 @@ export async function updateTimelineEvent(
 
 export async function deleteTimelineEvent(id: string, userId: string, ipAddress?: string | null) {
   const event = await getEvent(id);
-  await prisma.timelineEvent.delete({ where: { id } });
+  // Soft delete : conserver la trace forensique de l'événement (Q7)
+  await prisma.timelineEvent.update({ where: { id }, data: { deletedAt: new Date() } });
   logAudit({ userId, action: 'DELETE', resource: 'TIMELINE', resourceId: id, incidentId: event.incidentId, ipAddress });
   return true;
 }

@@ -3,6 +3,7 @@ import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import { assertIncidentWritable } from './incident';
 
 const LOG_ENTRY_INCLUDE = {
   author: true,
@@ -17,9 +18,13 @@ async function getEntry(id: string) {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getLogEntries(incidentId: string, cell?: Cell | null) {
+export async function getLogEntries(incidentId: string, cells?: Cell[] | null) {
   return prisma.logEntry.findMany({
-    where: { incidentId, ...(cell ? { cell } : {}), deletedAt: null },
+    where: {
+      incidentId,
+      ...(cells && cells.length > 0 ? { cell: { in: cells } } : {}),
+      deletedAt: null,
+    },
     orderBy: { createdAt: 'asc' },
     include: LOG_ENTRY_INCLUDE,
   });
@@ -34,6 +39,7 @@ export async function createLogEntry(
   authorId: string,
   ipAddress?: string | null,
 ) {
+  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const entry = await prisma.logEntry.create({
     data: { incidentId, cell, content, authorId },
     include: LOG_ENTRY_INCLUDE,

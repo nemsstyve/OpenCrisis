@@ -32,6 +32,9 @@ model User {
   contacts        Contact[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+
+  @@index([deletedAt])
+  @@index([isActive])
 }
 
 model Role {
@@ -86,6 +89,9 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ─── INCIDENT (WORKSPACE CENTRAL) ─────────────────────────────────────────────
@@ -107,8 +113,11 @@ model Incident {
   logEntries     LogEntry[]
   timelineEvents TimelineEvent[]
   documents      Document[]
-  contacts       IncidentContact[]
   auditLogs      AuditLog[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@index([createdById])
 }
 
 // ─── MAIN COURANTE ────────────────────────────────────────────────────────────
@@ -129,6 +138,10 @@ model LogEntry {
   incident Incident      @relation(fields: [incidentId], references: [id])
   author   User          @relation(fields: [authorId], references: [id])
   tags     LogEntryTag[]
+
+  @@index([incidentId, cell, deletedAt])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model Tag {
@@ -166,10 +179,14 @@ model TimelineEvent {
   openctiEntityType String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
 
   incident  Incident   @relation(fields: [incidentId], references: [id])
   actor     User?      @relation(fields: [actorId], references: [id])
   documents Document[]
+
+  @@index([incidentId, occurredAt])
+  @@index([deletedAt])
 }
 
 // ─── DOCUMENTS, BIBLIOTHÈQUE & ARTEFACTS ──────────────────────────────────────
@@ -192,6 +209,9 @@ model Document {
   incident      Incident?      @relation(fields: [incidentId], references: [id])
   timelineEvent TimelineEvent? @relation(fields: [timelineEventId], references: [id])
   uploadedBy    User           @relation(fields: [uploadedById], references: [id])
+
+  @@index([incidentId, deletedAt])
+  @@index([uploadedById])
 }
 
 // ─── ANNUAIRE ─────────────────────────────────────────────────────────────────
@@ -206,24 +226,14 @@ model Contact {
   email        String?
   site         String?
   notes        String?
-  isGlobal     Boolean   @default(true)
   createdById  String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  createdBy User              @relation(fields: [createdById], references: [id])
-  incidents IncidentContact[]
-}
+  createdBy User @relation(fields: [createdById], references: [id])
 
-model IncidentContact {
-  incidentId String
-  contactId  String
-
-  incident Incident @relation(fields: [incidentId], references: [id])
-  contact  Contact  @relation(fields: [contactId], references: [id])
-
-  @@id([incidentId, contactId])
+  @@index([deletedAt])
 }
 
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
@@ -241,6 +251,11 @@ model AuditLog {
 
   user     User?     @relation(fields: [userId], references: [id])
   incident Incident? @relation(fields: [incidentId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([incidentId])
+  @@index([resource, action])
 }
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
@@ -294,6 +309,5 @@ enum PermissionResource {
   DOCUMENTS
   BIBLIOTHEQUE
   ANNUAIRE
-  CARTOGRAPHIE
   ADMIN
 }

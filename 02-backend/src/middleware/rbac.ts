@@ -79,26 +79,32 @@ export async function requirePermission(
 }
 
 /**
- * N6 — ré-autorise un flux d'abonnement à CHAQUE événement.
- * Un utilisateur dont la permission est révoquée (ou le compte désactivé) en cours
- * de session cesse de recevoir les événements sans attendre l'expiration du token.
+ * N6 — ré-autorise un flux d'abonnement périodiquement.
+ * Un utilisateur dont la permission est révoquée cesse de recevoir les événements
+ * dans le délai cacheTtlMs (défaut 60s). Évite une requête DB par événement (F6).
  * Échec fermé : toute erreur d'autorisation supprime l'événement.
  */
 export async function* authorizedIterator<T>(
   source: AsyncIterator<T>,
   authorize: () => Promise<boolean>,
+  cacheTtlMs = 60_000,
 ): AsyncGenerator<T> {
+  let lastCheck = 0;
+  let cachedAllowed = false;
   try {
     while (true) {
       const { value, done } = await source.next();
       if (done) return;
-      let allowed = false;
-      try {
-        allowed = await authorize();
-      } catch {
-        allowed = false;
+      const now = Date.now();
+      if (now - lastCheck >= cacheTtlMs) {
+        try {
+          cachedAllowed = await authorize();
+        } catch {
+          cachedAllowed = false;
+        }
+        lastCheck = now;
       }
-      if (allowed) yield value;
+      if (cachedAllowed) yield value;
     }
   } finally {
     await source.return?.(undefined);

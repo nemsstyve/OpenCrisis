@@ -17,9 +17,13 @@ function cellToResource(cell: Cell) {
 // Cellules de main courante réellement lisibles par l'utilisateur courant.
 // SHARED n'est visible que si au moins une cellule l'est.
 async function readableCells(ctx: GraphQLContext): Promise<Cell[]> {
+  const [canDir, canOps] = await Promise.all([
+    hasPermission(ctx, 'MAIN_COURANTE_DIR', 'READ'),
+    hasPermission(ctx, 'MAIN_COURANTE_OPS', 'READ'),
+  ]);
   const cells: Cell[] = [];
-  if (await hasPermission(ctx, 'MAIN_COURANTE_DIR', 'READ')) cells.push('DIRECTIONAL');
-  if (await hasPermission(ctx, 'MAIN_COURANTE_OPS', 'READ')) cells.push('OPERATIONAL');
+  if (canDir) cells.push('DIRECTIONAL');
+  if (canOps) cells.push('OPERATIONAL');
   if (cells.length > 0) cells.push('SHARED');
   return cells;
 }

@@ -116,8 +116,12 @@ export const logEntryResolvers = {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
+        // F4 — sans filtre cell, souscrire aux 3 topics réels au lieu du topic _ALL inexistant
+        const topics = cell
+          ? TOPICS.LOG_ENTRY_ADDED(incidentId, cell)
+          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_ADDED(incidentId, c));
         return authorizedIterator(
-          pubsub.asyncIterator(TOPICS.LOG_ENTRY_ADDED(incidentId, cell ?? 'ALL')),
+          pubsub.asyncIterator(topics),
           () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
         );
       },
@@ -126,8 +130,12 @@ export const logEntryResolvers = {
       subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
         const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
         await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
+        // F4 — même correction pour logEntryUpdated
+        const topics = cell
+          ? TOPICS.LOG_ENTRY_UPDATED(incidentId, cell)
+          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_UPDATED(incidentId, c));
         return authorizedIterator(
-          pubsub.asyncIterator(TOPICS.LOG_ENTRY_UPDATED(incidentId, cell ?? 'ALL')),
+          pubsub.asyncIterator(topics),
           () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
         );
       },

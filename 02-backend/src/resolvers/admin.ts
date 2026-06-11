@@ -2,6 +2,7 @@ import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
 import { requirePermission } from '../middleware/rbac';
 import { logAudit } from '../middleware/audit';
+import { validate, adminCreateUserSchema, adminUpdateUserSchema, adminCreateRoleSchema, passwordSchema } from '../utils/validation';
 import * as adminService from '../services/admin';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -64,7 +65,8 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const user = await adminService.createUser(input, roleIds);
+      const data = validate(adminCreateUserSchema, input);
+      const user = await adminService.createUser(data, roleIds);
       logAudit({ userId: ctx.userId, action: 'CREATE', resource: 'ADMIN', resourceId: user.id, metadata: { target: 'user', email: input.email } });
       return user;
     },
@@ -80,7 +82,8 @@ export const adminResolvers = {
           extensions: { code: 'FORBIDDEN' },
         });
       }
-      const user = await adminService.updateUser(id, input);
+      const data = validate(adminUpdateUserSchema, input);
+      const user = await adminService.updateUser(id, data);
       logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: id, metadata: { target: 'user' } });
       return user;
     },
@@ -125,7 +128,8 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const role = await adminService.createRole(input);
+      const data = validate(adminCreateRoleSchema, input);
+      const role = await adminService.createRole(data);
       logAudit({ userId: ctx.userId, action: 'CREATE', resource: 'ADMIN', resourceId: role.id, metadata: { target: 'role', name: input.name } });
       return mapRoleDetail(role);
     },
@@ -154,6 +158,7 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
+      validate(passwordSchema, newPassword);
       const reset = await adminService.resetPassword(userId, newPassword);
       logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'password_reset' } });
       return reset;

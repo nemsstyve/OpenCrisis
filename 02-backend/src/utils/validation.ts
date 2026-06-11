@@ -110,3 +110,35 @@ export const createTagSchema = z.object({
   name: z.string().trim().min(1, 'Le nom du tag est requis').max(50),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Couleur hexadécimale invalide').optional(),
 });
+
+// ─── Admin — Utilisateurs ────────────────────────────────────────────────────────
+
+const optionalPhone = z.string().trim().max(50).optional().nullable();
+const optionalShort = z.string().trim().max(200).optional().nullable();
+
+export const adminCreateUserSchema = z.object({
+  email: z.string().trim().email('Email invalide').max(200),
+  password: passwordSchema,
+  firstName: shortText('Le prénom'),
+  lastName: shortText('Le nom'),
+  phone: optionalPhone,
+  company: optionalShort,
+  site: optionalShort,
+});
+
+export const adminUpdateUserSchema = z.object({
+  firstName: shortText('Le prénom').optional().nullable(),
+  lastName: shortText('Le nom').optional().nullable(),
+  phone: optionalPhone,
+  company: optionalShort,
+  site: optionalShort,
+  isActive: z.boolean().optional().nullable(),
+});
+
+// ─── Admin — Rôles ───────────────────────────────────────────────────────────────
+
+export const adminCreateRoleSchema = z.object({
+  name: shortText('Le nom du rôle'),
+  description: optionalText,
+  permissionIds: z.array(z.string().uuid()).min(1, 'Au moins une permission est requise'),
+});

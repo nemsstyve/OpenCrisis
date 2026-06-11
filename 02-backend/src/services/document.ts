@@ -5,6 +5,7 @@ import type { DocumentCategory } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import { assertIncidentWritable } from './incident';
 
 export const UPLOADS_DIR = '/app/uploads';
 
@@ -62,6 +63,7 @@ export async function createDocument(params: {
 
 export async function deleteDocument(id: string, userId: string, ipAddress?: string | null) {
   const doc = await getDoc(id);
+  if (doc.incidentId) await assertIncidentWritable(doc.incidentId);
   // Soft delete en base
   await prisma.document.update({ where: { id }, data: { deletedAt: new Date() } });
   // Supprimer le fichier physique (best-effort)

@@ -28,11 +28,17 @@ interface MainCouranteProps {
   subtitle: string;
 }
 
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+function safeColor(color: string | null | undefined): string {
+  return color && HEX_COLOR_RE.test(color) ? color : '#6B7280';
+}
+
 function TagBadge({ tag, onRemove }: { tag: GqlTag; onRemove?: () => void }) {
+  const c = safeColor(tag.color);
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
-      style={{ backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}40` }}
+      style={{ backgroundColor: `${c}20`, color: c, border: `1px solid ${c}40` }}
     >
       {tag.name}
       {onRemove && (
@@ -417,7 +423,7 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors"
                   style={
                     selectedTagIds.includes(tag.id)
-                      ? { backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}50` }
+                      ? { backgroundColor: `${safeColor(tag.color)}20`, color: safeColor(tag.color), border: `1px solid ${safeColor(tag.color)}50` }
                       : { backgroundColor: "#0a0b0d", color: "#9ca3af", border: "1px solid #1e2229" }
                   }
                 >
@@ -469,7 +475,7 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
                   className="px-3 py-1.5 rounded-lg text-sm transition-colors"
                   style={
                     filterTagId === tag.id
-                      ? { backgroundColor: tag.color, color: "#fff" }
+                      ? { backgroundColor: safeColor(tag.color), color: "#fff" }
                       : { backgroundColor: "#1e2229", color: "#9ca3af" }
                   }
                 >

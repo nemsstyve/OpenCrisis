@@ -176,6 +176,7 @@ model TimelineEvent {
   ipAddress         String?
   assetName         String?
   affectedUser      String?
+  ioc               String?
   openctiEntityId   String?
   openctiEntityType String?
   createdAt         DateTime          @default(now())

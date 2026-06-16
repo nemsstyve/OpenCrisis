@@ -43,6 +43,7 @@ export async function createTimelineEvent(
     ipAddress?: string | null;
     assetName?: string | null;
     affectedUser?: string | null;
+    ioc?: string | null;
   },
   userId: string,
   ipAddress?: string | null,
@@ -60,6 +61,7 @@ export async function createTimelineEvent(
       ipAddress: input.ipAddress,
       assetName: input.assetName,
       affectedUser: input.affectedUser,
+      ioc: input.ioc,
     },
     include: TIMELINE_INCLUDE,
   });
@@ -93,6 +95,7 @@ export async function updateTimelineEvent(
     ipAddress?: string | null;
     assetName?: string | null;
     affectedUser?: string | null;
+    ioc?: string | null;
   },
   userId: string,
   ipAddress?: string | null,
@@ -110,6 +113,7 @@ export async function updateTimelineEvent(
       ...(input.ipAddress !== undefined && { ipAddress: input.ipAddress }),
       ...(input.assetName !== undefined && { assetName: input.assetName }),
       ...(input.affectedUser !== undefined && { affectedUser: input.affectedUser }),
+      ...(input.ioc !== undefined && { ioc: input.ioc }),
     },
     include: TIMELINE_INCLUDE,
   });

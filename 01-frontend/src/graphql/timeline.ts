@@ -14,6 +14,7 @@ export const TIMELINE_EVENTS_QUERY = gql`
       ipAddress
       assetName
       affectedUser
+      ioc
       createdAt
       updatedAt
     }
@@ -34,6 +35,7 @@ export const CREATE_TIMELINE_EVENT_MUTATION = gql`
       ipAddress
       assetName
       affectedUser
+      ioc
       createdAt
       updatedAt
     }
@@ -52,6 +54,7 @@ export const UPDATE_TIMELINE_EVENT_MUTATION = gql`
       ipAddress
       assetName
       affectedUser
+      ioc
       updatedAt
     }
   }
@@ -77,6 +80,7 @@ export const TIMELINE_EVENT_ADDED_SUBSCRIPTION = gql`
       ipAddress
       assetName
       affectedUser
+      ioc
       createdAt
       updatedAt
     }

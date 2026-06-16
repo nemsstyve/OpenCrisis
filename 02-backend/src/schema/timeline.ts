@@ -20,6 +20,7 @@ export const timelineTypeDefs = `#graphql
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
     openctiEntityId: String
     openctiEntityType: String
     createdAt: String!
@@ -36,6 +37,7 @@ export const timelineTypeDefs = `#graphql
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
   }
 
   input UpdateTimelineEventInput {
@@ -47,6 +49,7 @@ export const timelineTypeDefs = `#graphql
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
   }
 
   extend type Query {

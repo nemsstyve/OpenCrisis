@@ -8,28 +8,28 @@ import { useAppStore } from "../../store/useAppStore";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
 import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY } from "../../graphql/incident";
-import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, IncidentStatus, Severity, TimelineEventType } from "../../types/generated";
+import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, GqlIncidentStatus, GqlSeverity, GqlTimelineEventType } from "../../types/generated";
 
 // ── Constantes de présentation ────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<IncidentStatus, string> = {
+const STATUS_LABEL: Record<GqlIncidentStatus, string> = {
   ACTIVE: "En cours",
   CONTAINED: "Contenu",
   CLOSED: "Clos",
 };
-const STATUS_COLOR: Record<IncidentStatus, string> = {
+const STATUS_COLOR: Record<GqlIncidentStatus, string> = {
   ACTIVE: "bg-red-500/10 text-red-400 border-red-500/30",
   CONTAINED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
   CLOSED: "bg-green-500/10 text-green-400 border-green-500/30",
 };
-const SEVERITY_COLOR: Record<Severity, string> = {
+const SEVERITY_COLOR: Record<GqlSeverity, string> = {
   LOW: "text-green-400",
   MEDIUM: "text-yellow-400",
   HIGH: "text-orange-400",
   CRITICAL: "text-red-400",
 };
 
-const TIMELINE_TYPE_ICON: Record<TimelineEventType, ComponentType<{ className?: string }>> = {
+const TIMELINE_TYPE_ICON: Record<GqlTimelineEventType, ComponentType<{ className?: string }>> = {
   DETECTION: AlertTriangle,
   ACTION: Shield,
   DECISION: AlertCircle,
@@ -37,7 +37,7 @@ const TIMELINE_TYPE_ICON: Record<TimelineEventType, ComponentType<{ className?: 
   ESCALATION: AlertTriangle,
   RESOLUTION: CheckCircle,
 };
-const TIMELINE_TYPE_COLOR: Record<TimelineEventType, string> = {
+const TIMELINE_TYPE_COLOR: Record<GqlTimelineEventType, string> = {
   DETECTION: "text-red-400",
   ACTION: "text-blue-400",
   DECISION: "text-purple-400",
@@ -115,13 +115,13 @@ export default function Dashboard() {
 
   const [updateIncident, { loading: updating }] = useMutation<
     { updateIncident: GqlIncident },
-    { id: string; input: { status?: IncidentStatus; name?: string; description?: string; severity?: Severity } }
+    { id: string; input: { status?: GqlIncidentStatus; name?: string; description?: string; severity?: GqlSeverity } }
   >(UPDATE_INCIDENT_MUTATION, {
     refetchQueries: [{ query: INCIDENT_QUERY, variables: { id: incidentId } }],
     onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 
-  async function handleStatusChange(status: IncidentStatus) {
+  async function handleStatusChange(status: GqlIncidentStatus) {
     setShowStatusMenu(false);
     await updateIncident({ variables: { id: incidentId, input: { status } } });
     toast.success(`Statut mis à jour : ${STATUS_LABEL[status]}`);
@@ -156,7 +156,7 @@ export default function Dashboard() {
   // Build timeline bar: real events + "now" marker
   const allPoints = [
     ...tlEvents.map((e) => ({ id: e.id, date: new Date(e.occurredAt), type: e.type, title: e.title, isCurrent: false })),
-    { id: "__now__", date: now, type: "DETECTION" as TimelineEventType, title: "Maintenant", isCurrent: true },
+    { id: "__now__", date: now, type: "DETECTION" as GqlTimelineEventType, title: "Maintenant", isCurrent: true },
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // Décompte légal de 72h (notification CNIL, dépôt de plainte) à partir de la
@@ -188,7 +188,7 @@ export default function Dashboard() {
                 </button>
                 {showStatusMenu && (
                   <div className="absolute right-0 top-full mt-1 bg-[#1a1d24] border border-[#1e2229] rounded-lg shadow-xl z-20 overflow-hidden w-36">
-                    {(["ACTIVE", "CONTAINED", "CLOSED"] as IncidentStatus[]).map((s) => (
+                    {(["ACTIVE", "CONTAINED", "CLOSED"] as GqlIncidentStatus[]).map((s) => (
                       <button
                         key={s}
                         onClick={() => handleStatusChange(s)}
@@ -343,8 +343,8 @@ export default function Dashboard() {
 
 // ── Modale édition incident ───────────────────────────────────────────────────
 
-const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
-const SEVERITY_LABEL: Record<Severity, string> = {
+const SEVERITY_OPTIONS: GqlSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_LABEL: Record<GqlSeverity, string> = {
   LOW: "Faible", MEDIUM: "Moyen", HIGH: "Élevé", CRITICAL: "Critique",
 };
 
@@ -356,12 +356,12 @@ function EditIncidentModal({
 }: {
   incident: GqlIncident;
   onClose: () => void;
-  onSave: (input: { name?: string; description?: string; severity?: Severity }) => Promise<void>;
+  onSave: (input: { name?: string; description?: string; severity?: GqlSeverity }) => Promise<void>;
   saving: boolean;
 }) {
   const [name, setName] = useState(incident.name);
   const [description, setDescription] = useState(incident.description ?? "");
-  const [severity, setSeverity] = useState<Severity>(incident.severity);
+  const [severity, setSeverity] = useState<GqlSeverity>(incident.severity);
 
   const inputCls = "w-full bg-[#1a1d24] border border-[#2a2e39] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500";
 
@@ -383,7 +383,7 @@ function EditIncidentModal({
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Sévérité</label>
-            <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} className={inputCls}>
+            <select value={severity} onChange={(e) => setSeverity(e.target.value as GqlSeverity)} className={inputCls}>
               {SEVERITY_OPTIONS.map((s) => (
                 <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>
               ))}

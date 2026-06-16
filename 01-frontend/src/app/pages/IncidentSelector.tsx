@@ -8,9 +8,9 @@ import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/inciden
 import { useAppStore } from "../../store/useAppStore";
 import { useLogout } from "../../hooks/useLogout";
 import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
-import type { GqlIncident, Severity } from "../../types/generated";
+import type { GqlIncident, GqlSeverity } from "../../types/generated";
 
-const SEVERITY_COLORS: Record<Severity, string> = {
+const SEVERITY_COLORS: Record<GqlSeverity, string> = {
   LOW: "text-green-400 bg-green-400/10",
   MEDIUM: "text-yellow-400 bg-yellow-400/10",
   HIGH: "text-orange-400 bg-orange-400/10",
@@ -23,7 +23,7 @@ const STATUS_LABELS: Record<GqlIncident["status"], string> = {
   CLOSED: "Clos",
 };
 
-const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_OPTIONS: GqlSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function IncidentSelector() {
   const navigate = useNavigate();

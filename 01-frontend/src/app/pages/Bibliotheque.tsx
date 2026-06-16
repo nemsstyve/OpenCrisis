@@ -12,10 +12,10 @@ import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
 import { useDebounce } from "../../hooks/useDebounce";
 import { downloadFile, uploadFile, formatBytes } from "../../lib/fileUtils";
-import type { GqlDocument, DocumentCategory } from "../../types/generated";
+import type { GqlDocument, GqlDocumentCategory } from "../../types/generated";
 
 // ── Catégories ────────────────────────────────────────────────────────────────
-const CATEGORY_LABELS: Record<DocumentCategory, string> = {
+const CATEGORY_LABELS: Record<GqlDocumentCategory, string> = {
   ARTIFACT: "Artefact",
   FICHE_REFLEXE: "Fiche réflexe",
   RAPPORT: "Rapport",
@@ -23,7 +23,7 @@ const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   OTHER: "Autre",
 };
 
-const CATEGORY_COLORS: Record<DocumentCategory, string> = {
+const CATEGORY_COLORS: Record<GqlDocumentCategory, string> = {
   ARTIFACT: "bg-red-500/10 text-red-400",
   FICHE_REFLEXE: "bg-blue-500/10 text-blue-400",
   RAPPORT: "bg-purple-500/10 text-purple-400",
@@ -43,13 +43,13 @@ interface UploadModalProps {
 
 function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [category, setCategory] = useState<DocumentCategory>("FICHE_REFLEXE");
+  const [category, setCategory] = useState<GqlDocumentCategory>("FICHE_REFLEXE");
   const [linkToIncident, setLinkToIncident] = useState(!!incidentId);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const UPLOAD_CATEGORIES: DocumentCategory[] = incidentId
+  const UPLOAD_CATEGORIES: GqlDocumentCategory[] = incidentId
     ? ["ARTIFACT", "RAPPORT", "FICHE_REFLEXE", "PROCEDURE", "OTHER"]
     : ["FICHE_REFLEXE", "PROCEDURE", "RAPPORT", "OTHER"];
 
@@ -113,7 +113,7 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
             <label className="block text-sm text-gray-400 mb-1.5">Catégorie</label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as DocumentCategory)}
+              onChange={(e) => setCategory(e.target.value as GqlDocumentCategory)}
               className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
             >
               {UPLOAD_CATEGORIES.map((c) => (

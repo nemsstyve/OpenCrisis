@@ -17,14 +17,14 @@ import {
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
 import { Skeleton } from "../components/ui/skeleton";
-import type { GqlTimelineEvent, TimelineEventType } from "../../types/generated";
+import type { GqlTimelineEvent, GqlTimelineEventType } from "../../types/generated";
 
 // ── Types d'événements ────────────────────────────────────────────────────────
-const EVENT_TYPES: TimelineEventType[] = [
+const EVENT_TYPES: GqlTimelineEventType[] = [
   "DETECTION", "ACTION", "DECISION", "COMMUNICATION", "ESCALATION", "RESOLUTION",
 ];
 
-const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
+const EVENT_TYPE_LABELS: Record<GqlTimelineEventType, string> = {
   DETECTION: "Détection",
   ACTION: "Action",
   DECISION: "Décision",
@@ -33,7 +33,7 @@ const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   RESOLUTION: "Résolution",
 };
 
-const EVENT_TYPE_COLORS: Record<TimelineEventType, string> = {
+const EVENT_TYPE_COLORS: Record<GqlTimelineEventType, string> = {
   DETECTION: "bg-red-500/10 text-red-400",
   ACTION: "bg-blue-500/10 text-blue-400",
   DECISION: "bg-purple-500/10 text-purple-400",
@@ -44,7 +44,7 @@ const EVENT_TYPE_COLORS: Record<TimelineEventType, string> = {
 
 // ── Formulaire d'ajout d'événement ────────────────────────────────────────────
 interface NewEventForm {
-  type: TimelineEventType;
+  type: GqlTimelineEventType;
   title: string;
   description: string;
   occurredAt: string;

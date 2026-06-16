@@ -304,12 +304,16 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
     try {
       const result = await createLogEntry({ variables: { incidentId, cell, content: newEntry.trim() } });
       const entryId = result.data?.createLogEntry?.id;
-      if (entryId && selectedTagIds.length > 0) {
-        await Promise.all(selectedTagIds.map((tagId) => addTag({ variables: { logEntryId: entryId, tagId } })));
-      }
       setNewEntry("");
       setSelectedTagIds([]);
       toast.success("Entrée ajoutée");
+      if (entryId && selectedTagIds.length > 0) {
+        try {
+          await Promise.all(selectedTagIds.map((tagId) => addTag({ variables: { logEntryId: entryId, tagId } })));
+        } catch {
+          toast.error("Entrée ajoutée, mais l'association des tags a échoué");
+        }
+      }
     } catch {
       toast.error("Erreur lors de l'ajout de l'entrée");
     } finally {

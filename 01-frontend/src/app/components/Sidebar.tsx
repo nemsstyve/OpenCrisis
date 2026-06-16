@@ -174,6 +174,7 @@ export default function Sidebar() {
             {/* Toujours monté (hauteur de ligne constante) — seule l'opacité change */}
             <div className="px-6 mb-1">
               <h3
+                aria-hidden={collapsed}
                 className={`text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate transition-opacity duration-300 ease-in-out ${
                   collapsed ? "opacity-0" : "opacity-100"
                 }`}
@@ -236,7 +237,7 @@ export default function Sidebar() {
           </div>
         )}
 
-        <div className={collapsed ? "p-2" : "p-4 space-y-1"}>
+        <div className={`py-4 transition-all duration-300 ease-in-out ${collapsed ? "px-2" : "px-4 space-y-1"}`}>
           {/* Déconnexion */}
           <button
             onClick={handleLogout}

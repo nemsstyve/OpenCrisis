@@ -1,0 +1,11 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <polygon fill="#000000" points="10,10 80,10 80,35 55,35 55,60 35,60 35,80 10,80" />
+  <polygon fill="#000000" points="190,10 120,10 120,35 145,35 145,60 165,60 165,80 190,80" />
+  <polygon fill="#000000" points="10,190 80,190 80,165 55,165 55,140 35,140 35,120 10,120" />
+  <polygon fill="#000000" points="190,190 120,190 120,165 145,165 145,140 165,140 165,120 190,120" />
+  <g stroke="#ff2d6d" stroke-width="14" stroke-linecap="round">
+    <line x1="100" y1="72" x2="100" y2="128" />
+    <line x1="100" y1="72" x2="100" y2="128" transform="rotate(60 100 100)" />
+    <line x1="100" y1="72" x2="100" y2="128" transform="rotate(120 100 100)" />
+  </g>
+</svg>

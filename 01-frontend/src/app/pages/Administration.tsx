@@ -19,8 +19,9 @@ import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { toast } from "sonner";
 import type {
-  GqlAdminUser, GqlRoleDetail, GqlAdminPermission, GqlAuditLogPage, GqlAuditLogEntry,
+  GqlRoleDetail, GqlPermission, GqlAuditLogPage, GqlAuditLogEntry,
 } from "../../types/generated";
+import type { AdminUser } from "../../types/admin";
 
 type Tab = "users" | "roles" | "audit";
 
@@ -44,7 +45,7 @@ function gqlError(err: unknown): string {
 // ── Modal utilisateur ─────────────────────────────────────────────────────────
 
 interface UserModalProps {
-  user?: GqlAdminUser | null;
+  user?: AdminUser | null;
   roles: GqlRoleDetail[];
   onClose: () => void;
   onSuccess: () => void;
@@ -230,13 +231,13 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
 
 function UsersTab() {
   const currentUser = useAppStore((s) => s.currentUser);
-  const [modal, setModal] = useState<{ open: boolean; user?: GqlAdminUser | null }>({ open: false });
+  const [modal, setModal] = useState<{ open: boolean; user?: AdminUser | null }>({ open: false });
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPwd, setResetPwd] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<GqlAdminUser | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AdminUser | null>(null);
 
-  const { data, loading, error } = useQuery<{ adminUsers: GqlAdminUser[] }>(ADMIN_USERS_QUERY, {
+  const { data, loading, error } = useQuery<{ adminUsers: AdminUser[] }>(ADMIN_USERS_QUERY, {
     fetchPolicy: "cache-and-network",
   });
   const { data: rolesData } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY);
@@ -248,14 +249,14 @@ function UsersTab() {
         if (!variables?.id) return;
         cache.updateQuery({ query: ADMIN_USERS_QUERY }, (prev) => {
           if (!prev) return prev;
-          return { adminUsers: prev.adminUsers.filter((u: GqlAdminUser) => u.id !== variables.id) };
+          return { adminUsers: prev.adminUsers.filter((u: AdminUser) => u.id !== variables.id) };
         });
       },
     }
   );
   const [resetPassword] = useMutation(ADMIN_RESET_PASSWORD_MUTATION);
 
-  async function handleDeleteConfirmed(user: GqlAdminUser) {
+  async function handleDeleteConfirmed(user: AdminUser) {
     setConfirmDelete(null);
     try {
       await deleteUser({ variables: { id: user.id } });
@@ -390,7 +391,7 @@ function RolesTab() {
   const { data: rolesData, loading: rolesLoading } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY, {
     fetchPolicy: "cache-and-network",
   });
-  const { data: permsData } = useQuery<{ adminPermissions: GqlAdminPermission[] }>(ADMIN_PERMISSIONS_QUERY);
+  const { data: permsData } = useQuery<{ adminPermissions: GqlPermission[] }>(ADMIN_PERMISSIONS_QUERY);
 
   const [deleteRole] = useMutation<{ adminDeleteRole: boolean }, { id: string }>(ADMIN_DELETE_ROLE_MUTATION, {
     update(cache, _, { variables }) {
@@ -410,7 +411,7 @@ function RolesTab() {
   const allPerms = permsData?.adminPermissions ?? [];
 
   // Group permissions by resource for the permission matrix
-  const byResource = allPerms.reduce<Record<string, GqlAdminPermission[]>>((acc, p) => {
+  const byResource = allPerms.reduce<Record<string, GqlPermission[]>>((acc, p) => {
     (acc[p.resource] ??= []).push(p);
     return acc;
   }, {});

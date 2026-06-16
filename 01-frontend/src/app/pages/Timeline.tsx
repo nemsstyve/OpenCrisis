@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { timelineEventSchema } from "../../lib/formSchemas";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Checkbox } from "../components/ui/checkbox";
 import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
@@ -16,14 +17,14 @@ import {
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
 import { Skeleton } from "../components/ui/skeleton";
-import type { GqlTimelineEvent, TimelineEventType } from "../../types/generated";
+import type { GqlTimelineEvent, GqlTimelineEventType } from "../../types/generated";
 
 // ── Types d'événements ────────────────────────────────────────────────────────
-const EVENT_TYPES: TimelineEventType[] = [
+const EVENT_TYPES: GqlTimelineEventType[] = [
   "DETECTION", "ACTION", "DECISION", "COMMUNICATION", "ESCALATION", "RESOLUTION",
 ];
 
-const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
+const EVENT_TYPE_LABELS: Record<GqlTimelineEventType, string> = {
   DETECTION: "Détection",
   ACTION: "Action",
   DECISION: "Décision",
@@ -32,7 +33,7 @@ const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   RESOLUTION: "Résolution",
 };
 
-const EVENT_TYPE_COLORS: Record<TimelineEventType, string> = {
+const EVENT_TYPE_COLORS: Record<GqlTimelineEventType, string> = {
   DETECTION: "bg-red-500/10 text-red-400",
   ACTION: "bg-blue-500/10 text-blue-400",
   DECISION: "bg-purple-500/10 text-purple-400",
@@ -43,10 +44,11 @@ const EVENT_TYPE_COLORS: Record<TimelineEventType, string> = {
 
 // ── Formulaire d'ajout d'événement ────────────────────────────────────────────
 interface NewEventForm {
-  type: TimelineEventType;
+  type: GqlTimelineEventType;
   title: string;
   description: string;
   occurredAt: string;
+  isFirstDetection: boolean;
   ipAddress: string;
   assetName: string;
   affectedUser: string;
@@ -57,6 +59,7 @@ const EMPTY_FORM: NewEventForm = {
   title: "",
   description: "",
   occurredAt: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+  isFirstDetection: false,
   ipAddress: "",
   assetName: "",
   affectedUser: "",
@@ -75,11 +78,15 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
   const {
     register,
     handleSubmit,
+    watch,
+    control,
     formState: { errors },
   } = useForm<NewEventForm>({
     resolver: zodResolver(timelineEventSchema),
     defaultValues: initial ?? EMPTY_FORM,
   });
+
+  const isDetection = watch("type") === "DETECTION";
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
@@ -106,6 +113,25 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
               ))}
             </select>
           </div>
+
+          {isDetection && (
+            <div className="flex items-center gap-2">
+              <Controller
+                name="isFirstDetection"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id="isFirstDetection"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                )}
+              />
+              <label htmlFor="isFirstDetection" className="text-sm text-gray-400">
+                Première Détection
+              </label>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
@@ -296,6 +322,7 @@ export default function Timeline() {
       title: event.title,
       description: event.description ?? "",
       occurredAt: new Date(event.occurredAt).toISOString().slice(0, 16),
+      isFirstDetection: event.isFirstDetection,
       ipAddress: event.ipAddress ?? "",
       assetName: event.assetName ?? "",
       affectedUser: event.affectedUser ?? "",
@@ -314,11 +341,17 @@ export default function Timeline() {
             title: form.title,
             description: form.description || null,
             occurredAt: new Date(form.occurredAt).toISOString(),
+            isFirstDetection: form.type === "DETECTION" ? form.isFirstDetection : false,
             ipAddress: form.ipAddress || null,
             assetName: form.assetName || null,
             affectedUser: form.affectedUser || null,
           },
         },
+        // Une autre entrée a pu perdre son statut "première détection" côté
+        // serveur ; le cache normalisé ne le sait pas tant qu'on ne refetch pas.
+        ...(form.type === "DETECTION" && form.isFirstDetection
+          ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
+          : {}),
       });
       setShowModal(false);
     } catch (err: unknown) {
@@ -344,11 +377,15 @@ export default function Timeline() {
             title: form.title,
             description: form.description || null,
             occurredAt: new Date(form.occurredAt).toISOString(),
+            isFirstDetection: form.type === "DETECTION" ? form.isFirstDetection : false,
             ipAddress: form.ipAddress || null,
             assetName: form.assetName || null,
             affectedUser: form.affectedUser || null,
           },
         },
+        ...(form.type === "DETECTION" && form.isFirstDetection
+          ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
+          : {}),
       });
       setEditing(null);
     } catch (err: unknown) {
@@ -559,7 +596,14 @@ export default function Timeline() {
                       })}
                     </td>
                     <td className="px-4 py-4">
-                      <p className="text-sm text-gray-200 font-medium">{event.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-200 font-medium">{event.title}</p>
+                        {event.isFirstDetection && (
+                          <span className="px-1.5 py-0.5 text-xs rounded bg-red-500/10 text-red-400 whitespace-nowrap">
+                            Première détection
+                          </span>
+                        )}
+                      </div>
                       {event.actor && (
                         <p className="text-xs text-blue-400 mt-0.5">
                           {event.actor.firstName} {event.actor.lastName}

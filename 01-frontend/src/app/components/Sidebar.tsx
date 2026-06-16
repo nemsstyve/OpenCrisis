@@ -1,4 +1,4 @@
-import { Link, useLocation, useParams, useNavigate } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import {
   LayoutDashboard,
   Users,
@@ -10,7 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
-import { useAuth } from "../../context/AuthContext";
+import { useLogout } from "../../hooks/useLogout";
 
 interface NavItem {
   path: string;
@@ -59,19 +59,13 @@ function buildNavSections(incidentId: string): NavSection[] {
 
 export default function Sidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { incidentId } = useParams<{ incidentId: string }>();
-  const { logout } = useAuth();
+  const handleLogout = useLogout();
   const currentUser = useAppStore((s) => s.currentUser);
   const currentIncident = useAppStore((s) => s.currentIncident);
   const hasPermission = useAppStore((s) => s.hasPermission);
 
   const navSections = incidentId ? buildNavSections(incidentId) : [];
-
-  async function handleLogout() {
-    await logout();
-    navigate("/login", { replace: true });
-  }
 
   // Nom de l'incident : depuis le store (sélectionné) ou depuis l'URL (rechargement)
   const incidentName =

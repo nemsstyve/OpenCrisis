@@ -3,13 +3,14 @@ import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
-import { AlertTriangle, Plus, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Plus, Loader2, RefreshCw, LogOut } from "lucide-react";
 import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
 import { useAppStore } from "../../store/useAppStore";
+import { useLogout } from "../../hooks/useLogout";
 import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
-import type { GqlIncident, Severity } from "../../types/generated";
+import type { GqlIncident, GqlSeverity } from "../../types/generated";
 
-const SEVERITY_COLORS: Record<Severity, string> = {
+const SEVERITY_COLORS: Record<GqlSeverity, string> = {
   LOW: "text-green-400 bg-green-400/10",
   MEDIUM: "text-yellow-400 bg-yellow-400/10",
   HIGH: "text-orange-400 bg-orange-400/10",
@@ -22,10 +23,11 @@ const STATUS_LABELS: Record<GqlIncident["status"], string> = {
   CLOSED: "Clos",
 };
 
-const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_OPTIONS: GqlSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function IncidentSelector() {
   const navigate = useNavigate();
+  const handleLogout = useLogout();
   const setCurrentIncident = useAppStore((s) => s.setCurrentIncident);
   const currentUser = useAppStore((s) => s.currentUser);
   const hasPermission = useAppStore((s) => s.hasPermission);
@@ -104,13 +106,22 @@ export default function IncidentSelector() {
               Bonjour{currentUser ? `, ${currentUser.firstName}` : ""} — sélectionnez un incident
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="p-2 text-gray-500 hover:text-gray-300 transition-colors"
-            title="Rafraîchir"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => refetch()}
+              className="p-2 text-gray-500 hover:text-gray-300 transition-colors"
+              title="Rafraîchir"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+              title="Se déconnecter"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* States */}

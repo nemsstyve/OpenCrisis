@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock, Settings, ChevronDown } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import { toast } from "sonner";
@@ -8,28 +8,28 @@ import { useAppStore } from "../../store/useAppStore";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
 import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY } from "../../graphql/incident";
-import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, IncidentStatus, Severity, TimelineEventType } from "../../types/generated";
+import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, GqlIncidentStatus, GqlSeverity, GqlTimelineEventType } from "../../types/generated";
 
 // ── Constantes de présentation ────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<IncidentStatus, string> = {
+const STATUS_LABEL: Record<GqlIncidentStatus, string> = {
   ACTIVE: "En cours",
   CONTAINED: "Contenu",
   CLOSED: "Clos",
 };
-const STATUS_COLOR: Record<IncidentStatus, string> = {
+const STATUS_COLOR: Record<GqlIncidentStatus, string> = {
   ACTIVE: "bg-red-500/10 text-red-400 border-red-500/30",
   CONTAINED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
   CLOSED: "bg-green-500/10 text-green-400 border-green-500/30",
 };
-const SEVERITY_COLOR: Record<Severity, string> = {
+const SEVERITY_COLOR: Record<GqlSeverity, string> = {
   LOW: "text-green-400",
   MEDIUM: "text-yellow-400",
   HIGH: "text-orange-400",
   CRITICAL: "text-red-400",
 };
 
-const TIMELINE_TYPE_ICON: Record<TimelineEventType, ComponentType<{ className?: string }>> = {
+const TIMELINE_TYPE_ICON: Record<GqlTimelineEventType, ComponentType<{ className?: string }>> = {
   DETECTION: AlertTriangle,
   ACTION: Shield,
   DECISION: AlertCircle,
@@ -37,7 +37,7 @@ const TIMELINE_TYPE_ICON: Record<TimelineEventType, ComponentType<{ className?: 
   ESCALATION: AlertTriangle,
   RESOLUTION: CheckCircle,
 };
-const TIMELINE_TYPE_COLOR: Record<TimelineEventType, string> = {
+const TIMELINE_TYPE_COLOR: Record<GqlTimelineEventType, string> = {
   DETECTION: "text-red-400",
   ACTION: "text-blue-400",
   DECISION: "text-purple-400",
@@ -46,93 +46,47 @@ const TIMELINE_TYPE_COLOR: Record<TimelineEventType, string> = {
   RESOLUTION: "text-green-400",
 };
 
-// ── Composant MemberWidget (contributeurs par cellule) ────────────────────────
+// ── Widget compte à rebours légal (72h) ────────────────────────────────────────
 
-interface Contributor {
-  id: string;
-  name: string;
-  initials: string;
-  count: number;
-  share: number; // 0–360
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  return now;
 }
 
-function ContributorsWidget({
-  title,
-  entries,
-  color,
-}: {
-  title: string;
-  entries: GqlLogEntry[];
-  color: string;
-}) {
-  // Group by author, top 4
-  const byAuthor = new Map<string, Contributor>();
-  for (const e of entries) {
-    const key = e.author.id;
-    if (!byAuthor.has(key)) {
-      const initials =
-        (e.author.firstName[0] ?? "") + (e.author.lastName[0] ?? "");
-      byAuthor.set(key, { id: key, name: `${e.author.firstName} ${e.author.lastName}`, initials, count: 0, share: 0 });
-    }
-    byAuthor.get(key)!.count++;
-  }
-
-  const total = entries.length || 1;
-  const contributors = Array.from(byAuthor.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4)
-    .map((c) => ({ ...c, share: (c.count / total) * 360 }));
-
-  if (contributors.length === 0) {
+function DeadlineWidget({ label, deadline, now }: { label: string; deadline: Date | null; now: Date }) {
+  if (!deadline) {
     return (
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6">
-        <h2 className="text-xl mb-4 text-white">{title}</h2>
-        <p className="text-gray-500 text-sm text-center py-8">Aucune entrée pour cet incident</p>
+        <h2 className="text-sm text-gray-400 mb-2">{label}</h2>
+        <p className="text-gray-500 text-sm">En attente de la première détection</p>
       </div>
     );
   }
 
-  const circumference = 2 * Math.PI * 40;
+  const remainingMs = deadline.getTime() - now.getTime();
+  const overdue = remainingMs <= 0;
+  const abs = Math.abs(remainingMs);
+  const hours = Math.floor(abs / 3_600_000);
+  const minutes = Math.floor((abs % 3_600_000) / 60_000);
+  const seconds = Math.floor((abs % 60_000) / 1000);
+  const pad = (n: number) => n.toString().padStart(2, "0");
 
   return (
     <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6">
-      <h2 className="text-xl mb-4 text-white">{title}</h2>
-      <p className="text-xs text-gray-500 mb-6">{entries.length} entrée(s) — top contributeurs</p>
-      <div className="grid grid-cols-2 gap-6">
-        {contributors.map((contributor) => {
-          const dashOffset = circumference - (contributor.share / 360) * circumference;
-          return (
-            <div key={contributor.id} className="flex flex-col items-center">
-              <div className="relative mb-3">
-                <svg className="w-24 h-24 -rotate-90">
-                  <circle
-                    cx="48" cy="48" r="40"
-                    fill="none" stroke="currentColor" strokeWidth="4"
-                    className="text-gray-700"
-                  />
-                  <circle
-                    cx="48" cy="48" r="40"
-                    fill="none" stroke="currentColor" strokeWidth="4"
-                    className={color}
-                    strokeDasharray={`${circumference}`}
-                    strokeDashoffset={`${dashOffset}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
-                    <span className="text-blue-400 text-sm font-medium">{contributor.initials}</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-center text-white">{contributor.name}</p>
-              <p className="text-xs text-center text-gray-500 mt-1">
-                {contributor.count} entrée{contributor.count > 1 ? "s" : ""}
-              </p>
-            </div>
-          );
+      <h2 className="text-sm text-gray-400 mb-2">{label}</h2>
+      <p className={`text-3xl font-light ${overdue ? "text-red-400" : "text-white"}`}>
+        {overdue ? "Délai dépassé" : `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`}
+      </p>
+      <p className="text-xs text-gray-500 mt-2">
+        Échéance :{" "}
+        {deadline.toLocaleString("fr-FR", {
+          day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
         })}
-      </div>
+      </p>
     </div>
   );
 }
@@ -155,18 +109,19 @@ export default function Dashboard() {
   const hasPermission = useAppStore((s) => s.hasPermission);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [editModal, setEditModal] = useState(false);
+  const now = useNow();
 
   const canWrite = hasPermission("DASHBOARD", "WRITE");
 
   const [updateIncident, { loading: updating }] = useMutation<
     { updateIncident: GqlIncident },
-    { id: string; input: { status?: IncidentStatus; name?: string; description?: string; severity?: Severity } }
+    { id: string; input: { status?: GqlIncidentStatus; name?: string; description?: string; severity?: GqlSeverity } }
   >(UPDATE_INCIDENT_MUTATION, {
     refetchQueries: [{ query: INCIDENT_QUERY, variables: { id: incidentId } }],
     onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 
-  async function handleStatusChange(status: IncidentStatus) {
+  async function handleStatusChange(status: GqlIncidentStatus) {
     setShowStatusMenu(false);
     await updateIncident({ variables: { id: incidentId, input: { status } } });
     toast.success(`Statut mis à jour : ${STATUS_LABEL[status]}`);
@@ -199,11 +154,17 @@ export default function Dashboard() {
   const isLoading = (canReadDir && dirLoading) || (canReadOps && opsLoading) || (canReadTimeline && tlLoading);
 
   // Build timeline bar: real events + "now" marker
-  const now = new Date();
   const allPoints = [
     ...tlEvents.map((e) => ({ id: e.id, date: new Date(e.occurredAt), type: e.type, title: e.title, isCurrent: false })),
-    { id: "__now__", date: now, type: "DETECTION" as TimelineEventType, title: "Maintenant", isCurrent: true },
+    { id: "__now__", date: now, type: "DETECTION" as GqlTimelineEventType, title: "Maintenant", isCurrent: true },
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Décompte légal de 72h (notification CNIL, dépôt de plainte) à partir de la
+  // première détection marquée sur la timeline
+  const firstDetection = tlEvents.find((e) => e.isFirstDetection) ?? null;
+  const legalDeadline = firstDetection
+    ? new Date(new Date(firstDetection.occurredAt).getTime() + 72 * 3_600_000)
+    : null;
 
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
@@ -227,7 +188,7 @@ export default function Dashboard() {
                 </button>
                 {showStatusMenu && (
                   <div className="absolute right-0 top-full mt-1 bg-[#1a1d24] border border-[#1e2229] rounded-lg shadow-xl z-20 overflow-hidden w-36">
-                    {(["ACTIVE", "CONTAINED", "CLOSED"] as IncidentStatus[]).map((s) => (
+                    {(["ACTIVE", "CONTAINED", "CLOSED"] as GqlIncidentStatus[]).map((s) => (
                       <button
                         key={s}
                         onClick={() => handleStatusChange(s)}
@@ -286,6 +247,18 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Échéances légales (72h) */}
+      {canReadTimeline ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <DeadlineWidget label="Notification à la CNIL (72h)" deadline={legalDeadline} now={now} />
+          <DeadlineWidget label="Porter plainte (72h)" deadline={legalDeadline} now={now} />
+        </div>
+      ) : (
+        <div className="mb-8">
+          <AccessRestricted label="Échéances légales" />
+        </div>
+      )}
 
       {/* Frise chronologique */}
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-8 mb-8">
@@ -346,20 +319,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Widgets contributeurs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {canReadDir ? (
-          <ContributorsWidget title="Cellule de Direction" entries={dirEntries} color="text-purple-500" />
-        ) : (
-          <AccessRestricted label="Cellule de Direction" />
-        )}
-        {canReadOps ? (
-          <ContributorsWidget title="Cellule opérationnelle" entries={opsEntries} color="text-blue-500" />
-        ) : (
-          <AccessRestricted label="Cellule opérationnelle" />
-        )}
-      </div>
-
       {/* Overlay fermeture menu statut */}
       {showStatusMenu && (
         <div className="fixed inset-0 z-10" onClick={() => setShowStatusMenu(false)} />
@@ -384,8 +343,8 @@ export default function Dashboard() {
 
 // ── Modale édition incident ───────────────────────────────────────────────────
 
-const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
-const SEVERITY_LABEL: Record<Severity, string> = {
+const SEVERITY_OPTIONS: GqlSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_LABEL: Record<GqlSeverity, string> = {
   LOW: "Faible", MEDIUM: "Moyen", HIGH: "Élevé", CRITICAL: "Critique",
 };
 
@@ -397,12 +356,12 @@ function EditIncidentModal({
 }: {
   incident: GqlIncident;
   onClose: () => void;
-  onSave: (input: { name?: string; description?: string; severity?: Severity }) => Promise<void>;
+  onSave: (input: { name?: string; description?: string; severity?: GqlSeverity }) => Promise<void>;
   saving: boolean;
 }) {
   const [name, setName] = useState(incident.name);
   const [description, setDescription] = useState(incident.description ?? "");
-  const [severity, setSeverity] = useState<Severity>(incident.severity);
+  const [severity, setSeverity] = useState<GqlSeverity>(incident.severity);
 
   const inputCls = "w-full bg-[#1a1d24] border border-[#2a2e39] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500";
 
@@ -424,7 +383,7 @@ function EditIncidentModal({
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Sévérité</label>
-            <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} className={inputCls}>
+            <select value={severity} onChange={(e) => setSeverity(e.target.value as GqlSeverity)} className={inputCls}>
               {SEVERITY_OPTIONS.map((s) => (
                 <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>
               ))}

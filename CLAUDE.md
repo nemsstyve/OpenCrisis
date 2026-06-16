@@ -116,10 +116,13 @@ opencrisis/
 │   │   ├── app/pages/    # Login/, IncidentSelector/, Dashboard/, MainCourante/,
 │   │   │                 # Timeline/, Documents/, Annuaire/, Cartographie/, Administration/
 │   │   ├── components/ui/ # 52 composants shadcn (ne pas modifier)
-│   │   ├── graphql/      # queries/, mutations/, subscriptions/ (fichiers .graphql)
+│   │   ├── graphql/      # un fichier .ts par domaine (admin, auth, timeline, ...),
+│   │   │                 # requêtes/mutations/subscriptions en gql`` inline (pas de .graphql séparés)
 │   │   ├── store/        # Zustand stores
 │   │   ├── context/      # AuthContext
-│   │   └── types/generated.ts  # AUTO-GÉNÉRÉ par codegen — ne pas éditer manuellement
+│   │   └── types/
+│   │       ├── generated.ts  # AUTO-GÉNÉRÉ par codegen — ne pas éditer manuellement
+│   │       └── admin.ts      # types manuels (projections de requêtes admin) — PAS généré
 │   └── codegen.yml
 ├── 02-backend/
 │   ├── prisma/

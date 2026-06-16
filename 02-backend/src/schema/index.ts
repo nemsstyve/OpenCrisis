@@ -6,6 +6,7 @@ import { timelineTypeDefs } from './timeline';
 import { documentTypeDefs } from './document';
 import { contactTypeDefs } from './contact';
 import { adminTypeDefs } from './admin';
+import { openctiTypeDefs } from './opencti';
 
 // Base types — étendu par chaque module
 const baseTypeDefs = `#graphql
@@ -23,4 +24,5 @@ export const typeDefs = [
   documentTypeDefs,
   contactTypeDefs,
   adminTypeDefs,
+  openctiTypeDefs,
 ];

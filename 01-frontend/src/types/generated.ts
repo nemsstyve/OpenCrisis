@@ -120,6 +120,8 @@ export interface GqlTimelineEvent {
   ipAddress?: string | null;
   assetName?: string | null;
   affectedUser?: string | null;
+  openctiEntityId?: string | null;
+  openctiEntityType?: string | null;
   createdAt: string;
   updatedAt: string;
 }

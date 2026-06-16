@@ -3,15 +3,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { timelineEventSchema } from "../../lib/formSchemas";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil } from "lucide-react";
+import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil, Link, Unlink, Search } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
-import { useQuery, useMutation } from "@apollo/client";
+import { useQuery, useMutation, useLazyQuery } from "@apollo/client";
 import {
   TIMELINE_EVENTS_QUERY,
   CREATE_TIMELINE_EVENT_MUTATION,
   UPDATE_TIMELINE_EVENT_MUTATION,
   DELETE_TIMELINE_EVENT_MUTATION,
   TIMELINE_EVENT_ADDED_SUBSCRIPTION,
+  SEARCH_OPENCTI_QUERY,
+  OPENCTI_STATUS_QUERY,
+  LINK_OPENCTI_MUTATION,
+  UNLINK_OPENCTI_MUTATION,
 } from "../../graphql/timeline";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
@@ -56,7 +60,7 @@ const EMPTY_FORM: NewEventForm = {
   type: "DETECTION",
   title: "",
   description: "",
-  occurredAt: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+  occurredAt: new Date().toISOString().slice(0, 16),
   ipAddress: "",
   assetName: "",
   affectedUser: "",
@@ -194,6 +198,147 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
   );
 }
 
+// ── OpenCTI ───────────────────────────────────────────────────────────────────
+
+interface OpenCTIEntity {
+  id: string;
+  name: string;
+  entity_type: string;
+  description?: string | null;
+}
+
+interface OpenCTIModalProps {
+  event: GqlTimelineEvent;
+  onClose: () => void;
+  onLink: (entity: OpenCTIEntity) => Promise<void>;
+  onUnlink: () => Promise<void>;
+}
+
+function OpenCTIModal({ event, onClose, onLink, onUnlink }: OpenCTIModalProps) {
+  const [searchQuery, setSearchQuery] = useState(event.ipAddress ?? event.assetName ?? "");
+  const [linking, setLinking] = useState(false);
+  const [searchOpenCTI, { data: searchData, loading: searching }] = useLazyQuery<{
+    searchOpenCTI: OpenCTIEntity[];
+  }>(SEARCH_OPENCTI_QUERY);
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (searchQuery.trim().length < 2) return;
+    searchOpenCTI({ variables: { query: searchQuery.trim() } });
+  }
+
+  async function handleLink(entity: OpenCTIEntity) {
+    setLinking(true);
+    try { await onLink(entity); onClose(); } finally { setLinking(false); }
+  }
+
+  async function handleUnlink() {
+    setLinking(true);
+    try { await onUnlink(); onClose(); } finally { setLinking(false); }
+  }
+
+  const results = searchData?.searchOpenCTI ?? [];
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
+          <div>
+            <h2 className="text-white font-medium flex items-center gap-2">
+              <span className="text-orange-400">&#x2B21;</span> Lier à OpenCTI
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">{event.title}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {event.openctiEntityId && (
+          <div className="mx-6 mt-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-orange-400 uppercase tracking-wider mb-0.5">Entité liée</p>
+                <p className="text-sm text-white">{event.openctiEntityType}</p>
+                <p className="text-xs text-gray-400 font-mono truncate">{event.openctiEntityId}</p>
+              </div>
+              <button
+                onClick={handleUnlink}
+                disabled={linking}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-xs transition-colors disabled:opacity-50"
+              >
+                <Unlink className="w-3 h-3" /> Délier
+              </button>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSearch} className="px-6 pt-4 pb-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="IP, domaine, hash, malware…"
+              className="flex-1 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={searching || searchQuery.trim().length < 2}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors disabled:opacity-50"
+            >
+              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Chercher
+            </button>
+          </div>
+        </form>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-4">
+          {searching && (
+            <div className="flex items-center justify-center py-8 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Recherche dans OpenCTI…
+            </div>
+          )}
+          {!searching && results.length === 0 && searchData && (
+            <p className="text-center text-gray-500 py-8 text-sm">
+              Aucune entité trouvée pour &quot;{searchQuery}&quot;
+            </p>
+          )}
+          {!searching && results.length > 0 && (
+            <div className="space-y-2 mt-2">
+              {results.map((entity) => (
+                <button
+                  key={entity.id}
+                  onClick={() => handleLink(entity)}
+                  disabled={linking}
+                  className="w-full text-left p-3 bg-[#0a0b0d] hover:bg-[#1e2229] border border-[#1e2229] hover:border-orange-500/40 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-white font-medium truncate">{entity.name}</p>
+                      <p className="text-xs text-orange-400 mt-0.5">{entity.entity_type}</p>
+                      {entity.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{entity.description}</p>
+                      )}
+                    </div>
+                    <Link className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {!searchData && !searching && (
+            <p className="text-center text-gray-600 py-8 text-sm">
+              Lancez une recherche pour trouver des entités OpenCTI
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page Timeline ─────────────────────────────────────────────────────────────
 
 export default function Timeline() {
@@ -202,6 +347,7 @@ export default function Timeline() {
   const canWrite = hasPermission("TIMELINE", "WRITE");
   const [exporting, setExporting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [openctiEvent, setOpenctiEvent] = useState<GqlTimelineEvent | null>(null);
 
   const [filters, setFilters] = useState<Record<string, string>>({
     occurredAt: "",
@@ -217,6 +363,10 @@ export default function Timeline() {
   const [editing, setEditing] = useState<GqlTimelineEvent | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSubmitting, setModalSubmitting] = useState(false);
+
+  // ── OpenCTI status ────────────────────────────────────────────────────────
+  const { data: statusData } = useQuery<{ openctiStatus: boolean }>(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = statusData?.openctiStatus ?? false;
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const {
@@ -288,6 +438,14 @@ export default function Timeline() {
   const [updateTimelineEvent] = useMutation<{ updateTimelineEvent: GqlTimelineEvent }>(
     UPDATE_TIMELINE_EVENT_MUTATION
   );
+
+  const [linkToOpenCTI] = useMutation(LINK_OPENCTI_MUTATION, {
+    refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }],
+  });
+
+  const [unlinkFromOpenCTI] = useMutation(UNLINK_OPENCTI_MUTATION, {
+    refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }],
+  });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function eventToForm(event: GqlTimelineEvent): NewEventForm {
@@ -414,7 +572,7 @@ export default function Timeline() {
     { key: "ipAddress", label: "Adresse IP", width: "w-32" },
     { key: "affectedUser", label: "Utilisateur", width: "w-40" },
     { key: "description", label: "Description", width: "w-48" },
-    { key: "_actions", label: "", width: "w-12" },
+    { key: "_actions", label: "", width: "w-20" },
   ];
 
   return (
@@ -595,6 +753,19 @@ export default function Timeline() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
+                          {openctiEnabled && (
+                            <button
+                              onClick={() => setOpenctiEvent(event)}
+                              className={`p-1 rounded transition-colors ${
+                                event.openctiEntityId
+                                  ? "text-orange-400 hover:bg-orange-500/10"
+                                  : "text-gray-500 hover:bg-[#1e2229] hover:text-orange-400"
+                              }`}
+                              title={event.openctiEntityId ? `Lié : ${event.openctiEntityType}` : "Lier à OpenCTI"}
+                            >
+                              <Link className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setConfirmDeleteId(event.id)}
                             className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
@@ -641,6 +812,27 @@ export default function Timeline() {
           error={modalError}
         />
       )}
+
+      {/* Modal OpenCTI */}
+      {openctiEvent && (
+        <OpenCTIModal
+          event={openctiEvent}
+          onClose={() => setOpenctiEvent(null)}
+          onLink={async (entity: OpenCTIEntity) => {
+            await linkToOpenCTI({
+              variables: {
+                eventId: openctiEvent.id,
+                openctiEntityId: entity.id,
+                openctiEntityType: entity.entity_type,
+              },
+            });
+          }}
+          onUnlink={async () => {
+            await unlinkFromOpenCTI({ variables: { eventId: openctiEvent.id } });
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={!!confirmDeleteId}
         description="Supprimer cet événement de la timeline ?"

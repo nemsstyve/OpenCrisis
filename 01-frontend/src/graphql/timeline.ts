@@ -13,6 +13,8 @@ export const TIMELINE_EVENTS_QUERY = gql`
       ipAddress
       assetName
       affectedUser
+      openctiEntityId
+      openctiEntityType
       createdAt
       updatedAt
     }
@@ -32,6 +34,8 @@ export const CREATE_TIMELINE_EVENT_MUTATION = gql`
       ipAddress
       assetName
       affectedUser
+      openctiEntityId
+      openctiEntityType
       createdAt
       updatedAt
     }
@@ -73,8 +77,54 @@ export const TIMELINE_EVENT_ADDED_SUBSCRIPTION = gql`
       ipAddress
       assetName
       affectedUser
+      openctiEntityId
+      openctiEntityType
       createdAt
       updatedAt
     }
   }
 `;
+
+// ─── OpenCTI ──────────────────────────────────────────────────────────────────
+
+export const SEARCH_OPENCTI_QUERY = gql`
+  query SearchOpenCTI($query: String!) {
+    searchOpenCTI(query: $query) {
+      id
+      name
+      entity_type
+      description
+    }
+  }
+`;
+
+export const OPENCTI_STATUS_QUERY = gql`
+  query OpenCTIStatus {
+    openctiStatus
+  }
+`;
+
+export const LINK_OPENCTI_MUTATION = gql`
+  mutation LinkTimelineEventToOpenCTI($eventId: ID!, $openctiEntityId: String!, $openctiEntityType: String!) {
+    linkTimelineEventToOpenCTI(
+      eventId: $eventId
+      openctiEntityId: $openctiEntityId
+      openctiEntityType: $openctiEntityType
+    ) {
+      id
+      openctiEntityId
+      openctiEntityType
+    }
+  }
+`;
+
+export const UNLINK_OPENCTI_MUTATION = gql`
+  mutation UnlinkTimelineEventFromOpenCTI($eventId: ID!) {
+    unlinkTimelineEventFromOpenCTI(eventId: $eventId) {
+      id
+      openctiEntityId
+      openctiEntityType
+    }
+  }
+`;
+

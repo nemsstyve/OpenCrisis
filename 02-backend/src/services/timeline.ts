@@ -38,6 +38,7 @@ export async function createTimelineEvent(
     title: string;
     description?: string | null;
     occurredAt: string;
+    isFirstDetection?: boolean | null;
     actorId?: string | null;
     ipAddress?: string | null;
     assetName?: string | null;
@@ -47,13 +48,14 @@ export async function createTimelineEvent(
   ipAddress?: string | null,
 ) {
   await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
-  const event = await prisma.timelineEvent.create({
+  const createOp = prisma.timelineEvent.create({
     data: {
       incidentId,
       type: input.type,
       title: input.title,
       description: input.description,
       occurredAt: new Date(input.occurredAt),
+      isFirstDetection: input.isFirstDetection ?? false,
       actorId: input.actorId,
       ipAddress: input.ipAddress,
       assetName: input.assetName,
@@ -61,6 +63,20 @@ export async function createTimelineEvent(
     },
     include: TIMELINE_INCLUDE,
   });
+  // Un seul événement "première détection" par incident (point de départ du
+  // décompte légal 72h) — bascule atomique pour éviter qu'une interruption
+  // entre les deux requêtes ne laisse 0 ou 2 événements marqués.
+  const event = input.isFirstDetection
+    ? (
+        await prisma.$transaction([
+          prisma.timelineEvent.updateMany({
+            where: { incidentId, isFirstDetection: true },
+            data: { isFirstDetection: false },
+          }),
+          createOp,
+        ])
+      )[1]
+    : await createOp;
   logAudit({ userId, action: 'CREATE', resource: 'TIMELINE', resourceId: event.id, incidentId, ipAddress });
   pubsub.publish(TOPICS.TIMELINE_EVENT_ADDED(incidentId), { timelineEventAdded: event });
   return event;
@@ -73,6 +89,7 @@ export async function updateTimelineEvent(
     title?: string | null;
     description?: string | null;
     occurredAt?: string | null;
+    isFirstDetection?: boolean | null;
     ipAddress?: string | null;
     assetName?: string | null;
     affectedUser?: string | null;
@@ -82,19 +99,31 @@ export async function updateTimelineEvent(
 ) {
   const existing = await getEvent(id); // garantit que l'événement existe et n'est pas supprimé
   await assertIncidentWritable(existing.incidentId); // F1 — refuser l'édition sur un incident clôturé
-  const event = await prisma.timelineEvent.update({
+  const updateOp = prisma.timelineEvent.update({
     where: { id },
     data: {
       ...(input.type != null && { type: input.type }),
       ...(input.title != null && { title: input.title }),
       ...(input.description !== undefined && { description: input.description }),
       ...(input.occurredAt != null && { occurredAt: new Date(input.occurredAt) }),
+      ...(input.isFirstDetection != null && { isFirstDetection: input.isFirstDetection }),
       ...(input.ipAddress !== undefined && { ipAddress: input.ipAddress }),
       ...(input.assetName !== undefined && { assetName: input.assetName }),
       ...(input.affectedUser !== undefined && { affectedUser: input.affectedUser }),
     },
     include: TIMELINE_INCLUDE,
   });
+  const event = input.isFirstDetection
+    ? (
+        await prisma.$transaction([
+          prisma.timelineEvent.updateMany({
+            where: { incidentId: existing.incidentId, isFirstDetection: true, id: { not: id } },
+            data: { isFirstDetection: false },
+          }),
+          updateOp,
+        ])
+      )[1]
+    : await updateOp;
   logAudit({ userId, action: 'UPDATE', resource: 'TIMELINE', resourceId: id, incidentId: event.incidentId, ipAddress });
   return event;
 }

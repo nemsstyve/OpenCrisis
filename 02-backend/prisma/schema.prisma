@@ -171,6 +171,7 @@ model TimelineEvent {
   title             String
   description       String?
   occurredAt        DateTime
+  isFirstDetection  Boolean           @default(false)
   actorId           String?
   ipAddress         String?
   assetName         String?

@@ -15,6 +15,7 @@ export const timelineTypeDefs = `#graphql
     title: String!
     description: String
     occurredAt: String!
+    isFirstDetection: Boolean!
     actor: User
     ipAddress: String
     assetName: String
@@ -30,6 +31,7 @@ export const timelineTypeDefs = `#graphql
     title: String!
     description: String
     occurredAt: String!
+    isFirstDetection: Boolean
     actorId: ID
     ipAddress: String
     assetName: String
@@ -41,6 +43,7 @@ export const timelineTypeDefs = `#graphql
     title: String
     description: String
     occurredAt: String
+    isFirstDetection: Boolean
     ipAddress: String
     assetName: String
     affectedUser: String

@@ -116,6 +116,7 @@ export interface GqlTimelineEvent {
   title: string;
   description?: string | null;
   occurredAt: string;
+  isFirstDetection: boolean;
   actor?: { id: string; firstName: string; lastName: string } | null;
   ipAddress?: string | null;
   assetName?: string | null;

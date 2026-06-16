@@ -9,6 +9,7 @@ export const TIMELINE_EVENTS_QUERY = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName
@@ -28,6 +29,7 @@ export const CREATE_TIMELINE_EVENT_MUTATION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName
@@ -46,6 +48,7 @@ export const UPDATE_TIMELINE_EVENT_MUTATION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       ipAddress
       assetName
       affectedUser
@@ -69,6 +72,7 @@ export const TIMELINE_EVENT_ADDED_SUBSCRIPTION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName

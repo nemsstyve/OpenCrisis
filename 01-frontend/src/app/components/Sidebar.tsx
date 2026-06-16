@@ -106,10 +106,10 @@ export default function Sidebar() {
         collapsed ? "w-16" : "w-48"
       } bg-white dark:bg-[#0a0b0d] border-r border-gray-200 dark:border-[#1e2229] flex flex-col h-screen transition-[width] duration-300 ease-in-out`}
     >
-      {/* Logo + bouton replier */}
+      {/* Logo + bouton replier — padding vertical constant pour ne pas décaler le reste */}
       <div
-        className={`flex items-center border-b border-gray-200 dark:border-[#1e2229] transition-all duration-300 ease-in-out ${
-          collapsed ? "justify-center p-4" : "justify-between px-6 py-5"
+        className={`flex items-center border-b border-gray-200 dark:border-[#1e2229] py-5 transition-all duration-300 ease-in-out ${
+          collapsed ? "justify-center px-4" : "justify-between px-6"
         }`}
       >
         <h1
@@ -131,11 +131,11 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Incident courant */}
+      {/* Incident courant — hauteur fixe pour ne pas décaler la navigation */}
       {incidentId && (
         <div
-          className={`border-b border-gray-200 dark:border-[#1e2229] transition-all duration-300 ease-in-out ${
-            collapsed ? "p-2 flex justify-center" : "px-4 py-3"
+          className={`h-16 flex items-center border-b border-gray-200 dark:border-[#1e2229] transition-all duration-300 ease-in-out ${
+            collapsed ? "justify-center px-2" : "justify-start px-4"
           }`}
         >
           {collapsed ? (
@@ -148,7 +148,7 @@ export default function Sidebar() {
               <ChevronLeft className="w-4 h-4" />
             </Link>
           ) : (
-            <>
+            <div className="min-w-0">
               <Link
                 to="/incidents"
                 className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 transition-colors"
@@ -159,7 +159,7 @@ export default function Sidebar() {
               <p className="text-xs text-gray-900 dark:text-white mt-1.5 truncate text-center font-medium" title={incidentName}>
                 {incidentName}
               </p>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -171,13 +171,16 @@ export default function Sidebar() {
             key={section.title}
             className={`py-2 ${index > 0 ? "border-t border-gray-200 dark:border-[#1e2229]" : ""}`}
           >
-            {!collapsed && (
-              <div className="px-6 mb-1">
-                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate">
-                  {section.title}
-                </h3>
-              </div>
-            )}
+            {/* Toujours monté (hauteur de ligne constante) — seule l'opacité change */}
+            <div className="px-6 mb-1">
+              <h3
+                className={`text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate transition-opacity duration-300 ease-in-out ${
+                  collapsed ? "opacity-0" : "opacity-100"
+                }`}
+              >
+                {section.title}
+              </h3>
+            </div>
             <ul>
               {section.items.map((item) => {
                 const Icon = item.icon;

@@ -73,15 +73,16 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Rôle *</label>
-            <input {...register("role")} className={inputCls} placeholder="Chef cellule opérationnelle" />
-            {errors.role && <p className={errCls}>{errors.role.message}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Organisation</label>
-            <input {...register("organization")} className={inputCls} placeholder="TechCorp SA" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Rôle *</label>
+              <input {...register("role")} className={inputCls} placeholder="Chef cellule opérationnelle" />
+              {errors.role && <p className={errCls}>{errors.role.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Organisation</label>
+              <input {...register("organization")} className={inputCls} placeholder="TechCorp SA" />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

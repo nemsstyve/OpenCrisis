@@ -515,15 +515,15 @@ export default function Timeline() {
   const totalActiveCount = activeFilterCount + (globalSearch ? 1 : 0);
 
   const columns = [
-    { key: "occurredAt", label: "Timestamp", width: "w-44" },
+    { key: "occurredAt", label: "Timestamp", width: "w-36" },
     { key: "title", label: "Événement", width: "" },
-    { key: "type", label: "Type", width: "w-36" },
-    { key: "assetName", label: "Asset", width: "w-36" },
-    { key: "ipAddress", label: "IP", width: "w-32" },
-    { key: "ioc", label: "IOC", width: "w-44" },
-    { key: "affectedUser", label: "Utilisateur", width: "w-36" },
-    { key: "description", label: "Description", width: "w-48" },
-    ...(canWrite ? [{ key: "_actions", label: "", width: "w-16" }] : []),
+    { key: "type", label: "Type", width: "w-28" },
+    { key: "assetName", label: "Asset", width: "w-24" },
+    { key: "ipAddress", label: "IP", width: "w-28" },
+    { key: "ioc", label: "IOC", width: "w-40" },
+    { key: "affectedUser", label: "Utilisateur", width: "w-24" },
+    { key: "description", label: "Description", width: "w-32" },
+    ...(canWrite ? [{ key: "_actions", label: "", width: "w-14" }] : []),
   ];
 
   const filterInputCls =
@@ -652,7 +652,7 @@ export default function Timeline() {
       {/* Tableau */}
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
                 {columns.map((column) => (
@@ -766,17 +766,17 @@ export default function Timeline() {
                         hour: "2-digit", minute: "2-digit",
                       })}
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-200 font-medium">{event.title}</p>
+                    <td className="px-4 py-4 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm text-gray-200 font-medium truncate" title={event.title}>{event.title}</p>
                         {event.isFirstDetection && (
-                          <span className="px-1.5 py-0.5 text-xs rounded bg-red-500/10 text-red-400 whitespace-nowrap">
+                          <span className="shrink-0 px-1.5 py-0.5 text-xs rounded bg-red-500/10 text-red-400 whitespace-nowrap">
                             Première détection
                           </span>
                         )}
                       </div>
                       {event.actor && (
-                        <p className="text-xs text-blue-400 mt-0.5">
+                        <p className="text-xs text-blue-400 mt-0.5 truncate">
                           {event.actor.firstName} {event.actor.lastName}
                         </p>
                       )}
@@ -786,24 +786,24 @@ export default function Timeline() {
                         {EVENT_TYPE_LABELS[event.type]}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300 text-center">
-                      {event.assetName ?? <span className="text-gray-600">—</span>}
+                    <td className="px-4 py-4 text-sm text-gray-300 text-center">
+                      <p className="truncate" title={event.assetName ?? ""}>{event.assetName ?? <span className="text-gray-600">—</span>}</p>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-center">
                       {event.ipAddress
                         ? <span className="text-sm font-mono text-green-400"><CopyCell value={event.ipAddress} /></span>
                         : <span className="text-gray-600">—</span>}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-4 text-center">
                       {event.ioc
-                        ? <span className="text-sm font-mono text-yellow-400"><CopyCell value={event.ioc} /></span>
+                        ? <span className="text-sm font-mono text-yellow-400 block truncate" title={event.ioc}><CopyCell value={event.ioc} /></span>
                         : <span className="text-gray-600">—</span>}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300 text-center">
-                      {event.affectedUser ?? <span className="text-gray-600">—</span>}
+                    <td className="px-4 py-4 text-sm text-gray-300 text-center">
+                      <p className="truncate" title={event.affectedUser ?? ""}>{event.affectedUser ?? <span className="text-gray-600">—</span>}</p>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-400">
-                      {event.description ?? <span className="text-gray-600">—</span>}
+                      <p className="truncate" title={event.description ?? ""}>{event.description ?? <span className="text-gray-600">—</span>}</p>
                     </td>
                     {canWrite && (
                       <td className="px-4 py-4">

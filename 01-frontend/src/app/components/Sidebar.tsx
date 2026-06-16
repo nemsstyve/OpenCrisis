@@ -141,7 +141,7 @@ export default function Sidebar() {
                 <ChevronLeft className="w-3.5 h-3.5" />
                 Changer d'incident
               </Link>
-              <p className="text-xs text-gray-900 dark:text-white mt-1.5 truncate font-medium" title={incidentName}>
+              <p className="text-xs text-gray-900 dark:text-white mt-1.5 truncate text-center font-medium" title={incidentName}>
                 {incidentName}
               </p>
             </>

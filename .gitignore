@@ -3,6 +3,14 @@
 .env.local
 .env.*.local
 
+# ─── CERTIFICATS SSL ──────────────────────────────────────────────────────────
+# Les certificats auto-signés sont générés via scripts/generate-certs.sh
+certs/
+
+# ─── BACKUPS ──────────────────────────────────────────────────────────────────
+# Les dumps chiffrés GPG sont produits par le service backup
+backups/
+
 # ─── DÉPENDANCES ──────────────────────────────────────────────────────────────
 node_modules/
 

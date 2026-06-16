@@ -306,7 +306,9 @@ function UsersTab() {
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {["Nom", "Email", "Rôles", "Statut", "Actions"].map((h) => (
-                <th key={h} scope="col" className={`px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}>{h}</th>
+                <th key={h} scope="col" className="px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider">
+                  {h === "Actions" ? <span className="sr-only">{h}</span> : h}
+                </th>
               ))}
             </tr>
           </thead>

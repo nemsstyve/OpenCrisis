@@ -529,7 +529,7 @@ export default function Timeline() {
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
                 {columns.map((column) => (
-                  <th key={column.key} scope="col" className={`px-4 py-3 text-left ${column.width}${column.key === "_actions" ? " sr-only" : ""}`}>
+                  <th key={column.key} scope="col" className={`px-4 py-3 text-left ${column.width}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-400 uppercase tracking-wider">
                         {column.label}

@@ -303,9 +303,9 @@ export default function Annuaire() {
                     <th
                       key={h}
                       scope="col"
-                      className={`px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}
+                      className="px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider"
                     >
-                      {h}
+                      {h === "Actions" ? <span className="sr-only">{h}</span> : h}
                     </th>
                   ))}
                 </tr>

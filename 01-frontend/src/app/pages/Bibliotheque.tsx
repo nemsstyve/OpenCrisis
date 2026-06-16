@@ -206,9 +206,9 @@ function DocumentTable({
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {columns.map((col) => (
-                <th key={col.key} scope="col" className={`px-4 py-3 text-left ${col.width}${col.key === "_actions" ? " sr-only" : ""}`}>
+                <th key={col.key} scope="col" className={`px-4 py-3 text-left ${col.width}`}>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-400 uppercase tracking-wider">{col.label}</span>
+                    <span className={`text-sm text-gray-400 uppercase tracking-wider${col.key === "_actions" ? " sr-only" : ""}`}>{col.label}</span>
                     {col.key !== "_actions" && (
                       <button
                         onClick={() => onToggleFilter(col.key)}

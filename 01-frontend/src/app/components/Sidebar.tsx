@@ -104,15 +104,21 @@ export default function Sidebar() {
     <aside
       className={`${
         collapsed ? "w-16" : "w-64"
-      } bg-white dark:bg-[#0a0b0d] border-r border-gray-200 dark:border-[#1e2229] flex flex-col h-screen transition-[width] duration-200`}
+      } bg-white dark:bg-[#0a0b0d] border-r border-gray-200 dark:border-[#1e2229] flex flex-col h-screen transition-[width] duration-300 ease-in-out`}
     >
       {/* Logo + bouton replier */}
-      <div className={`flex items-center border-b border-gray-200 dark:border-[#1e2229] ${collapsed ? "justify-center p-4" : "justify-between px-6 py-5"}`}>
-        {!collapsed && (
-          <div className="min-w-0">
-            <h1 className="text-xl text-gray-900 dark:text-white truncate">Open Crisis</h1>
-          </div>
-        )}
+      <div
+        className={`flex items-center border-b border-gray-200 dark:border-[#1e2229] transition-all duration-300 ease-in-out ${
+          collapsed ? "justify-center p-4" : "justify-between px-6 py-5"
+        }`}
+      >
+        <h1
+          className={`text-xl text-gray-900 dark:text-white truncate whitespace-nowrap overflow-hidden flex-shrink-0 transition-all duration-300 ease-in-out ${
+            collapsed ? "max-w-0 opacity-0" : "max-w-[180px] opacity-100"
+          }`}
+        >
+          Open Crisis
+        </h1>
         {!isTablet && (
           <button
             onClick={toggleCollapsed}
@@ -127,7 +133,11 @@ export default function Sidebar() {
 
       {/* Incident courant */}
       {incidentId && (
-        <div className={`border-b border-gray-200 dark:border-[#1e2229] ${collapsed ? "p-2 flex justify-center" : "px-4 py-3"}`}>
+        <div
+          className={`border-b border-gray-200 dark:border-[#1e2229] transition-all duration-300 ease-in-out ${
+            collapsed ? "p-2 flex justify-center" : "px-4 py-3"
+          }`}
+        >
           {collapsed ? (
             <Link
               to="/incidents"
@@ -163,7 +173,7 @@ export default function Sidebar() {
           >
             {!collapsed && (
               <div className="px-6 mb-1">
-                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500">
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate">
                   {section.title}
                 </h3>
               </div>
@@ -172,7 +182,9 @@ export default function Sidebar() {
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
-                const base = "flex items-center gap-2.5 py-1.5 text-sm transition-colors";
+                const base = `flex items-center py-1.5 text-sm transition-all duration-300 ease-in-out ${
+                  collapsed ? "gap-0" : "gap-2.5"
+                }`;
                 const layout = collapsed ? "justify-center px-0 mx-2 rounded-lg" : "px-6 border-l-2";
                 const active = isActive
                   ? collapsed
@@ -190,7 +202,13 @@ export default function Sidebar() {
                       className={`${base} ${layout} ${active}`}
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />
-                      {!collapsed && <span>{item.label}</span>}
+                      <span
+                        className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
+                          collapsed ? "max-w-0 opacity-0" : "max-w-[180px] opacity-100"
+                        }`}
+                      >
+                        {item.label}
+                      </span>
                     </Link>
                   </li>
                 );
@@ -221,12 +239,18 @@ export default function Sidebar() {
             onClick={handleLogout}
             aria-label="Se déconnecter"
             title={collapsed ? "Se déconnecter" : undefined}
-            className={`flex items-center gap-3 w-full rounded-lg text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors text-sm ${
-              collapsed ? "justify-center p-2" : "px-3 py-2"
+            className={`flex items-center w-full rounded-lg text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all duration-300 ease-in-out text-sm ${
+              collapsed ? "justify-center gap-0 p-2" : "gap-3 px-3 py-2"
             }`}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && <span>Se déconnecter</span>}
+            <span
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
+                collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"
+              }`}
+            >
+              Se déconnecter
+            </span>
           </button>
         </div>
       </div>

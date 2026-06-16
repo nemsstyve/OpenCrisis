@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
 import { Download, Plus, Clock, Tag, Filter, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import { exportPdf } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
@@ -109,38 +111,39 @@ function EntryRow({
 
           {canWrite && (
             <div className="flex items-center gap-1 flex-shrink-0">
-              <div className="relative">
-                <button
-                  onClick={() => setShowTagPicker((v) => !v)}
-                  className="p-1 hover:bg-[#1e2229] rounded transition-colors text-gray-500 hover:text-white"
-                  title="Ajouter un tag"
-                >
-                  <Tag className="w-3.5 h-3.5" />
-                </button>
-                {showTagPicker && (
-                  <div className="absolute right-0 top-7 bg-[#1e2229] border border-[#2a2e39] rounded-lg shadow-lg z-20 p-2 min-w-32">
-                    {addableTags.length > 0 ? (
-                      addableTags.map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => { onAddTag(entry.id, t.id); setShowTagPicker(false); }}
-                          className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-[#2a2e39] transition-colors text-sm text-gray-300 text-left"
-                        >
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
-                          {t.name}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-xs text-gray-500 px-2 py-1">Tous les tags sont associés</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Popover open={showTagPicker} onOpenChange={setShowTagPicker}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="p-1 hover:bg-[#1e2229] rounded transition-colors text-gray-500 hover:text-white"
+                    title="Ajouter un tag"
+                    aria-label="Ajouter un tag"
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-auto min-w-32 bg-[#1e2229] border-[#2a2e39] text-gray-300 p-2">
+                  {addableTags.length > 0 ? (
+                    addableTags.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => { onAddTag(entry.id, t.id); setShowTagPicker(false); }}
+                        className="flex items-center gap-2 w-full px-2 py-1 rounded hover:bg-[#2a2e39] transition-colors text-sm text-gray-300 text-left"
+                      >
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+                        {t.name}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500 px-2 py-1">Tous les tags sont associés</p>
+                  )}
+                </PopoverContent>
+              </Popover>
               {isOwn && !editing && (
                 <button
                   onClick={() => { setEditContent(entry.content); setEditing(true); }}
                   className="p-1 hover:bg-[#1e2229] rounded transition-colors text-gray-500 hover:text-white"
                   title="Modifier"
+                  aria-label="Modifier l'entrée"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -149,6 +152,7 @@ function EntryRow({
                 onClick={() => onDelete(entry.id)}
                 className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
                 title="Supprimer"
+                aria-label="Supprimer l'entrée"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -305,8 +309,9 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
       }
       setNewEntry("");
       setSelectedTagIds([]);
+      toast.success("Entrée ajoutée");
     } catch {
-      // error handled silently — form stays
+      toast.error("Erreur lors de l'ajout de l'entrée");
     } finally {
       setSubmitting(false);
     }
@@ -314,9 +319,14 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
 
   async function handleCreateTag() {
     if (!newTagName.trim()) return;
-    await createTag({ variables: { name: newTagName.trim() } });
-    setNewTagName("");
-    setShowNewTagInput(false);
+    try {
+      await createTag({ variables: { name: newTagName.trim() } });
+      toast.success("Tag créé");
+      setNewTagName("");
+      setShowNewTagInput(false);
+    } catch {
+      toast.error("Erreur lors de la création du tag");
+    }
   }
 
   function toggleSelectedTag(id: string) {
@@ -331,7 +341,7 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
 
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl mb-2 text-white">{title}</h1>
           <p className="text-gray-400">{subtitle}</p>
@@ -341,7 +351,7 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
             if (!incidentId || exporting) return;
             setExporting(true);
             try { await exportPdf(incidentId, incident?.name ?? incidentId); }
-            catch (e) { alert(e instanceof Error ? e.message : "Erreur export"); }
+            catch (e) { toast.error(e instanceof Error ? e.message : "Erreur lors de l'export"); }
             finally { setExporting(false); }
           }}
           disabled={exporting}
@@ -353,7 +363,7 @@ export default function MainCourante({ cell, permissionResource, title, subtitle
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6">
           <p className="text-gray-400 text-sm mb-2">Entrées totales</p>
           <p className="text-3xl text-white">{entries.length}</p>

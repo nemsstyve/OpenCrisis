@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { FormModal } from "../components/FormModal";
 import { Download, Search, Upload, Trash2, ChevronDown, X, Loader2, Plus, FileText } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import {
@@ -62,6 +63,7 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
         incidentId: linkToIncident && incidentId ? incidentId : undefined,
         category,
       });
+      toast.success("Document importé");
       onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -72,16 +74,8 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">Télécharger un fichier</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
+    <FormModal open onClose={onClose} title="Importer un fichier">
+      <div className="p-6 space-y-4">
           {/* Zone de sélection de fichier */}
           <div
             onClick={() => inputRef.current?.click()}
@@ -155,12 +149,11 @@ function UploadModal({ incidentId, onClose, onSuccess }: UploadModalProps) {
               className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
               {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {uploading ? "Upload…" : "Télécharger"}
+              {uploading ? "Import…" : "Importer"}
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </FormModal>
   );
 }
 
@@ -258,7 +251,7 @@ function DocumentTable({
               <tr>
                 <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-500 text-sm">
                   {documents.length === 0
-                    ? "Aucun document — téléchargez-en un."
+                    ? "Aucun document — importez-en un."
                     : "Aucun document ne correspond aux filtres."}
                 </td>
               </tr>
@@ -451,7 +444,7 @@ export default function Bibliotheque() {
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl mb-2 text-white">Bibliothèque</h1>
           <p className="text-gray-400">Fiches réflexes, procédures, artefacts et pièces jointes</p>
@@ -462,7 +455,7 @@ export default function Bibliotheque() {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Télécharger un fichier
+            Importer un fichier
           </button>
         )}
       </div>

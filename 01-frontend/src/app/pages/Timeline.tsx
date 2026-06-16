@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { timelineEventSchema } from "../../lib/formSchemas";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { FormModal } from "../components/FormModal";
 import { Checkbox } from "../components/ui/checkbox";
 import { ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
@@ -93,18 +95,13 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
   const errCls = "text-red-400 text-xs mt-1";
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">
-            {mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
-          </h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
+    <FormModal
+      open
+      onClose={onClose}
+      title={mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
+      contentClassName="sm:max-w-lg"
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Type *</label>
             <select {...register("type")} className={inputCls}>
@@ -215,8 +212,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </FormModal>
   );
 }
 
@@ -353,6 +349,7 @@ export default function Timeline() {
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
+      toast.success("Événement ajouté");
       setShowModal(false);
     } catch (err: unknown) {
       const msg =
@@ -387,6 +384,7 @@ export default function Timeline() {
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
+      toast.success("Événement modifié");
       setEditing(null);
     } catch (err: unknown) {
       const msg =
@@ -457,18 +455,18 @@ export default function Timeline() {
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl mb-2 text-white">Timeline — Cellule opérationnelle</h1>
           <p className="text-gray-400">Chronologie détaillée des événements opérationnels</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={async () => {
               if (!incidentId || exporting) return;
               setExporting(true);
               try { await exportXlsx(incidentId, incident?.name ?? incidentId); }
-              catch (e) { alert(e instanceof Error ? e.message : "Erreur export"); }
+              catch (e) { toast.error(e instanceof Error ? e.message : "Erreur lors de l'export"); }
               finally { setExporting(false); }
             }}
             disabled={exporting}
@@ -636,6 +634,7 @@ export default function Timeline() {
                             onClick={() => { setEditing(event); setModalError(null); }}
                             className="p-1 hover:bg-blue-500/10 rounded transition-colors text-gray-500 hover:text-blue-400"
                             title="Modifier"
+                            aria-label="Modifier l'événement"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -643,6 +642,7 @@ export default function Timeline() {
                             onClick={() => setConfirmDeleteId(event.id)}
                             className="p-1 hover:bg-red-500/10 rounded transition-colors text-gray-500 hover:text-red-400"
                             title="Supprimer"
+                            aria-label="Supprimer l'événement"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

@@ -221,8 +221,21 @@ Pages existantes dans `01-frontend/src/app/pages/` :
 ### Hooks et utilitaires (Phase 6-7)
 
 - `src/hooks/useCurrentIncident.ts` — restaure `currentIncident` Zustand depuis URL params si store vide
+- `src/hooks/useMediaQuery.ts` — hook générique `useMediaQuery(query)` (réagit aux changements de viewport)
 - `src/lib/fileUtils.ts` — `downloadFile(id, name)` + `uploadFile(file, opts)` + `formatBytes(n)` via REST JWT
 - `src/lib/exportUtils.ts` — déclenchement export PDF (main courante) et Excel (timeline) via GET REST JWT
+
+### Conventions UI (responsive desktop + tablette)
+
+- **Modales de formulaire** — toujours utiliser `src/app/components/FormModal.tsx` (wrapper sur le `Dialog`
+  shadcn) : ferme au clic extérieur + Échap + focus-trap. Ne plus créer de modale `fixed inset-0` à la main.
+  Pour les confirmations destructives, utiliser `ConfirmDialog.tsx` (AlertDialog).
+- **Sidebar** (`src/app/components/Sidebar.tsx`) — repliable en mode icônes (état persistant `localStorage`
+  clé `sidebar-collapsed`) ; repli automatique sous 1024px via `useMediaQuery`. Pas de drawer mobile
+  (portée desktop + tablette).
+- **Upload de fichier** — libellé « Importer un fichier » (« Télécharger » réservé au download d'un document).
+- **Feedback** — `toast.success` après chaque mutation réussie (Sonner monté dans `App.tsx`),
+  `toast.error` pour les erreurs (jamais `alert()`).
 
 ---
 

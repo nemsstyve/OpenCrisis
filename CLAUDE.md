@@ -100,6 +100,8 @@ cd 01-frontend && pnpm codegen
 cd 01-frontend && pnpm dev
 ```
 
+⚠️ **Danger `prisma migrate diff --shadow-database-url`** — ne JAMAIS passer l'URL de la vraie base `opencrisis` comme shadow database : un incident du 2026-06-16 a vidé `User`/`Incident`/tout le contenu de cette façon (le mécanisme de shadow DB de Prisma a traité la base réelle comme jetable). Si Node.js n'est pas disponible localement et qu'une migration doit être générée hors du conteneur backend, écrire le SQL `ALTER TABLE` à la main plutôt que d'utiliser `migrate diff` avec une URL de base non dédiée.
+
 ---
 
 ## Structure du projet
@@ -156,7 +158,7 @@ opencrisis/
 - **Incident** — entité centrale (workspace). Tout est filtré par `incidentId`
 - **LogEntry** — entrée de main courante, champ `cell: Cell` (DIRECTIONAL | OPERATIONAL | SHARED)
 - **Tag** — tags libres sur les entrées main courante (relation M2M via `LogEntryTag`)
-- **TimelineEvent** — événement chronologique de la crise
+- **TimelineEvent** — événement chronologique de la crise. Champ `isFirstDetection: Boolean` — un seul événement par incident peut être marqué ainsi (exclusivité gérée dans `services/timeline.ts::clearFirstDetection`) ; sert de point de départ aux décomptes légaux de 72h (notification CNIL, dépôt de plainte) affichés sur le Dashboard.
 - **Document** — fichier. `incidentId null` = bibliothèque globale ; sinon rattaché à l'incident. `category` distingue ARTIFACT / FICHE_REFLEXE / RAPPORT / PROCEDURE / OTHER
 - **Contact** — annuaire de l'organisation. Le rattachement par incident (`IncidentContact`) et le champ `isGlobal` ont été retirés au Sprint P2
 - **AuditLog** — trace automatique de toutes les mutations (ne jamais supprimer)

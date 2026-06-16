@@ -87,6 +87,12 @@ export default function Sidebar() {
   }
 
   const navSections = incidentId ? buildNavSections(incidentId) : [];
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.permission || hasPermission(item.permission)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // Nom de l'incident : depuis le store (sélectionné) ou depuis l'URL (rechargement)
   const incidentName =
@@ -105,7 +111,6 @@ export default function Sidebar() {
         {!collapsed && (
           <div className="min-w-0">
             <h1 className="text-xl text-gray-900 dark:text-white truncate">Open Crisis</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestion de crise</p>
           </div>
         )}
         {!isTablet && (
@@ -150,53 +155,49 @@ export default function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        {navSections.map((section) => {
-          const visibleItems = section.items.filter(
-            (item) => !item.permission || hasPermission(item.permission)
-          );
-          if (visibleItems.length === 0) return null;
-
-          return (
-            <div key={section.title} className="mb-6">
-              {!collapsed && (
-                <div className="px-6 mb-2">
-                  <h3 className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-500">
-                    {section.title}
-                  </h3>
-                </div>
-              )}
-              <ul>
-                {visibleItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
-                  const base = "flex items-center gap-3 py-2.5 transition-colors";
-                  const layout = collapsed ? "justify-center px-0 mx-2 rounded-lg" : "px-6 border-l-2";
-                  const active = isActive
-                    ? collapsed
-                      ? "bg-gray-100 dark:bg-[#1e2229] text-gray-900 dark:text-white"
-                      : "border-blue-500 bg-gray-100 dark:bg-[#1e2229] text-gray-900 dark:text-white"
-                    : collapsed
-                      ? "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#13151a] hover:text-gray-900 dark:hover:text-white"
-                      : "border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#13151a] hover:text-gray-900 dark:hover:text-white";
-                  return (
-                    <li key={item.path}>
-                      <Link
-                        to={item.path}
-                        title={collapsed ? item.label : undefined}
-                        aria-label={collapsed ? item.label : undefined}
-                        className={`${base} ${layout} ${active}`}
-                      >
-                        <Icon className="w-5 h-5 flex-shrink-0" />
-                        {!collapsed && <span>{item.label}</span>}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto py-1">
+        {visibleSections.map((section, index) => (
+          <div
+            key={section.title}
+            className={`py-2 ${index > 0 ? "border-t border-gray-200 dark:border-[#1e2229]" : ""}`}
+          >
+            {!collapsed && (
+              <div className="px-6 mb-1">
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-500">
+                  {section.title}
+                </h3>
+              </div>
+            )}
+            <ul>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                const base = "flex items-center gap-2.5 py-1.5 text-sm transition-colors";
+                const layout = collapsed ? "justify-center px-0 mx-2 rounded-lg" : "px-6 border-l-2";
+                const active = isActive
+                  ? collapsed
+                    ? "bg-gray-100 dark:bg-[#1e2229] text-gray-900 dark:text-white"
+                    : "border-blue-500 bg-gray-100 dark:bg-[#1e2229] text-gray-900 dark:text-white"
+                  : collapsed
+                    ? "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#13151a] hover:text-gray-900 dark:hover:text-white"
+                    : "border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#13151a] hover:text-gray-900 dark:hover:text-white";
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      title={collapsed ? item.label : undefined}
+                      aria-label={collapsed ? item.label : undefined}
+                      className={`${base} ${layout} ${active}`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && <span>{item.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Footer — utilisateur + actions */}

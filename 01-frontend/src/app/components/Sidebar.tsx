@@ -103,7 +103,7 @@ export default function Sidebar() {
   return (
     <aside
       className={`${
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-48"
       } bg-white dark:bg-[#0a0b0d] border-r border-gray-200 dark:border-[#1e2229] flex flex-col h-screen transition-[width] duration-300 ease-in-out`}
     >
       {/* Logo + bouton replier */}
@@ -203,8 +203,8 @@ export default function Sidebar() {
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />
                       <span
-                        className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
-                          collapsed ? "max-w-0 opacity-0" : "max-w-[180px] opacity-100"
+                        className={`overflow-hidden text-ellipsis whitespace-nowrap transition-all duration-300 ease-in-out ${
+                          collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
                         }`}
                       >
                         {item.label}
@@ -245,8 +245,8 @@ export default function Sidebar() {
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />
             <span
-              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
-                collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"
+              className={`overflow-hidden text-ellipsis whitespace-nowrap transition-all duration-300 ease-in-out ${
+                collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
               }`}
             >
               Se déconnecter

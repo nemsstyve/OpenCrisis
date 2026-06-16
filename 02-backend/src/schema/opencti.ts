@@ -24,5 +24,14 @@ export const openctiTypeDefs = `#graphql
 
     # Délier un événement Timeline d'OpenCTI
     unlinkTimelineEventFromOpenCTI(eventId: ID!): TimelineEvent!
+
+    # Exporter un incident en Case STIX dans OpenCTI
+    exportIncidentToOpenCTI(incidentId: ID!): OpenCTIEntity!
+
+    # Creer un observable dans OpenCTI
+    createOpenCTIObservable(type: String!, value: String!, description: String): OpenCTIEntity!
+
+    # Créer un observable dans OpenCTI
+    createOpenCTIObservable(type: String!, value: String!, description: String): OpenCTIEntity!
   }
 `;

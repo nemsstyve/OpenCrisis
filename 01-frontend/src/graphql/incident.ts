@@ -58,3 +58,13 @@ export const DELETE_INCIDENT_MUTATION = gql`
     deleteIncident(id: $id)
   }
 `;
+
+export const EXPORT_INCIDENT_TO_OPENCTI_MUTATION = gql`
+  mutation ExportIncidentToOpenCTI($incidentId: ID!) {
+    exportIncidentToOpenCTI(incidentId: $incidentId) {
+      id
+      name
+      entity_type
+    }
+  }
+`;

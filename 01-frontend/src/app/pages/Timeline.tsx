@@ -16,6 +16,7 @@ import {
   OPENCTI_STATUS_QUERY,
   LINK_OPENCTI_MUTATION,
   UNLINK_OPENCTI_MUTATION,
+  CREATE_OPENCTI_OBSERVABLE_MUTATION,
 } from "../../graphql/timeline";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
@@ -215,11 +216,23 @@ interface OpenCTIModalProps {
 }
 
 function OpenCTIModal({ event, onClose, onLink, onUnlink }: OpenCTIModalProps) {
-  const [searchQuery, setSearchQuery] = useState(event.ipAddress ?? event.assetName ?? "");
+  const autoQuery = event.ipAddress ?? event.assetName ?? "";
+  const [searchQuery, setSearchQuery] = useState(autoQuery);
   const [linking, setLinking] = useState(false);
+  const [creating, setCreating] = useState(false);
+
   const [searchOpenCTI, { data: searchData, loading: searching }] = useLazyQuery<{
     searchOpenCTI: OpenCTIEntity[];
   }>(SEARCH_OPENCTI_QUERY);
+
+  const [createObservable] = useMutation(CREATE_OPENCTI_OBSERVABLE_MUTATION);
+
+  // Recherche automatique à l'ouverture si IP ou asset disponible
+  useEffect(() => {
+    if (autoQuery.trim().length >= 2) {
+      searchOpenCTI({ variables: { query: autoQuery.trim() } });
+    }
+  }, []);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -237,7 +250,36 @@ function OpenCTIModal({ event, onClose, onLink, onUnlink }: OpenCTIModalProps) {
     try { await onUnlink(); onClose(); } finally { setLinking(false); }
   }
 
+  // Créer l'observable dans OpenCTI puis lier
+  async function handleCreate() {
+    if (!searchQuery.trim()) return;
+    setCreating(true);
+    try {
+      // Détecter le type automatiquement
+      const isIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(searchQuery.trim());
+      const type = isIP ? "IPv4-Addr" : "Hostname";
+      const res = await createObservable({
+        variables: {
+          type,
+          value: searchQuery.trim(),
+          description: event.description ?? `Détecté lors de l'incident - ${event.title}`,
+        },
+      });
+      const entity = res.data?.createOpenCTIObservable;
+      if (entity) {
+        await onLink(entity);
+        onClose();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const results = searchData?.searchOpenCTI ?? [];
+  const hasSearched = !!searchData;
+  const noResults = hasSearched && !searching && results.length === 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
@@ -300,11 +342,23 @@ function OpenCTIModal({ event, onClose, onLink, onUnlink }: OpenCTIModalProps) {
               Recherche dans OpenCTI…
             </div>
           )}
-          {!searching && results.length === 0 && searchData && (
-            <p className="text-center text-gray-500 py-8 text-sm">
-              Aucune entité trouvée pour &quot;{searchQuery}&quot;
-            </p>
+
+          {noResults && (
+            <div className="text-center py-6">
+              <p className="text-gray-500 text-sm mb-4">
+                Aucune entité trouvée pour &quot;{searchQuery}&quot;
+              </p>
+              <button
+                onClick={handleCreate}
+                disabled={creating || linking}
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {creating ? "Création…" : `Créer "${searchQuery}" dans OpenCTI`}
+              </button>
+            </div>
           )}
+
           {!searching && results.length > 0 && (
             <div className="space-y-2 mt-2">
               {results.map((entity) => (
@@ -328,7 +382,8 @@ function OpenCTIModal({ event, onClose, onLink, onUnlink }: OpenCTIModalProps) {
               ))}
             </div>
           )}
-          {!searchData && !searching && (
+
+          {!hasSearched && !searching && (
             <p className="text-center text-gray-600 py-8 text-sm">
               Lancez une recherche pour trouver des entités OpenCTI
             </p>

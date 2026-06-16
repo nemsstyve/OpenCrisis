@@ -5,6 +5,8 @@ import {
   searchOpenCTIEntities,
   linkTimelineEventToOpenCTI,
   unlinkTimelineEventFromOpenCTI,
+  exportIncidentToOpenCTI,
+  createOpenCTIObservable,
 } from '../services/opencti';
 
 export const openctiResolvers = {
@@ -36,7 +38,7 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       if (!ctx.userId) {
-        throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+        throw new GraphQLError('Non authentifie', { extensions: { code: 'UNAUTHENTICATED' } });
       }
       return linkTimelineEventToOpenCTI(
         eventId,
@@ -54,9 +56,35 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       if (!ctx.userId) {
-        throw new GraphQLError('Non authentifié', { extensions: { code: 'UNAUTHENTICATED' } });
+        throw new GraphQLError('Non authentifie', { extensions: { code: 'UNAUTHENTICATED' } });
       }
       return unlinkTimelineEventFromOpenCTI(eventId, ctx.userId, ctx.req?.ip);
+    },
+
+    createOpenCTIObservable: async (
+      _: unknown,
+      { type, value, description }: { type: string; value: string; description?: string },
+      ctx: GraphQLContext,
+    ) => {
+      await requirePermission(ctx, 'TIMELINE', 'WRITE');
+      if (!ctx.userId) {
+        throw new GraphQLError('Non authentifie', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      return createOpenCTIObservable(type, value, description ?? '');
+    },
+
+    
+
+    exportIncidentToOpenCTI: async (
+      _: unknown,
+      { incidentId }: { incidentId: string },
+      ctx: GraphQLContext,
+    ) => {
+      await requirePermission(ctx, 'TIMELINE', 'WRITE');
+      if (!ctx.userId) {
+        throw new GraphQLError('Non authentifie', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      return exportIncidentToOpenCTI(incidentId, ctx.userId, ctx.req?.ip);
     },
   },
 };

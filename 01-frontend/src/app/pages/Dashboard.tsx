@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 import { useState } from "react";
 import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock, Settings, ChevronDown } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
+import { EXPORT_INCIDENT_TO_OPENCTI_MUTATION } from "../../graphql/incident";
+import { OPENCTI_STATUS_QUERY } from "../../graphql/timeline";
 import { toast } from "sonner";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
@@ -151,6 +153,10 @@ function AccessRestricted({ label }: { label: string }) {
 // ── Page Dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const [exportingOCTI, setExportingOCTI] = useState(false);
+  const { data: octiStatus } = useQuery(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = octiStatus?.openctiStatus ?? false;
+  const [exportToOpenCTI] = useMutation(EXPORT_INCIDENT_TO_OPENCTI_MUTATION);
   const { incidentId, incident } = useCurrentIncident();
   const hasPermission = useAppStore((s) => s.hasPermission);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -215,6 +221,29 @@ export default function Dashboard() {
         </div>
         {incident && (
           <div className="flex items-center gap-3">
+            {openctiEnabled && canWrite && (
+              <button
+                onClick={async () => {
+                  if (exportingOCTI) return;
+                  setExportingOCTI(true);
+                  try {
+                    const res = await exportToOpenCTI({ variables: { incidentId: incident.id } });
+                    const name = res.data?.exportIncidentToOpenCTI?.name ?? "Case";
+                    alert("Exporte vers OpenCTI : " + name);
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "Erreur export OpenCTI");
+                  } finally {
+                    setExportingOCTI(false);
+                  }
+                }}
+                disabled={exportingOCTI}
+                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                title="Exporter vers OpenCTI"
+              >
+                {exportingOCTI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                {exportingOCTI ? "Export..." : "OpenCTI"}
+              </button>
+            )}
             {canWrite ? (
               <div className="relative">
                 <button

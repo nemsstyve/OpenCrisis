@@ -128,3 +128,13 @@ export const UNLINK_OPENCTI_MUTATION = gql`
   }
 `;
 
+
+export const CREATE_OPENCTI_OBSERVABLE_MUTATION = gql`
+  mutation CreateOpenCTIObservable($type: String!, $value: String!, $description: String) {
+    createOpenCTIObservable(type: $type, value: $value, description: $description) {
+      id
+      name
+      entity_type
+    }
+  }
+`;

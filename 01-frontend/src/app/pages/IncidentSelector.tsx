@@ -3,7 +3,9 @@ import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
-import { AlertTriangle, Plus, Loader2, RefreshCw } from "lucide-react";
+import { EXPORT_INCIDENT_TO_OPENCTI_MUTATION } from "../../graphql/incident";
+import { OPENCTI_STATUS_QUERY } from "../../graphql/timeline";
+import { AlertTriangle, Plus, Loader2, RefreshCw, Shield } from "lucide-react";
 import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
 import { useAppStore } from "../../store/useAppStore";
 import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
@@ -25,6 +27,10 @@ const STATUS_LABELS: Record<GqlIncident["status"], string> = {
 const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function IncidentSelector() {
+  const [exportingOCTIId, setExportingOCTIId] = useState<string | null>(null);
+  const { data: octiStatus } = useQuery(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = octiStatus?.openctiStatus ?? false;
+  const [exportToOpenCTI] = useMutation(EXPORT_INCIDENT_TO_OPENCTI_MUTATION);
   const navigate = useNavigate();
   const setCurrentIncident = useAppStore((s) => s.setCurrentIncident);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -185,6 +191,30 @@ export default function IncidentSelector() {
                       {incident.severity}
                     </span>
                     <span className="text-xs text-gray-500">{STATUS_LABELS[incident.status]}</span>
+                    {openctiEnabled && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (exportingOCTIId) return;
+                          setExportingOCTIId(incident.id);
+                          try {
+                            const res = await exportToOpenCTI({ variables: { incidentId: incident.id } });
+                            const name = res.data?.exportIncidentToOpenCTI?.name ?? "Case";
+                            alert("Exporte vers OpenCTI : " + name);
+                          } catch (e) {
+                            alert(e instanceof Error ? e.message : "Erreur");
+                          } finally {
+                            setExportingOCTIId(null);
+                          }
+                        }}
+                        disabled={exportingOCTIId === incident.id}
+                        className="flex items-center gap-1 text-xs px-2 py-1 bg-orange-600/10 hover:bg-orange-600/20 text-orange-400 rounded transition-colors disabled:opacity-50"
+                        title="Exporter vers OpenCTI"
+                      >
+                        {exportingOCTIId === incident.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shield className="w-3 h-3" />}
+                        OpenCTI
+                      </button>
+                    )}
                   </div>
                 </div>
               </button>

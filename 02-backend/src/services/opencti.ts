@@ -71,19 +71,19 @@ export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntit
             id
             entity_type
             ... on StixDomainObject {
-              name: standard_id
+              standard_id
             }
             ... on IPv4Addr {
-              name: value
+              observable_value
             }
             ... on IPv6Addr {
-              name: value
+              observable_value
             }
             ... on DomainName {
-              name: value
+              observable_value
             }
             ... on Url {
-              name: value
+              observable_value
             }
             ... on StixCyberObservable {
               observable_value
@@ -122,6 +122,7 @@ export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntit
             id: string;
             entity_type: string;
             name?: string;
+            standard_id?: string;
             observable_value?: string;
             description?: string;
           };
@@ -134,7 +135,7 @@ export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntit
     return data.stixCoreObjects.edges.map(({ node }) => ({
       id: node.id,
       entity_type: node.entity_type,
-      name: node.name ?? node.observable_value ?? node.id,
+      name: node.name ?? node.observable_value ?? node.standard_id ?? node.id,
       description: node.description ?? null,
     }));
   } catch (err) {
@@ -210,4 +211,115 @@ export async function unlinkTimelineEventFromOpenCTI(
   });
 
   return updated;
+}
+
+// ─── Export incident → Case STIX OpenCTI ──────────────────────────────────────
+
+export async function exportIncidentToOpenCTI(
+  incidentId: string,
+  userId: string,
+  ipAddress?: string | null,
+) {
+  checkEnabled();
+
+  const incident = await prisma.incident.findUnique({
+    where: { id: incidentId },
+    include: { timelineEvents: { where: { deletedAt: null } } },
+  });
+
+  if (!incident) {
+    throw new GraphQLError('Incident introuvable', { extensions: { code: 'NOT_FOUND' } });
+  }
+
+  const severityMap: Record<string, string> = {
+    LOW: 'low', MEDIUM: 'medium', HIGH: 'high', CRITICAL: 'critical',
+  };
+
+  const gql = `
+    mutation CreateCase($input: CaseIncidentAddInput!) {
+      caseIncidentAdd(input: $input) {
+        id
+        name
+        entity_type
+      }
+    }
+  `;
+
+  const data = await openctiQuery(gql, {
+    input: {
+      name: incident.name,
+      description: incident.description ?? '',
+      severity: severityMap[incident.severity] ?? 'medium',
+      priority: incident.severity === 'CRITICAL' ? 'P1' : incident.severity === 'HIGH' ? 'P2' : 'P3',
+    },
+  }) as { caseIncidentAdd?: { id: string; name: string; entity_type: string } };
+
+  const caseId = data?.caseIncidentAdd?.id;
+
+  if (caseId) {
+    await prisma.incident.update({
+      where: { id: incidentId },
+      data: { openctiCaseId: caseId },
+    });
+
+    logAudit({
+      userId,
+      action: 'EXPORT_OPENCTI',
+      resource: 'INCIDENT',
+      resourceId: incidentId,
+      incidentId,
+      ipAddress,
+      metadata: { openctiCaseId: caseId, caseEntityType: data?.caseIncidentAdd?.entity_type },
+    });
+  }
+
+  return {
+    id: caseId ?? '',
+    name: data?.caseIncidentAdd?.name ?? incident.name,
+    entity_type: data?.caseIncidentAdd?.entity_type ?? 'Case-Incident',
+  };
+}
+
+// ─── Export incident → Case STIX OpenCTI ──────────────────────────────────────
+
+// ─── Créer un observable dans OpenCTI ─────────────────────────────────────────
+
+export async function createOpenCTIObservable(
+  type: string,
+  value: string,
+  description: string,
+) {
+  checkEnabled();
+
+  const typeMap: Record<string, string> = {
+    'IPv4-Addr': 'iPv4AddrAdd',
+    'Domain-Name': 'domainNameAdd',
+    'Hostname': 'hostnameAdd',
+    'StixFile': 'stixFileAdd',
+  };
+
+  const mutation = typeMap[type] ?? 'iPv4AddrAdd';
+
+  const gql = `
+    mutation CreateObservable($type: String!, $IPv4Addr: IPv4AddrAddInput) {
+      stixCyberObservableAdd(type: $type, IPv4Addr: $IPv4Addr) {
+        id
+        entity_type
+        observable_value
+      }
+    }
+  `;
+
+  const data = await openctiQuery(gql, {
+    type,
+    IPv4Addr: {
+      value,
+    },
+  }) as { stixCyberObservableAdd?: { id: string; entity_type: string; observable_value: string } };
+
+  return {
+    id: data?.stixCyberObservableAdd?.id ?? '',
+    name: data?.stixCyberObservableAdd?.observable_value ?? value,
+    entity_type: data?.stixCyberObservableAdd?.entity_type ?? type,
+  };
 }

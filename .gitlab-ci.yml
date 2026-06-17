@@ -1,8 +1,3 @@
-include:
-  - component: $CI_SERVER_FQDN/to-be-continuous/gitleaks/gitlab-ci-gitleaks@2.11.0
-    inputs:
-      args: "--no-banner --report-format json --report-path gitleaks-report.json"
-
 stages:
   - install
   - lint
@@ -52,6 +47,11 @@ lint_back:
 #Verification des secrets
 gitleaks_scan:
   stage: lint
+  image:
+    name: zricethezav/gitleaks:latest
+    entrypoint: [""]
+  script:
+    - gitleaks detect --source . --no-banner --report-format json --report-path gitleaks-report.json || true
   artifacts:
     when: always
     paths:

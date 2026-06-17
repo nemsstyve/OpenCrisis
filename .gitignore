@@ -2,10 +2,12 @@
 .env
 .env.local
 .env.*.local
+credentials.txt
 
 # ─── CERTIFICATS SSL ──────────────────────────────────────────────────────────
 # Les certificats auto-signés sont générés via scripts/generate-certs.sh
 certs/
+Application/certs/
 
 # ─── BACKUPS ──────────────────────────────────────────────────────────────────
 # Les dumps chiffrés GPG sont produits par le service backup

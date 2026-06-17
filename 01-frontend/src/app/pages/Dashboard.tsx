@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@apollo/client";
 import { toast } from "sonner";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { useAppStore } from "../../store/useAppStore";
+import { FormModal } from "../components/FormModal";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
 import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY } from "../../graphql/incident";
@@ -169,13 +170,13 @@ export default function Dashboard() {
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl text-white mb-2">Tableau de bord</h1>
           <p className="text-gray-400">Vue d'ensemble de la situation de crise actuelle</p>
         </div>
         {incident && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {canWrite ? (
               <div className="relative">
                 <button
@@ -213,6 +214,7 @@ export default function Dashboard() {
                 onClick={() => setEditModal(true)}
                 className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] text-gray-400 hover:text-white transition-colors"
                 title="Modifier l'incident"
+                aria-label="Modifier l'incident"
               >
                 <Settings className="w-4 h-4" />
               </button>
@@ -366,13 +368,8 @@ function EditIncidentModal({
   const inputCls = "w-full bg-[#1a1d24] border border-[#2a2e39] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500";
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">Modifier l'incident</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
-        </div>
-        <div className="p-6 space-y-4">
+    <FormModal open onClose={onClose} title="Modifier l'incident">
+      <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} required />
@@ -400,7 +397,6 @@ function EditIncidentModal({
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enregistrer"}
           </button>
         </div>
-      </div>
-    </div>
+    </FormModal>
   );
 }

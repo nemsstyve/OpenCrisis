@@ -63,8 +63,8 @@ export const timelineResolvers = {
 
   TimelineEvent: {
     actor: (parent: { actor: unknown }) => parent.actor,
-    occurredAt: (parent: { occurredAt: Date }) => parent.occurredAt.toISOString(),
-    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
-    updatedAt: (parent: { updatedAt: Date }) => parent.updatedAt.toISOString(),
+    occurredAt: (parent: { occurredAt: Date | string }) => new Date(parent.occurredAt).toISOString(),
+    createdAt: (parent: { createdAt: Date | string }) => new Date(parent.createdAt).toISOString(),
+    updatedAt: (parent: { updatedAt: Date | string }) => new Date(parent.updatedAt).toISOString(),
   },
 };

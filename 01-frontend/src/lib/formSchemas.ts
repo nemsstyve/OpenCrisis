@@ -70,5 +70,6 @@ export const timelineEventSchema = z.object({
   ipAddress: z.string().max(64),
   assetName: z.string().max(200),
   affectedUser: z.string().max(200),
+  ioc: z.string().max(500),
 });
 export type TimelineEventForm = z.infer<typeof timelineEventSchema>;

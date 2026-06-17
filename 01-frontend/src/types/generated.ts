@@ -104,6 +104,7 @@ export type GqlCreateTimelineEventInput = {
   affectedUser?: InputMaybe<Scalars['String']['input']>;
   assetName?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  ioc?: InputMaybe<Scalars['String']['input']>;
   ipAddress?: InputMaybe<Scalars['String']['input']>;
   isFirstDetection?: InputMaybe<Scalars['Boolean']['input']>;
   occurredAt: Scalars['String']['input'];
@@ -492,6 +493,7 @@ export type GqlTimelineEvent = {
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   incidentId: Scalars['ID']['output'];
+  ioc?: Maybe<Scalars['String']['output']>;
   ipAddress?: Maybe<Scalars['String']['output']>;
   isFirstDetection: Scalars['Boolean']['output'];
   occurredAt: Scalars['String']['output'];
@@ -532,6 +534,7 @@ export type GqlUpdateTimelineEventInput = {
   affectedUser?: InputMaybe<Scalars['String']['input']>;
   assetName?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  ioc?: InputMaybe<Scalars['String']['input']>;
   ipAddress?: InputMaybe<Scalars['String']['input']>;
   isFirstDetection?: InputMaybe<Scalars['Boolean']['input']>;
   occurredAt?: InputMaybe<Scalars['String']['input']>;

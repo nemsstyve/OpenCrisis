@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
 import { AlertTriangle, Plus, Loader2, RefreshCw, LogOut } from "lucide-react";
+import { FormModal } from "../components/FormModal";
 import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
 import { useAppStore } from "../../store/useAppStore";
 import { useLogout } from "../../hooks/useLogout";
@@ -73,6 +75,7 @@ export default function IncidentSelector() {
       });
       setShowModal(false);
       reset();
+      toast.success("Incident créé");
       if (d?.createIncident) selectIncident(d.createIncident);
     } catch (err: unknown) {
       const msg = (err as { graphQLErrors?: Array<{ message: string }> })?.graphQLErrors?.[0]?.message
@@ -111,6 +114,7 @@ export default function IncidentSelector() {
               onClick={() => refetch()}
               className="p-2 text-gray-500 hover:text-gray-300 transition-colors"
               title="Rafraîchir"
+              aria-label="Rafraîchir la liste"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -118,6 +122,7 @@ export default function IncidentSelector() {
               onClick={handleLogout}
               className="p-2 text-gray-500 hover:text-red-400 transition-colors"
               title="Se déconnecter"
+              aria-label="Se déconnecter"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -217,9 +222,8 @@ export default function IncidentSelector() {
 
       {/* Create incident modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-white font-medium mb-4">Déclarer un incident</h2>
+        <FormModal open onClose={closeModal} title="Déclarer un incident">
+          <div className="p-6">
             <form onSubmit={handleSubmit(onCreate)} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
@@ -277,7 +281,7 @@ export default function IncidentSelector() {
               </div>
             </form>
           </div>
-        </div>
+        </FormModal>
       )}
     </div>
   );

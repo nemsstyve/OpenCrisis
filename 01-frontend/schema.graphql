@@ -158,6 +158,7 @@ enum TimelineEventType {
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
     openctiEntityId: String
     openctiEntityType: String
     createdAt: String!
@@ -174,6 +175,7 @@ enum TimelineEventType {
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
   }
 
   input UpdateTimelineEventInput {
@@ -185,6 +187,7 @@ enum TimelineEventType {
     ipAddress: String
     assetName: String
     affectedUser: String
+    ioc: String
   }
 
   extend type Query {

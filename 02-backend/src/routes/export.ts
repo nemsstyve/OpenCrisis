@@ -249,6 +249,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       { header: 'Acteur', key: 'actor', width: 26 },
       { header: 'Asset', key: 'assetName', width: 20 },
       { header: 'Adresse IP', key: 'ipAddress', width: 16 },
+      { header: 'IOC', key: 'ioc', width: 36 },
       { header: 'Utilisateur affecté', key: 'affectedUser', width: 28 },
     ];
     const tlHeader = tlSheet.getRow(1);
@@ -273,6 +274,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
         actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
         assetName: event.assetName ?? '',
         ipAddress: event.ipAddress ?? '',
+        ioc: event.ioc ?? '',
         affectedUser: event.affectedUser ?? '',
       });
     }

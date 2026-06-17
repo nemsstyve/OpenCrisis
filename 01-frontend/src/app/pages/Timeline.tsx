@@ -139,9 +139,9 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
       title={mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
       contentClassName="sm:max-w-2xl"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-3" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-5 space-y-2" noValidate>
         {/* ── Section Identification ─────────────────────────── */}
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider -mb-1">Identification</p>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Identification</p>
 
         {/* Type — badges cliquables, 1 seule ligne */}
         <div>
@@ -219,7 +219,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
         </div>
 
         {/* ── Section Contexte technique ──────────────────────── */}
-        <div className="pt-2 border-t border-[#1e2229]">
+        <div className="border-t border-[#1e2229] pt-2">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contexte technique</p>
         </div>
 
@@ -265,9 +265,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
               <Plus className="w-3 h-3" /> Ajouter
             </button>
           </div>
-          {fields.length === 0 ? (
-            <p className="text-xs text-gray-600 italic px-1">Aucun IOC — cliquez sur Ajouter</p>
-          ) : (
+          {fields.length > 0 && (
             <div className="space-y-2 max-h-32 overflow-y-auto pr-0.5">
               {fields.map((field, index) => (
                 <div key={field.id} className="flex gap-2 items-center">
@@ -303,7 +301,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           <label className="block text-sm text-gray-400 mb-1.5">Description</label>
           <textarea
             {...register("description")}
-            rows={2}
+            rows={1}
             className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
             placeholder="Description détaillée de l'événement…"
           />

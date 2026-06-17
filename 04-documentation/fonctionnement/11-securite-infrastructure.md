@@ -118,7 +118,7 @@ cap_add:
 | frontend | aucune | nginx-unprivileged écoute sur 8080 (> 1024), pas root |
 | backend | aucune | `USER node`, port 4000 (> 1024), pas d'opération privilégiée |
 | postgres | `CHOWN` `SETUID` `SETGID` `DAC_READ_SEARCH` `FOWNER` | Initialisation du volume données + switch utilisateur postgres |
-| redis | `SETUID` `SETGID` | Switch utilisateur redis au démarrage |
+| redis | aucune | Démarre directement comme UID 999 (`user: "999:999"` dans compose), pas de switch d'utilisateur |
 
 Sans ces capabilities sélectives, les services concernés ne démarreraient pas (erreur `Operation not permitted` au moment du switch d'utilisateur ou du `chown` initial).
 
@@ -205,14 +205,14 @@ Le dossier `certs/` est exclu de Git via `.gitignore`. **Chaque environnement g�
 ```nginx
 ssl_protocols TLSv1.2 TLSv1.3;
 ssl_prefer_server_ciphers on;
-ssl_ciphers 'ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:...';
+ssl_ciphers 'ECDHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256';
 ssl_session_cache shared:SSL:10m;
 ssl_session_timeout 1h;
 ssl_session_tickets off;
 ```
 
 - **TLS 1.2 et 1.3 uniquement** — TLS 1.0 et 1.1 sont obsolètes et vulnérables (BEAST, POODLE)
-- **Cipher suites avec Perfect Forward Secrecy** (ECDHE/DHE) uniquement — si la clé privée est compromise plus tard, les sessions passées restent confidentielles
+- **ECDHE uniquement** (Perfect Forward Secrecy) — les suites DHE ont été retirées car elles nécessitent un fichier `ssl_dhparam` explicite ; sans lui, nginx utilise des paramètres DH par défaut potentiellement faibles. ECDHE offre le même PFS sans configuration supplémentaire.
 - **AES-GCM** — chiffrement authentifié (AEAD), résistant aux attaques par padding
 - **Session tickets désactivés** — évite la vulnérabilité de réutilisation de tickets TLS
 
@@ -250,9 +250,11 @@ Le `max-age=3600` (1 heure) est volontairement court pendant la phase démo. Pou
 | `Strict-Transport-Security` | `max-age=3600; includeSubDomains` | Force HTTPS dans le navigateur |
 | `X-Frame-Options` | `DENY` | Empêche l'inclusion dans une iframe (clickjacking) |
 | `X-Content-Type-Options` | `nosniff` | Empêche le MIME-sniffing par le navigateur |
-| `X-XSS-Protection` | `1; mode=block` | Filtre XSS legacy |
 | `Referrer-Policy` | `strict-origin` | Limite la fuite d'URL via Referer |
 | `Permissions-Policy` | `geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()` | Désactive les API navigateur non utilisées |
+| `Content-Security-Policy` | voir section dédiée | XSS, injection de contenu, clickjacking |
+
+> **`X-XSS-Protection` retiré** : déprécié depuis 2019, ignoré par Chrome/Firefox, et source de vulnérabilités dans les anciennes versions d'IE. La CSP (`script-src 'self'`) couvre intégralement ce vecteur dans les navigateurs modernes.
 
 ### Content Security Policy (CSP)
 
@@ -262,7 +264,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob:;
 font-src 'self' data:;
-connect-src 'self' wss:;
+connect-src 'self' wss://$host;
 frame-ancestors 'none';
 base-uri 'self';
 form-action 'self';
@@ -271,7 +273,7 @@ object-src 'none'
 
 - **`default-src 'self'`** — tout ressource externe interdite par défaut
 - **`script-src 'self'`** — aucun script externe ni inline (sauf si nécessaire pour Vite/React)
-- **`connect-src 'self' wss:`** — autorise les WebSocket sécurisés pour les subscriptions GraphQL
+- **`connect-src 'self' wss://$host`** — autorise les WebSocket sécurisés uniquement vers le même hôte que la requête. `$host` est expansé dynamiquement par nginx (`wss://localhost` en dev, `wss://mondomaine.fr` en prod). La directive bare `wss:` (sans hôte) autorisait des connexions WebSocket vers n'importe quel serveur internet.
 - **`object-src 'none'`** — bloque les plugins Flash/Java/ActiveX (legacy mais important)
 - **`frame-ancestors 'none'`** — équivalent moderne de X-Frame-Options DENY
 
@@ -335,7 +337,9 @@ Tous les secrets (mots de passe, JWT, tokens) sont centralisés dans `.env` à l
 .env
 .env.local
 .env.*.local
+credentials.txt     # fichier de sortie de setup.sh (contient les mots de passe générés)
 certs/
+Application/certs/  # pattern explicite : le pattern certs/ seul ne couvre pas les sous-dossiers imbriqués
 backups/
 node_modules/
 ```
@@ -387,7 +391,7 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 | 14 | Ciphers ECDHE avec PFS | HTTP | Compromis rétroactif de clés |
 | 15 | Redirection 301 HTTP → HTTPS | HTTP | Trafic en clair |
 | 16 | HSTS | HTTP | Downgrade attack |
-| 17 | 7 headers de sécurité OWASP | HTTP | XSS, clickjacking, MIME-sniffing |
+| 17 | 6 headers de sécurité OWASP (X-XSS-Protection retiré, remplacé par CSP) | HTTP | XSS, clickjacking, MIME-sniffing |
 | 18 | CSP stricte | HTTP | XSS, injection de contenu |
 | 19 | Rate limiting général (200/min) | HTTP | DoS basique |
 | 20 | Rate limiting login (10/min) | HTTP | Bruteforce de mots de passe |
@@ -489,9 +493,15 @@ curl -kI https://localhost/backup.sh
 ### Capabilities Linux
 
 ```bash
+# PostgreSQL : CHOWN + SETUID + SETGID + DAC_READ_SEARCH + FOWNER
 docker inspect opencrisis-postgres-1 \
   --format '{{.HostConfig.CapDrop}} / {{.HostConfig.CapAdd}}'
 # Attendu : [ALL] / [CHOWN SETUID SETGID DAC_READ_SEARCH FOWNER]
+
+# Redis : aucune cap ajoutée (user: 999:999, pas de switch d'utilisateur)
+docker inspect opencrisis-redis-1 \
+  --format '{{.HostConfig.CapDrop}} / {{.HostConfig.CapAdd}}'
+# Attendu : [ALL] / []
 ```
 
 ---

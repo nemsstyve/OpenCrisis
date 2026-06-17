@@ -34,9 +34,7 @@ lint_front:
   stage: lint
   image: node:22-alpine
   script:
-    - cd 01-frontend
-    - npm ci
-    - npx eslint . --format gitlab --output-file gl-codequality.json
+    - npx eslint 01-frontend --format gitlab --output-file gl-codequality-front.json
   artifacts:
     reports:
       codequality: 01-frontend/gl-codequality.json
@@ -45,9 +43,7 @@ lint_back:
   stage: lint
   image: node:22-alpine
   script:
-    - cd 02-backend
-    - npm ci
-    - npx eslint . --format gitlab --output-file gl-codequality.json
+    - npx eslint 02-backend --format gitlab --output-file gl-codequality-back.json
   artifacts:
     reports:
       codequality: 02-backend/gl-codequality.json

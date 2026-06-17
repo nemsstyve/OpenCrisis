@@ -40,13 +40,19 @@ const CELL_LABELS: Record<string, string> = {
 
 const IOC_TYPE_LABELS: Record<string, string> = { hash: 'Hash', domain: 'Domaine', ip: 'IP' };
 
+// Préfixe les valeurs débutant par un caractère de formule Excel (=, +, -, @, tab, CR)
+// pour les traiter comme du texte brut et éviter l'injection de formule (CWE-1236).
+function xlsxSafeString(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
 function formatIocsForExport(raw: string | null): string {
   if (!raw) return '';
   try {
     const parsed = JSON.parse(raw) as Array<{ iocType: string; value: string }>;
     if (Array.isArray(parsed)) return parsed.map((e) => `[${IOC_TYPE_LABELS[e.iocType] ?? e.iocType}] ${e.value}`).join('\n');
-    return raw;
-  } catch { return raw; }
+    return xlsxSafeString(raw);
+  } catch { return xlsxSafeString(raw); }
 }
 
 // ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────

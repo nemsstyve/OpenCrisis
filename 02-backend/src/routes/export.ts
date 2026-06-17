@@ -38,6 +38,23 @@ const CELL_LABELS: Record<string, string> = {
   SHARED: 'Partagé',
 };
 
+const IOC_TYPE_LABELS: Record<string, string> = { hash: 'Hash', domain: 'Domaine', ip: 'IP' };
+
+// Préfixe les valeurs débutant par un caractère de formule Excel (=, +, -, @, tab, CR)
+// pour les traiter comme du texte brut et éviter l'injection de formule (CWE-1236).
+function xlsxSafeString(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+function formatIocsForExport(raw: string | null): string {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as Array<{ iocType: string; value: string }>;
+    if (Array.isArray(parsed)) return parsed.map((e) => `[${IOC_TYPE_LABELS[e.iocType] ?? e.iocType}] ${e.value}`).join('\n');
+    return xlsxSafeString(raw);
+  } catch { return xlsxSafeString(raw); }
+}
+
 // ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────
 // Export de la main courante — filtré sur les cellules accessibles (DÉC-1)
 
@@ -266,7 +283,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     };
 
     for (const event of timelineEvents) {
-      tlSheet.addRow({
+      const row = tlSheet.addRow({
         occurredAt: new Date(event.occurredAt).toLocaleString('fr-FR'),
         type: TYPE_LABELS[event.type] ?? event.type,
         title: event.title,
@@ -274,9 +291,10 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
         actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
         assetName: event.assetName ?? '',
         ipAddress: event.ipAddress ?? '',
-        ioc: event.ioc ?? '',
+        ioc: formatIocsForExport(event.ioc),
         affectedUser: event.affectedUser ?? '',
       });
+      row.getCell('ioc').alignment = { wrapText: true, vertical: 'top' };
     }
 
     res.setHeader(

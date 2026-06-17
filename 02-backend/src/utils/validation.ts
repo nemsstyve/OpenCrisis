@@ -93,7 +93,7 @@ export const createTimelineEventSchema = z.object({
   ipAddress: z.string().trim().max(64).optional().nullable(),
   assetName: z.string().trim().max(200).optional().nullable(),
   affectedUser: z.string().trim().max(200).optional().nullable(),
-  ioc: z.string().trim().max(500).optional().nullable(),
+  ioc: z.string().trim().max(5000).optional().nullable(),
 });
 
 export const updateTimelineEventSchema = z.object({
@@ -105,7 +105,7 @@ export const updateTimelineEventSchema = z.object({
   ipAddress: z.string().trim().max(64).optional().nullable(),
   assetName: z.string().trim().max(200).optional().nullable(),
   affectedUser: z.string().trim().max(200).optional().nullable(),
-  ioc: z.string().trim().max(500).optional().nullable(),
+  ioc: z.string().trim().max(5000).optional().nullable(),
 });
 
 // ─── Tag ────────────────────────────────────────────────────────────────────────

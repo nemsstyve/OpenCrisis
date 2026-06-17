@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { timelineEventSchema } from "../../lib/formSchemas";
+import { timelineEventSchema, IOC_TYPES, type IocType, type IocEntry } from "../../lib/formSchemas";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FormModal } from "../components/FormModal";
 import { Checkbox } from "../components/ui/checkbox";
@@ -56,6 +56,34 @@ function toDatetimeLocal(iso: string | Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ── IOC — helpers ─────────────────────────────────────────────────────────────
+const IOC_TYPE_LABELS: Record<IocType, string> = {
+  hash: "Hash",
+  domain: "Domaine",
+  ip: "IP",
+};
+
+function parseIocs(raw: string | null | undefined): IocEntry[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (e): e is IocEntry =>
+          IOC_TYPES.includes(e.iocType as IocType) && typeof e.value === "string" && e.value.length > 0,
+      );
+    }
+    return [{ iocType: "hash", value: raw }];
+  } catch {
+    return [{ iocType: "hash", value: raw }];
+  }
+}
+
+function serializeIocs(iocs: IocEntry[]): string | null {
+  if (!iocs || iocs.length === 0) return null;
+  return JSON.stringify(iocs);
+}
+
 // ── Formulaire d'ajout d'événement ────────────────────────────────────────────
 interface NewEventForm {
   type: GqlTimelineEventType;
@@ -66,7 +94,7 @@ interface NewEventForm {
   ipAddress: string;
   assetName: string;
   affectedUser: string;
-  ioc: string;
+  iocs: IocEntry[];
 }
 
 const EMPTY_FORM: NewEventForm = {
@@ -78,7 +106,7 @@ const EMPTY_FORM: NewEventForm = {
   ipAddress: "",
   assetName: "",
   affectedUser: "",
-  ioc: "",
+  iocs: [],
 };
 
 interface EventModalProps {
@@ -103,6 +131,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
   });
 
   const isDetection = watch("type") === "DETECTION";
+  const { fields, append, remove } = useFieldArray({ control, name: "iocs" });
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
@@ -113,47 +142,76 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
       open
       onClose={onClose}
       title={mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
-      contentClassName="sm:max-w-lg"
+      contentClassName="sm:max-w-2xl"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Type *</label>
-            <select {...register("type")} className={inputCls}>
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
+      <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-5 space-y-2" noValidate>
+        {/* ── Section Identification ─────────────────────────── */}
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Identification</p>
+
+        {/* Type — badges cliquables, 1 seule ligne */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Type *</label>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <div className="grid grid-cols-6 gap-2">
+                {EVENT_TYPES.map((t) => {
+                  const active = field.value === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => field.onChange(t)}
+                      className={`py-1.5 rounded-full text-xs font-medium border transition-colors text-center ${
+                        active
+                          ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                          : "bg-transparent border-[#1e2229] text-gray-400 hover:border-gray-500 hover:text-gray-200"
+                      }`}
+                    >
+                      {EVENT_TYPE_LABELS[t]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
+        </div>
+
+        {/* Première Détection — inline, uniquement si type=DETECTION */}
+        {isDetection && (
+          <div className="flex items-center gap-2.5 px-3 py-2 bg-red-500/5 border border-red-500/20 rounded-md">
+            <Controller
+              name="isFirstDetection"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="isFirstDetection"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              )}
+            />
+            <label htmlFor="isFirstDetection" className="text-sm text-gray-300 cursor-pointer">
+              Marquer comme première détection
+            </label>
+            <span className="ml-auto shrink-0 text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
+              Point de départ 72h CNIL
+            </span>
           </div>
+        )}
 
-          {isDetection && (
-            <div className="flex items-center gap-2">
-              <Controller
-                name="isFirstDetection"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox
-                    id="isFirstDetection"
-                    checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                )}
-              />
-              <label htmlFor="isFirstDetection" className="text-sm text-gray-400">
-                Première Détection
-              </label>
-            </div>
-          )}
-
+        {/* Titre | Date/Heure — 2 colonnes */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
             <input
               {...register("title")}
               className={inputCls}
-              placeholder="Ex : Détection d'un accès non autorisé"
+              placeholder="Ex : Accès non autorisé détecté"
             />
             {errors.title && <p className={errCls}>{errors.title.message}</p>}
           </div>
-
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Date / Heure *</label>
             <input
@@ -163,79 +221,126 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             />
             {errors.occurredAt && <p className={errCls}>{errors.occurredAt.message}</p>}
           </div>
+        </div>
 
+        {/* ── Section Contexte technique ──────────────────────── */}
+        <div className="border-t border-[#1e2229] pt-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contexte technique</p>
+        </div>
+
+        {/* Utilisateur affecté — pleine largeur */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
+          <input
+            {...register("affectedUser")}
+            className={inputCls}
+            placeholder="jean.martin@company.com"
+          />
+        </div>
+
+        {/* Asset | Adresse IP */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Description</label>
-            <textarea
-              {...register("description")}
-              rows={3}
-              className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
-              placeholder="Description détaillée de l'événement…"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
-              <input
-                {...register("assetName")}
-                className={inputCls}
-                placeholder="Serveur-DB-01"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
-              <input
-                {...register("ipAddress")}
-                className={inputCls}
-                placeholder="10.0.1.15"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
+            <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
             <input
-              {...register("affectedUser")}
+              {...register("assetName")}
               className={inputCls}
-              placeholder="jean.martin@company.com"
+              placeholder="Serveur-DB-01"
             />
           </div>
-
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">IOC</label>
+            <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
             <input
-              {...register("ioc")}
+              {...register("ipAddress")}
               className={inputCls}
-              placeholder="Hash, domaine, IP…"
+              placeholder="10.0.1.15"
             />
-            {errors.ioc && <p className={errCls}>{errors.ioc.message}</p>}
           </div>
+        </div>
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-md px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
+        {/* IOC — liste dynamique type + valeur */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm text-gray-400">IOC</label>
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors"
+              onClick={() => append({ iocType: "hash", value: "" })}
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
             >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {submitting ? "Enregistrement…" : mode === "edit" ? "Enregistrer" : "Ajouter"}
+              <Plus className="w-3 h-3" /> Ajouter
             </button>
           </div>
-        </form>
+          {fields.length > 0 && (
+            <div className="space-y-2 max-h-32 overflow-y-auto pr-0.5">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex flex-col gap-0.5">
+                  <div className="flex gap-2 items-center">
+                    <select
+                      {...register(`iocs.${index}.iocType`)}
+                      className="w-24 shrink-0 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors"
+                    >
+                      {IOC_TYPES.map((t) => (
+                        <option key={t} value={t}>{IOC_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                    <input
+                      {...register(`iocs.${index}.value`)}
+                      className={`flex-1 bg-[#0a0b0d] border rounded-md px-3 py-2 text-white text-xs font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors ${errors.iocs?.[index]?.value ? "border-red-500" : "border-[#1e2229]"}`}
+                      placeholder="Valeur…"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
+                      aria-label="Supprimer cet IOC"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {errors.iocs?.[index]?.value?.message && (
+                    <p className="text-red-400 text-xs pl-[6.5rem]">{errors.iocs?.[index]?.value?.message}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1.5">Description</label>
+          <textarea
+            {...register("description")}
+            rows={1}
+            className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+            placeholder="Description détaillée de l'événement…"
+          />
+        </div>
+
+        {error && (
+          <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-md px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {submitting ? "Enregistrement…" : mode === "edit" ? "Enregistrer" : "Ajouter"}
+          </button>
+        </div>
+      </form>
     </FormModal>
   );
 }
@@ -378,7 +483,7 @@ export default function Timeline() {
       ipAddress: event.ipAddress ?? "",
       assetName: event.assetName ?? "",
       affectedUser: event.affectedUser ?? "",
-      ioc: event.ioc ?? "",
+      iocs: parseIocs(event.ioc),
     };
   }
 
@@ -398,10 +503,10 @@ export default function Timeline() {
             ipAddress: form.ipAddress || null,
             assetName: form.assetName || null,
             affectedUser: form.affectedUser || null,
-            ioc: form.ioc || null,
+            ioc: serializeIocs(form.iocs),
           },
         },
-        ...(form.type === "DETECTION" && form.isFirstDetection
+        ...(form.type === "DETECTION"
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
@@ -434,10 +539,10 @@ export default function Timeline() {
             ipAddress: form.ipAddress || null,
             assetName: form.assetName || null,
             affectedUser: form.affectedUser || null,
-            ioc: form.ioc || null,
+            ioc: serializeIocs(form.iocs),
           },
         },
-        ...(form.type === "DETECTION" && form.isFirstDetection
+        ...(form.type === "DETECTION"
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
@@ -476,7 +581,8 @@ export default function Timeline() {
   const filteredEvents = events.filter((event) => {
     if (globalSearch) {
       const needle = globalSearch.toLowerCase();
-      const haystack = [event.title, event.description ?? "", event.assetName ?? "", event.ipAddress ?? "", event.affectedUser ?? "", event.ioc ?? "", EVENT_TYPE_LABELS[event.type]].join(" ").toLowerCase();
+      const iocText = parseIocs(event.ioc).map((e) => e.value).join(" ");
+      const haystack = [event.title, event.description ?? "", event.assetName ?? "", event.ipAddress ?? "", event.affectedUser ?? "", iocText, EVENT_TYPE_LABELS[event.type]].join(" ").toLowerCase();
       if (!haystack.includes(needle)) return false;
     }
     if (typeFilters.size > 0 && !typeFilters.has(event.type)) return false;
@@ -490,7 +596,7 @@ export default function Timeline() {
     if (tf.title && !event.title.toLowerCase().includes(tf.title.toLowerCase())) return false;
     if (tf.assetName && !(event.assetName ?? "").toLowerCase().includes(tf.assetName.toLowerCase())) return false;
     if (tf.ipAddress && !(event.ipAddress ?? "").toLowerCase().includes(tf.ipAddress.toLowerCase())) return false;
-    if (tf.ioc && !(event.ioc ?? "").toLowerCase().includes(tf.ioc.toLowerCase())) return false;
+    if (tf.ioc && !parseIocs(event.ioc).some((e) => e.value.toLowerCase().includes(tf.ioc.toLowerCase()))) return false;
     if (tf.affectedUser && !(event.affectedUser ?? "").toLowerCase().includes(tf.affectedUser.toLowerCase())) return false;
     if (tf.description && !(event.description ?? "").toLowerCase().includes(tf.description.toLowerCase())) return false;
     return true;
@@ -916,12 +1022,25 @@ export default function Timeline() {
                           : <span className="text-gray-600">—</span>}
                       </td>
                     )}
-                    {/* IOC — variable, mono, wrap */}
+                    {/* IOC — liste structurée type+valeur */}
                     {visibleColumns.has("ioc") && (
                       <td className="px-4 py-3 text-center">
-                        {event.ioc
-                          ? <span className="text-sm font-mono text-yellow-400"><CopyCell value={event.ioc} /></span>
-                          : <span className="text-gray-600">—</span>}
+                        {(() => {
+                          const iocs = parseIocs(event.ioc);
+                          if (iocs.length === 0) return <span className="text-gray-600">—</span>;
+                          return (
+                            <div className="flex flex-col gap-1 items-center">
+                              {iocs.map((ioc, i) => (
+                                <div key={`${ioc.iocType}-${ioc.value}-${i}`} className="flex items-center gap-1.5">
+                                  <span className="shrink-0 text-xs text-gray-500 bg-[#1a1d24] px-1.5 py-0.5 rounded">
+                                    {IOC_TYPE_LABELS[ioc.iocType]}
+                                  </span>
+                                  <CopyCell value={ioc.value} className="font-mono text-xs text-yellow-400" />
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     {/* Utilisateur — variable, wrap */}
@@ -1001,8 +1120,14 @@ export default function Timeline() {
       <ConfirmDialog
         open={!!confirmDeleteId}
         description="Supprimer cet événement de la timeline ?"
-        onConfirm={() => {
-          if (confirmDeleteId) deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+        onConfirm={async () => {
+          if (confirmDeleteId) {
+            try {
+              await deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+            } catch {
+              toast.error("Erreur lors de la suppression");
+            }
+          }
           setConfirmDeleteId(null);
         }}
         onCancel={() => setConfirmDeleteId(null)}

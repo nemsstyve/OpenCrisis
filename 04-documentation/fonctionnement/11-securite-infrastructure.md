@@ -154,12 +154,12 @@ Un service qui devient `unhealthy` (3 checks consécutifs en erreur) est marqué
 
 | Service | Image | Justification |
 |---|---|---|
-| nginx (reverse proxy) | `nginx:1.27-alpine` | Stable, base Alpine minimaliste |
-| frontend (runtime) | `nginxinc/nginx-unprivileged:1.28-alpine` | Image officielle non-root |
-| frontend (build) | `node:20.19.0-alpine` | Version Node LTS précise |
-| backend | `node:20.19.0-alpine` | Idem |
-| postgres | `postgres:16.3-alpine` | Version mineure pinnée |
-| redis | `redis:7.2-alpine` | Idem |
+| nginx (reverse proxy) | `nginx:alpine` | Stable, base Alpine minimaliste |
+| frontend (runtime) | `nginxinc/nginx-unprivileged:alpine` | Image officielle non-root |
+| frontend (build) | `node:alpine` | Version Node LTS précise |
+| backend | `node:alpine` | Idem |
+| postgres | `postgres:alpine` | Version mineure pinnée |
+| redis | `redis:alpine` | Idem |
 
 Pas de tag `:latest` nulle part. Une mise à jour d'image est une décision consciente, pas un effet de bord d'un `docker compose pull`.
 

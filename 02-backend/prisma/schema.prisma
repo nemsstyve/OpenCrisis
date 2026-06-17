@@ -32,6 +32,7 @@ model User {
   contacts        Contact[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+  iocs            IoC[]
 
   @@index([deletedAt])
   @@index([isActive])
@@ -171,10 +172,12 @@ model TimelineEvent {
   title             String
   description       String?
   occurredAt        DateTime
+  isFirstDetection  Boolean           @default(false)
   actorId           String?
   ipAddress         String?
   assetName         String?
   affectedUser      String?
+  ioc               String?
   openctiEntityId   String?
   openctiEntityType String?
   createdAt         DateTime          @default(now())
@@ -184,6 +187,7 @@ model TimelineEvent {
   incident  Incident   @relation(fields: [incidentId], references: [id])
   actor     User?      @relation(fields: [actorId], references: [id])
   documents Document[]
+  iocs      IoC[]
 
   @@index([incidentId, occurredAt])
   @@index([deletedAt])
@@ -260,6 +264,24 @@ model AuditLog {
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
 
+
+// ─── IOC (Indicators of Compromise) ──────────────────────────────────────────
+
+model IoC {
+  id              String   @id @default(uuid())
+  timelineEventId String
+  type            IoCType
+  value           String
+  description     String?
+  createdAt       DateTime @default(now())
+  createdById     String
+
+  timelineEvent TimelineEvent @relation(fields: [timelineEventId], references: [id])
+  createdBy     User          @relation(fields: [createdById], references: [id])
+
+  @@index([timelineEventId])
+}
+
 enum IncidentStatus {
   ACTIVE
   CONTAINED
@@ -310,4 +332,17 @@ enum PermissionResource {
   BIBLIOTHEQUE
   ANNUAIRE
   ADMIN
+}
+
+enum IoCType {
+  IPV4
+  IPV6
+  HASH_MD5
+  HASH_SHA1
+  HASH_SHA256
+  DOMAIN
+  URL
+  EMAIL
+  YARA
+  OTHER
 }

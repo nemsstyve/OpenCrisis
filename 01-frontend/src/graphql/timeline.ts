@@ -9,12 +9,12 @@ export const TIMELINE_EVENTS_QUERY = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName
       affectedUser
-      openctiEntityId
-      openctiEntityType
+      ioc
       createdAt
       updatedAt
     }
@@ -30,12 +30,12 @@ export const CREATE_TIMELINE_EVENT_MUTATION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName
       affectedUser
-      openctiEntityId
-      openctiEntityType
+      ioc
       createdAt
       updatedAt
     }
@@ -50,9 +50,11 @@ export const UPDATE_TIMELINE_EVENT_MUTATION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       ipAddress
       assetName
       affectedUser
+      ioc
       updatedAt
     }
   }
@@ -73,19 +75,17 @@ export const TIMELINE_EVENT_ADDED_SUBSCRIPTION = gql`
       title
       description
       occurredAt
+      isFirstDetection
       actor { id firstName lastName }
       ipAddress
       assetName
       affectedUser
-      openctiEntityId
-      openctiEntityType
+      ioc
       createdAt
       updatedAt
     }
   }
 `;
-
-// ─── OpenCTI ──────────────────────────────────────────────────────────────────
 
 export const SEARCH_OPENCTI_QUERY = gql`
   query SearchOpenCTI($query: String!) {
@@ -106,11 +106,7 @@ export const OPENCTI_STATUS_QUERY = gql`
 
 export const LINK_OPENCTI_MUTATION = gql`
   mutation LinkTimelineEventToOpenCTI($eventId: ID!, $openctiEntityId: String!, $openctiEntityType: String!) {
-    linkTimelineEventToOpenCTI(
-      eventId: $eventId
-      openctiEntityId: $openctiEntityId
-      openctiEntityType: $openctiEntityType
-    ) {
+    linkTimelineEventToOpenCTI(eventId: $eventId, openctiEntityId: $openctiEntityId, openctiEntityType: $openctiEntityType) {
       id
       openctiEntityId
       openctiEntityType
@@ -128,7 +124,6 @@ export const UNLINK_OPENCTI_MUTATION = gql`
   }
 `;
 
-
 export const CREATE_OPENCTI_OBSERVABLE_MUTATION = gql`
   mutation CreateOpenCTIObservable($type: String!, $value: String!, $description: String) {
     createOpenCTIObservable(type: $type, value: $value, description: $description) {
@@ -136,5 +131,35 @@ export const CREATE_OPENCTI_OBSERVABLE_MUTATION = gql`
       name
       entity_type
     }
+  }
+`;
+
+export const IOCS_BY_EVENT_QUERY = gql`
+  query IoCsByEvent($timelineEventId: ID!) {
+    iocsByEvent(timelineEventId: $timelineEventId) {
+      id
+      type
+      value
+      description
+      createdAt
+    }
+  }
+`;
+
+export const ADD_IOC_MUTATION = gql`
+  mutation AddIoC($timelineEventId: ID!, $type: IoCType!, $value: String!, $description: String) {
+    addIoC(timelineEventId: $timelineEventId, type: $type, value: $value, description: $description) {
+      id
+      type
+      value
+      description
+      createdAt
+    }
+  }
+`;
+
+export const REMOVE_IOC_MUTATION = gql`
+  mutation RemoveIoC($id: ID!) {
+    removeIoC(id: $id)
   }
 `;

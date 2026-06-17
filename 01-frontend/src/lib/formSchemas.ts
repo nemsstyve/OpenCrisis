@@ -66,8 +66,10 @@ export const timelineEventSchema = z.object({
   title: requiredText("Le titre"),
   description: z.string().max(2000),
   occurredAt: z.string().min(1, "La date est requise"),
+  isFirstDetection: z.boolean(),
   ipAddress: z.string().max(64),
   assetName: z.string().max(200),
   affectedUser: z.string().max(200),
+  ioc: z.string().max(500),
 });
 export type TimelineEventForm = z.infer<typeof timelineEventSchema>;

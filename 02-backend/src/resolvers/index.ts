@@ -7,6 +7,7 @@ import { documentResolvers } from './document';
 import { contactResolvers } from './contact';
 import { adminResolvers } from './admin';
 import { openctiResolvers } from './opencti';
+import { iocResolvers } from './ioc';
 
 export const resolvers = [
   authResolvers,
@@ -18,4 +19,5 @@ export const resolvers = [
   contactResolvers,
   adminResolvers,
   openctiResolvers,
+  iocResolvers,
 ];

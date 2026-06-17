@@ -113,47 +113,73 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
       open
       onClose={onClose}
       title={mode === "edit" ? "Modifier l'événement" : "Ajouter un événement"}
-      contentClassName="sm:max-w-lg"
+      contentClassName="sm:max-w-2xl"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Type *</label>
-            <select {...register("type")} className={inputCls}>
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-3" noValidate>
+        {/* Type — badges cliquables */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Type *</label>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-2">
+                {EVENT_TYPES.map((t) => {
+                  const active = field.value === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => field.onChange(t)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                          : "bg-transparent border-[#1e2229] text-gray-400 hover:border-gray-500 hover:text-gray-200"
+                      }`}
+                    >
+                      {EVENT_TYPE_LABELS[t]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
+        </div>
+
+        {/* Première Détection — inline, uniquement si type=DETECTION */}
+        {isDetection && (
+          <div className="flex items-center gap-2.5 px-3 py-2 bg-red-500/5 border border-red-500/20 rounded-md">
+            <Controller
+              name="isFirstDetection"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="isFirstDetection"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              )}
+            />
+            <label htmlFor="isFirstDetection" className="text-sm text-gray-300 cursor-pointer">
+              Marquer comme première détection
+            </label>
+            <span className="ml-auto shrink-0 text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
+              Point de départ 72h CNIL
+            </span>
           </div>
+        )}
 
-          {isDetection && (
-            <div className="flex items-center gap-2">
-              <Controller
-                name="isFirstDetection"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox
-                    id="isFirstDetection"
-                    checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                )}
-              />
-              <label htmlFor="isFirstDetection" className="text-sm text-gray-400">
-                Première Détection
-              </label>
-            </div>
-          )}
-
+        {/* Titre | Date/Heure — 2 colonnes */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
             <input
               {...register("title")}
               className={inputCls}
-              placeholder="Ex : Détection d'un accès non autorisé"
+              placeholder="Ex : Accès non autorisé détecté"
             />
             {errors.title && <p className={errCls}>{errors.title.message}</p>}
           </div>
-
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Date / Heure *</label>
             <input
@@ -163,36 +189,50 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             />
             {errors.occurredAt && <p className={errCls}>{errors.occurredAt.message}</p>}
           </div>
+        </div>
 
+        {/* Description */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1.5">Description</label>
+          <textarea
+            {...register("description")}
+            rows={2}
+            className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+            placeholder="Description détaillée de l'événement…"
+          />
+        </div>
+
+        {/* Asset | Adresse IP */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Description</label>
-            <textarea
-              {...register("description")}
-              rows={3}
-              className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
-              placeholder="Description détaillée de l'événement…"
+            <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
+            <input
+              {...register("assetName")}
+              className={inputCls}
+              placeholder="Serveur-DB-01"
             />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
-              <input
-                {...register("assetName")}
-                className={inputCls}
-                placeholder="Serveur-DB-01"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
-              <input
-                {...register("ipAddress")}
-                className={inputCls}
-                placeholder="10.0.1.15"
-              />
-            </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
+            <input
+              {...register("ipAddress")}
+              className={inputCls}
+              placeholder="10.0.1.15"
+            />
           </div>
+        </div>
 
+        {/* IOC | Utilisateur affecté */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">IOC</label>
+            <input
+              {...register("ioc")}
+              className={`${inputCls} font-mono text-xs`}
+              placeholder="Hash, domaine, IP…"
+            />
+            {errors.ioc && <p className={errCls}>{errors.ioc.message}</p>}
+          </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
             <input
@@ -201,41 +241,32 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
               placeholder="jean.martin@company.com"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">IOC</label>
-            <input
-              {...register("ioc")}
-              className={inputCls}
-              placeholder="Hash, domaine, IP…"
-            />
-            {errors.ioc && <p className={errCls}>{errors.ioc.message}</p>}
-          </div>
+        {error && (
+          <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-md px-3 py-2">
+            {error}
+          </p>
+        )}
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-md px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {submitting ? "Enregistrement…" : mode === "edit" ? "Enregistrer" : "Ajouter"}
-            </button>
-          </div>
-        </form>
+        <div className="flex gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 border border-[#1e2229] text-gray-400 hover:text-white rounded-md px-3 py-2 text-sm transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {submitting ? "Enregistrement…" : mode === "edit" ? "Enregistrer" : "Ajouter"}
+          </button>
+        </div>
+      </form>
     </FormModal>
   );
 }

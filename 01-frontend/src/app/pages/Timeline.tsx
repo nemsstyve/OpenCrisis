@@ -140,6 +140,9 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
       contentClassName="sm:max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-3" noValidate>
+        {/* ── Section Identification ─────────────────────────── */}
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider -mb-1">Identification</p>
+
         {/* Type — badges cliquables, 1 seule ligne */}
         <div>
           <label className="block text-sm text-gray-400 mb-2">Type *</label>
@@ -213,6 +216,11 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             />
             {errors.occurredAt && <p className={errCls}>{errors.occurredAt.message}</p>}
           </div>
+        </div>
+
+        {/* ── Section Contexte technique ──────────────────────── */}
+        <div className="pt-2 border-t border-[#1e2229]">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contexte technique</p>
         </div>
 
         {/* Utilisateur affecté — pleine largeur */}

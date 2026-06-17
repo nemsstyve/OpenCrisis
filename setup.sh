@@ -67,11 +67,11 @@ validate_app_password() {
 }
 
 # Vérifie qu'un mot de passe Postgres ne contient pas de chars qui cassent
-# DATABASE_URL (/, @, :, ?, #, espace)
+# DATABASE_URL (délimiteurs URI RFC 3986) ou la substitution sed (métacaractères).
 validate_pg_password() {
     local pwd="$1"
-    [[ ${#pwd} -ge 12 ]]                 || { echo "Au moins 12 caractères requis"; return 1; }
-    [[ ! "$pwd" =~ [/@:?\#[:space:]] ]]  || { echo "Caractères interdits : / @ : ? # espace"; return 1; }
+    [[ ${#pwd} -ge 12 ]]                        || { echo "Au moins 12 caractères requis"; return 1; }
+    [[ ! "$pwd" =~ [/@:?#%|&\\[:space:]] ]]     || { echo "Caractères interdits : / @ : ? # % | & \\ espace"; return 1; }
     return 0
 }
 
@@ -418,7 +418,9 @@ write_credentials_file() {
     local admin_password="$2"
     local pg_password="$3"
 
-    cat > "$CREDENTIALS_FILE" <<EOF
+    # umask 077 : le fichier est créé en 0600 dès l'ouverture, sans fenêtre
+    # world-readable entre la création et chmod. La sous-coquille isole le umask.
+    (umask 077; cat > "$CREDENTIALS_FILE" <<EOF
 ════════════════════════════════════════════════════════════════════════════
   OpenCrisis — Identifiants
   Généré le $(date -Iseconds)
@@ -452,7 +454,7 @@ write_credentials_file() {
 
 ════════════════════════════════════════════════════════════════════════════
 EOF
-    chmod 600 "$CREDENTIALS_FILE"
+)
     log_ok "credentials.txt écrit (droits 600)"
 }
 
@@ -700,6 +702,11 @@ action_test_security() {
         log_error "Stack non démarrée — lancer l'option 2 d'abord"; pause; return
     fi
 
+    # set -e désactivé dans cette fonction : les tests vérifient intentionnellement
+    # des commandes qui peuvent échouer (wget bloqué, grep absent…). Sans set +e,
+    # le premier échec ferait sortir le script avant que test_result() ne soit appelé.
+    set +e
+
     local pass=0 fail=0
     test_result() {
         if [[ $? -eq 0 ]]; then
@@ -788,6 +795,7 @@ action_test_security() {
 
     echo ""
     log_title "Résumé : ${GREEN}${pass} réussis${RESET} / ${RED}${fail} échecs${RESET}"
+    set -e  # Restaurer set -e après les tests
     pause
 }
 

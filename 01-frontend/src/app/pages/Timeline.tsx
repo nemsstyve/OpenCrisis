@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,8 +7,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FormModal } from "../components/FormModal";
 import { Checkbox } from "../components/ui/checkbox";
 import {
-  ChevronDown, X, Plus, Loader2, Trash2, Download, Pencil,
-  ArrowUpDown, ArrowUp, ArrowDown, Search, Copy,
+  Filter, SlidersHorizontal, X, Plus, Loader2, Trash2, Download, Pencil,
+  ArrowUp, ArrowDown, Search, Copy,
 } from "lucide-react";
 import { exportXlsx } from "../../lib/exportUtils";
 import { useQuery, useMutation } from "@apollo/client";
@@ -241,17 +241,17 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
 }
 
 // ── Bouton copie dans le presse-papier ───────────────────────────────────────
-function CopyCell({ value }: { value: string }) {
+function CopyCell({ value, className }: { value: string; className?: string }) {
   return (
-    <div className="group flex items-center gap-1">
-      <span>{value}</span>
+    <div className={`group inline-flex items-start gap-1 max-w-full ${className ?? ""}`}>
+      <span className="break-words min-w-0">{value}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();
           navigator.clipboard.writeText(value);
           toast.success("Copié !");
         }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/10 rounded"
+        className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/10 rounded"
         aria-label="Copier"
       >
         <Copy className="w-3 h-3 text-gray-400" />
@@ -271,18 +271,26 @@ export default function Timeline() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [globalSearch, setGlobalSearch] = useState("");
 
-  const [filters, setFilters] = useState<Record<string, string>>({
-    occurredAt: "",
-    title: "",
-    type: "",
-    assetName: "",
-    ipAddress: "",
-    affectedUser: "",
-    description: "",
-    ioc: "",
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
+    new Set(["occurredAt", "title", "type", "assetName", "ipAddress", "ioc", "affectedUser", "description", "_actions"])
+  );
+  const columnPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!columnPickerOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node))
+        setColumnPickerOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [columnPickerOpen]);
+  const [typeFilters, setTypeFilters] = useState<Set<GqlTimelineEventType>>(new Set());
+  const [dateRange, setDateRange] = useState({ from: "", fromTime: "00:00", to: "", toTime: "23:59" });
+  const [textFilters, setTextFilters] = useState({
+    title: "", assetName: "", ipAddress: "", ioc: "", affectedUser: "", description: "",
   });
-  const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<GqlTimelineEvent | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -445,24 +453,18 @@ export default function Timeline() {
     }
   }
 
-  function toggleFilter(column: string) {
-    const next = new Set(activeFilters);
-    if (next.has(column)) {
-      next.delete(column);
-      setFilters((prev) => ({ ...prev, [column]: "" }));
-      if (column === "occurredAt") setDateRange({ from: "", to: "" });
-    } else {
-      next.add(column);
-    }
-    setActiveFilters(next);
+  function toggleTypeFilter(t: GqlTimelineEventType) {
+    setTypeFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
   }
 
-  function clearFilter(column: string) {
-    const next = new Set(activeFilters);
-    next.delete(column);
-    setActiveFilters(next);
-    setFilters((prev) => ({ ...prev, [column]: "" }));
-    if (column === "occurredAt") setDateRange({ from: "", to: "" });
+  function clearAllFilters() {
+    setTypeFilters(new Set());
+    setDateRange({ from: "", fromTime: "00:00", to: "", toTime: "23:59" });
+    setTextFilters({ title: "", assetName: "", ipAddress: "", ioc: "", affectedUser: "", description: "" });
   }
 
   // ── Données triées et filtrées ────────────────────────────────────────────
@@ -472,62 +474,50 @@ export default function Timeline() {
   });
 
   const filteredEvents = events.filter((event) => {
-    // Recherche globale
     if (globalSearch) {
       const needle = globalSearch.toLowerCase();
-      const haystack = [
-        event.title,
-        event.description ?? "",
-        event.assetName ?? "",
-        event.ipAddress ?? "",
-        event.affectedUser ?? "",
-        event.ioc ?? "",
-      ].join(" ").toLowerCase();
+      const haystack = [event.title, event.description ?? "", event.assetName ?? "", event.ipAddress ?? "", event.affectedUser ?? "", event.ioc ?? "", EVENT_TYPE_LABELS[event.type]].join(" ").toLowerCase();
       if (!haystack.includes(needle)) return false;
     }
-    // Filtres par colonne
-    return Object.entries(filters).every(([key, value]) => {
-      if (!value && !(key === "occurredAt" && (dateRange.from || dateRange.to))) return true;
-      switch (key) {
-        case "occurredAt": {
-          const t = new Date(event.occurredAt).getTime();
-          const from = dateRange.from ? new Date(dateRange.from).getTime() : -Infinity;
-          const to = dateRange.to ? new Date(dateRange.to + "T23:59:59").getTime() : Infinity;
-          return t >= from && t <= to;
-        }
-        case "type":
-          return !value || event.type === value;
-        case "title": return event.title.toLowerCase().includes(value.toLowerCase());
-        case "assetName": return (event.assetName ?? "").toLowerCase().includes(value.toLowerCase());
-        case "ipAddress": return (event.ipAddress ?? "").toLowerCase().includes(value.toLowerCase());
-        case "affectedUser": return (event.affectedUser ?? "").toLowerCase().includes(value.toLowerCase());
-        case "description": return (event.description ?? "").toLowerCase().includes(value.toLowerCase());
-        case "ioc": return (event.ioc ?? "").toLowerCase().includes(value.toLowerCase());
-        default: return true;
-      }
-    });
+    if (typeFilters.size > 0 && !typeFilters.has(event.type)) return false;
+    if (dateRange.from || dateRange.to) {
+      const t = new Date(event.occurredAt).getTime();
+      const from = dateRange.from ? new Date(`${dateRange.from}T${dateRange.fromTime}`).getTime() : -Infinity;
+      const to = dateRange.to ? new Date(`${dateRange.to}T${dateRange.toTime}:59`).getTime() : Infinity;
+      if (t < from || t > to) return false;
+    }
+    const tf = textFilters;
+    if (tf.title && !event.title.toLowerCase().includes(tf.title.toLowerCase())) return false;
+    if (tf.assetName && !(event.assetName ?? "").toLowerCase().includes(tf.assetName.toLowerCase())) return false;
+    if (tf.ipAddress && !(event.ipAddress ?? "").toLowerCase().includes(tf.ipAddress.toLowerCase())) return false;
+    if (tf.ioc && !(event.ioc ?? "").toLowerCase().includes(tf.ioc.toLowerCase())) return false;
+    if (tf.affectedUser && !(event.affectedUser ?? "").toLowerCase().includes(tf.affectedUser.toLowerCase())) return false;
+    if (tf.description && !(event.description ?? "").toLowerCase().includes(tf.description.toLowerCase())) return false;
+    return true;
   });
 
   const isDateRangeActive = dateRange.from !== "" || dateRange.to !== "";
   const activeFilterCount =
-    Object.entries(filters).filter(([k, v]) => k !== "occurredAt" && v !== "").length +
-    (isDateRangeActive ? 1 : 0);
+    (typeFilters.size > 0 ? 1 : 0) +
+    (isDateRangeActive ? 1 : 0) +
+    Object.values(textFilters).filter(Boolean).length;
   const totalActiveCount = activeFilterCount + (globalSearch ? 1 : 0);
 
   const columns = [
-    { key: "occurredAt", label: "Timestamp", width: "w-36" },
-    { key: "title", label: "Événement", width: "" },
-    { key: "type", label: "Type", width: "w-28" },
-    { key: "assetName", label: "Asset", width: "w-24" },
-    { key: "ipAddress", label: "IP", width: "w-28" },
-    { key: "ioc", label: "IOC", width: "w-40" },
-    { key: "affectedUser", label: "Utilisateur", width: "w-24" },
-    { key: "description", label: "Description", width: "w-32" },
-    ...(canWrite ? [{ key: "_actions", label: "", width: "w-14" }] : []),
+    { key: "occurredAt", label: "Timestamp",   width: "w-40",  fixed: true  },
+    { key: "title",      label: "Événement",   width: "",      fixed: false },
+    { key: "type",       label: "Type",        width: "w-36",  fixed: true  },
+    { key: "assetName",  label: "Asset",       width: "",      fixed: false },
+    { key: "ipAddress",  label: "IP",          width: "w-36",  fixed: true  },
+    { key: "ioc",        label: "IOC",         width: "",      fixed: false },
+    { key: "affectedUser", label: "Utilisateur", width: "",    fixed: false },
+    { key: "description",  label: "Description", width: "",    fixed: false },
+    ...(canWrite ? [{ key: "_actions", label: "", width: "w-14", fixed: true }] : []),
   ];
+  const displayedColumns = columns.filter((c) => visibleColumns.has(c.key));
 
   const filterInputCls =
-    "mt-2 w-full px-2 py-1 bg-[#13151a] border border-[#1e2229] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500";
+    "w-full px-3 py-1.5 bg-[#0f1116] border border-[#1e2229] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors";
 
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
@@ -565,80 +555,237 @@ export default function Timeline() {
         </div>
       </div>
 
-      {/* Recherche globale */}
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-        <input
-          type="text"
-          value={globalSearch}
-          onChange={(e) => setGlobalSearch(e.target.value)}
-          placeholder="Rechercher dans tous les champs…"
-          className="w-full pl-9 pr-4 py-2 bg-[#13151a] border border-[#1e2229] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-        />
-        {globalSearch && (
+      {/* Barre recherche + bouton filtres */}
+      <div className="mb-3 flex gap-3 items-center">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            placeholder="Rechercher dans tous les champs…"
+            className="w-full pl-9 pr-9 py-2 bg-[#13151a] border border-[#1e2229] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+          {globalSearch && (
+            <button
+              onClick={() => setGlobalSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setFilterPanelOpen((o) => !o)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
+            filterPanelOpen || activeFilterCount > 0
+              ? "bg-blue-600/20 border-blue-500/50 text-blue-400"
+              : "bg-[#13151a] border-[#1e2229] text-gray-400 hover:text-white hover:border-[#2a2e39]"
+          }`}
+          aria-expanded={filterPanelOpen}
+        >
+          <Filter className="w-4 h-4" />
+          Filtres
+          {activeFilterCount > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 text-xs rounded-full bg-blue-500 text-white leading-none">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+
+        {/* Sélecteur de colonnes */}
+        <div className="relative shrink-0" ref={columnPickerRef}>
           <button
-            onClick={() => setGlobalSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+            onClick={() => setColumnPickerOpen((o) => !o)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              columnPickerOpen
+                ? "bg-blue-600/20 border-blue-500/50 text-blue-400"
+                : "bg-[#13151a] border-[#1e2229] text-gray-400 hover:text-white hover:border-[#2a2e39]"
+            }`}
+            aria-expanded={columnPickerOpen}
+            aria-label="Choisir les colonnes affichées"
           >
-            <X className="w-4 h-4" />
+            <SlidersHorizontal className="w-4 h-4" />
+            Colonnes
           </button>
-        )}
+          {columnPickerOpen && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-[#13151a] border border-[#1e2229] rounded-lg p-3 shadow-xl min-w-44">
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-medium">Colonnes affichées</p>
+              {columns.filter((c) => c.key !== "_actions").map((col) => (
+                <label key={col.key} className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.has(col.key)}
+                    onChange={() => {
+                      setVisibleColumns((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(col.key)) next.delete(col.key); else next.add(col.key);
+                        return next;
+                      });
+                    }}
+                    className="accent-blue-500 w-3.5 h-3.5 shrink-0"
+                  />
+                  <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{col.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Filtres actifs */}
-      {totalActiveCount > 0 && (
-        <div className="mb-6 bg-[#13151a] border border-[#1e2229] rounded-lg p-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-gray-400">Filtres actifs :</span>
-            {globalSearch && (
-              <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 text-sm rounded-lg">
-                <span>Recherche :</span>
-                <span className="font-medium">{globalSearch}</span>
+      {/* Panneau de filtres */}
+      {filterPanelOpen && (
+        <div className="mb-4 bg-[#13151a] border border-[#1e2229] rounded-lg p-4 space-y-4">
+          {/* Type — multi-sélection */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Type</p>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_TYPES.map((t) => (
                 <button
-                  onClick={() => setGlobalSearch("")}
-                  aria-label="Retirer la recherche globale"
-                  className="hover:bg-blue-500/20 rounded p-0.5 transition-colors"
+                  key={t}
+                  onClick={() => toggleTypeFilter(t)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    typeFilters.has(t)
+                      ? `${EVENT_TYPE_COLORS[t]} border-current`
+                      : "border-[#1e2229] text-gray-500 hover:border-[#2a2e39] hover:text-gray-300"
+                  }`}
                 >
-                  <X className="w-3 h-3" />
+                  {EVENT_TYPE_LABELS[t]}
                 </button>
-              </span>
-            )}
-            {isDateRangeActive && (
-              <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 text-sm rounded-lg">
-                <span>Timestamp :</span>
-                <span className="font-medium">
-                  {dateRange.from || "…"} → {dateRange.to || "…"}
-                </span>
-                <button
-                  onClick={() => clearFilter("occurredAt")}
-                  aria-label="Retirer le filtre Timestamp"
-                  className="hover:bg-blue-500/20 rounded p-0.5 transition-colors"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {Object.entries(filters)
-              .filter(([key, value]) => key !== "occurredAt" && value !== "")
-              .map(([key, value]) => (
-                <span
-                  key={key}
-                  className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 text-sm rounded-lg"
-                >
-                  <span className="capitalize">{columns.find((c) => c.key === key)?.label ?? key} :</span>
-                  <span className="font-medium">
-                    {key === "type" ? EVENT_TYPE_LABELS[value as GqlTimelineEventType] ?? value : value}
-                  </span>
-                  <button
-                    onClick={() => clearFilter(key)}
-                    aria-label={`Retirer le filtre ${columns.find((c) => c.key === key)?.label ?? key}`}
-                    className="hover:bg-blue-500/20 rounded p-0.5 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
               ))}
+            </div>
           </div>
+
+          {/* Période */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Période</p>
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Date de début</label>
+                <input
+                  type="date"
+                  value={dateRange.from}
+                  onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
+                  className={filterInputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Heure de début</label>
+                <input
+                  type="time"
+                  value={dateRange.fromTime}
+                  onChange={(e) => setDateRange((r) => ({ ...r, fromTime: e.target.value }))}
+                  disabled={!dateRange.from}
+                  className={`${filterInputCls} disabled:opacity-30 disabled:cursor-not-allowed`}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Date de fin</label>
+                <input
+                  type="date"
+                  value={dateRange.to}
+                  onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
+                  className={filterInputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Heure de fin</label>
+                <input
+                  type="time"
+                  value={dateRange.toTime}
+                  onChange={(e) => setDateRange((r) => ({ ...r, toTime: e.target.value }))}
+                  disabled={!dateRange.to}
+                  className={`${filterInputCls} disabled:opacity-30 disabled:cursor-not-allowed`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Champs texte */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Champs</p>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                ["title", "Titre / Événement"],
+                ["assetName", "Asset"],
+                ["ipAddress", "IP"],
+                ["ioc", "IOC"],
+                ["affectedUser", "Utilisateur"],
+                ["description", "Description"],
+              ] as [keyof typeof textFilters, string][]).map(([key, label]) => (
+                <div key={key}>
+                  <label className="block text-xs text-gray-500 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={textFilters[key]}
+                    onChange={(e) => setTextFilters((prev) => ({ ...prev, [key]: e.target.value }))}
+                    placeholder="Filtrer…"
+                    className={filterInputCls}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Réinitialiser */}
+          {activeFilterCount > 0 && (
+            <div className="flex justify-end pt-1 border-t border-[#1e2229]">
+              <button
+                onClick={clearAllFilters}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Réinitialiser les filtres
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Résumé des filtres actifs */}
+      {totalActiveCount > 0 && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-500">Filtres actifs :</span>
+          {globalSearch && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-full">
+              Recherche : <span className="font-medium">{globalSearch}</span>
+              <button onClick={() => setGlobalSearch("")} aria-label="Retirer la recherche" className="hover:text-white"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {typeFilters.size > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-full">
+              Types : <span className="font-medium">{[...typeFilters].map((t) => EVENT_TYPE_LABELS[t]).join(", ")}</span>
+              <button onClick={() => setTypeFilters(new Set())} aria-label="Retirer filtre type" className="hover:text-white"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {isDateRangeActive && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-full">
+              Période : <span className="font-medium">
+                {dateRange.from ? new Date(`${dateRange.from}T${dateRange.fromTime}`).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "…"}
+                {" → "}
+                {dateRange.to ? new Date(`${dateRange.to}T${dateRange.toTime}`).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "…"}
+              </span>
+              <button onClick={() => setDateRange({ from: "", fromTime: "00:00", to: "", toTime: "23:59" })} aria-label="Retirer filtre période" className="hover:text-white"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {(Object.entries(textFilters) as [keyof typeof textFilters, string][])
+            .filter(([, v]) => v !== "")
+            .map(([key, value]) => {
+              const labels: Record<keyof typeof textFilters, string> = { title: "Titre", assetName: "Asset", ipAddress: "IP", ioc: "IOC", affectedUser: "Utilisateur", description: "Description" };
+              return (
+                <span key={key} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-full">
+                  {labels[key]} : <span className="font-medium">{value}</span>
+                  <button onClick={() => setTextFilters((prev) => ({ ...prev, [key]: "" }))} aria-label={`Retirer filtre ${labels[key]}`} className="hover:text-white"><X className="w-3 h-3" /></button>
+                </span>
+              );
+            })}
+          {totalActiveCount > 0 && (
+            <button
+              onClick={() => { clearAllFilters(); setGlobalSearch(""); }}
+              className="text-xs text-gray-500 hover:text-white transition-colors ml-1"
+            >
+              Tout effacer
+            </button>
+          )}
         </div>
       )}
 
@@ -652,88 +799,26 @@ export default function Timeline() {
       {/* Tableau */}
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
+          <table className="w-full">
             <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
               <tr>
-                {columns.map((column) => (
+                {displayedColumns.map((column) => (
                   <th key={column.key} scope="col" className={`px-4 py-3 text-center ${column.width}`}>
                     <div className="flex items-center justify-center gap-1">
-                      <span className="text-sm text-gray-400 uppercase tracking-wider">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">
                         {column.label}
                       </span>
-                      {/* Bouton de tri sur la colonne Timestamp */}
                       {column.key === "occurredAt" && (
                         <button
                           onClick={() => setSortDirection((d) => d === "desc" ? "asc" : "desc")}
-                          aria-label={`Trier par ordre ${sortDirection === "desc" ? "croissant" : "décroissant"}`}
+                          aria-label={`Trier ${sortDirection === "desc" ? "croissant" : "décroissant"}`}
                           className="p-1 rounded transition-colors hover:bg-[#1e2229] text-blue-400"
                           title={sortDirection === "desc" ? "Plus récent en premier" : "Plus ancien en premier"}
                         >
-                          {sortDirection === "desc"
-                            ? <ArrowDown className="w-3 h-3" />
-                            : <ArrowUp className="w-3 h-3" />}
-                        </button>
-                      )}
-                      {/* Bouton filtre */}
-                      {column.key !== "_actions" && (
-                        <button
-                          onClick={() => toggleFilter(column.key)}
-                          aria-label={`Filtrer par ${column.label}`}
-                          aria-pressed={activeFilters.has(column.key)}
-                          className={`p-1 rounded transition-colors ${
-                            activeFilters.has(column.key) || (column.key === "occurredAt" && isDateRangeActive)
-                              ? "bg-blue-500/20 text-blue-400"
-                              : "hover:bg-[#1e2229] text-gray-500"
-                          }`}
-                        >
-                          <ChevronDown className="w-3 h-3" />
+                          {sortDirection === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
                         </button>
                       )}
                     </div>
-                    {/* Contrôles de filtre inline */}
-                    {activeFilters.has(column.key) && column.key === "occurredAt" && (
-                      <div className="mt-2 flex gap-1">
-                        <input
-                          type="date"
-                          value={dateRange.from}
-                          onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
-                          aria-label="Date de début"
-                          className={filterInputCls}
-                        />
-                        <input
-                          type="date"
-                          value={dateRange.to}
-                          onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
-                          aria-label="Date de fin"
-                          className={filterInputCls}
-                        />
-                      </div>
-                    )}
-                    {activeFilters.has(column.key) && column.key === "type" && (
-                      <select
-                        value={filters["type"]}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
-                        aria-label="Filtrer par type"
-                        className={filterInputCls}
-                      >
-                        <option value="">Tous les types</option>
-                        {EVENT_TYPES.map((t) => (
-                          <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
-                        ))}
-                      </select>
-                    )}
-                    {activeFilters.has(column.key) && column.key !== "occurredAt" && column.key !== "type" && column.key !== "_actions" && (
-                      <input
-                        type="text"
-                        value={filters[column.key] || ""}
-                        onChange={(e) =>
-                          setFilters((prev) => ({ ...prev, [column.key]: e.target.value }))
-                        }
-                        aria-label={`Valeur du filtre ${column.label}`}
-                        placeholder="Filtrer…"
-                        className={filterInputCls}
-                      />
-                    )}
                   </th>
                 ))}
               </tr>
@@ -742,7 +827,7 @@ export default function Timeline() {
               {loading && !data ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`sk-${i}`} role="status" aria-label="Chargement">
-                    {columns.map((column) => (
+                    {displayedColumns.map((column) => (
                       <td key={column.key} className="px-4 py-4">
                         <Skeleton className="h-4 w-full bg-[#1e2229]" />
                       </td>
@@ -751,7 +836,7 @@ export default function Timeline() {
                 ))
               ) : filteredEvents.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={displayedColumns.length} className="px-4 py-12 text-center text-gray-500">
                     {events.length === 0
                       ? "Aucun événement — ajoutez-en un."
                       : "Aucun événement correspondant aux filtres."}
@@ -759,52 +844,102 @@ export default function Timeline() {
                 </tr>
               ) : (
                 filteredEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-[#1a1d24] transition-colors">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-white text-center">
-                      {new Date(event.occurredAt).toLocaleString("fr-FR", {
-                        day: "2-digit", month: "2-digit", year: "numeric",
-                        hour: "2-digit", minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-4 py-4 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm text-gray-200 font-medium truncate" title={event.title}>{event.title}</p>
-                        {event.isFirstDetection && (
-                          <span className="shrink-0 px-1.5 py-0.5 text-xs rounded bg-red-500/10 text-red-400 whitespace-nowrap">
-                            Première détection
+                  <tr key={event.id} className="hover:bg-[#1a1d24] transition-colors align-top">
+                    {/* Timestamp — fixe, pas de retour à la ligne */}
+                    {visibleColumns.has("occurredAt") && (
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-white text-center">
+                        <CopyCell value={new Date(event.occurredAt).toLocaleString("fr-FR", {
+                          day: "2-digit", month: "2-digit", year: "numeric",
+                          hour: "2-digit", minute: "2-digit",
+                        })} />
+                      </td>
+                    )}
+                    {/* Événement — variable, wrap */}
+                    {visibleColumns.has("title") && (
+                      <td className="px-4 py-3 text-center">
+                        <div className="group inline-flex items-start gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap justify-center items-center gap-1.5">
+                              <span className="text-sm text-gray-200 font-medium break-words">{event.title}</span>
+                              {event.isFirstDetection && (
+                                <span className="shrink-0 px-1.5 py-0.5 text-xs rounded bg-red-500/10 text-red-400 whitespace-nowrap">
+                                  Première détection
+                                </span>
+                              )}
+                            </div>
+                            {event.actor && (
+                              <p className="text-xs text-blue-400 mt-0.5">
+                                {event.actor.firstName} {event.actor.lastName}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(event.title); toast.success("Copié !"); }}
+                            className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/10 rounded"
+                            aria-label="Copier le titre"
+                          >
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                    {/* Type — fixe, badge */}
+                    {visibleColumns.has("type") && (
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <div className="group inline-flex items-center gap-1">
+                          <span className={`px-2 py-1 text-xs rounded ${EVENT_TYPE_COLORS[event.type]}`}>
+                            {EVENT_TYPE_LABELS[event.type]}
                           </span>
-                        )}
-                      </div>
-                      {event.actor && (
-                        <p className="text-xs text-blue-400 mt-0.5 truncate">
-                          {event.actor.firstName} {event.actor.lastName}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-center">
-                      <span className={`px-2 py-1 text-xs rounded ${EVENT_TYPE_COLORS[event.type]}`}>
-                        {EVENT_TYPE_LABELS[event.type]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-300 text-center">
-                      <p className="truncate" title={event.assetName ?? ""}>{event.assetName ?? <span className="text-gray-600">—</span>}</p>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-center">
-                      {event.ipAddress
-                        ? <span className="text-sm font-mono text-green-400"><CopyCell value={event.ipAddress} /></span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {event.ioc
-                        ? <span className="text-sm font-mono text-yellow-400 block truncate" title={event.ioc}><CopyCell value={event.ioc} /></span>
-                        : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-300 text-center">
-                      <p className="truncate" title={event.affectedUser ?? ""}>{event.affectedUser ?? <span className="text-gray-600">—</span>}</p>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-400">
-                      <p className="truncate" title={event.description ?? ""}>{event.description ?? <span className="text-gray-600">—</span>}</p>
-                    </td>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(EVENT_TYPE_LABELS[event.type]); toast.success("Copié !"); }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/10 rounded"
+                            aria-label="Copier le type"
+                          >
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                    {/* Asset — variable, wrap */}
+                    {visibleColumns.has("assetName") && (
+                      <td className="px-4 py-3 text-sm text-gray-300 text-center">
+                        {event.assetName
+                          ? <CopyCell value={event.assetName} />
+                          : <span className="text-gray-600">—</span>}
+                      </td>
+                    )}
+                    {/* IP — fixe, mono */}
+                    {visibleColumns.has("ipAddress") && (
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        {event.ipAddress
+                          ? <span className="text-sm font-mono text-green-400"><CopyCell value={event.ipAddress} /></span>
+                          : <span className="text-gray-600">—</span>}
+                      </td>
+                    )}
+                    {/* IOC — variable, mono, wrap */}
+                    {visibleColumns.has("ioc") && (
+                      <td className="px-4 py-3 text-center">
+                        {event.ioc
+                          ? <span className="text-sm font-mono text-yellow-400"><CopyCell value={event.ioc} /></span>
+                          : <span className="text-gray-600">—</span>}
+                      </td>
+                    )}
+                    {/* Utilisateur — variable, wrap */}
+                    {visibleColumns.has("affectedUser") && (
+                      <td className="px-4 py-3 text-sm text-gray-300 text-center">
+                        {event.affectedUser
+                          ? <CopyCell value={event.affectedUser} />
+                          : <span className="text-gray-600">—</span>}
+                      </td>
+                    )}
+                    {/* Description — variable, wrap */}
+                    {visibleColumns.has("description") && (
+                      <td className="px-4 py-3 text-sm text-gray-400 text-center">
+                        {event.description
+                          ? <CopyCell value={event.description} />
+                          : <span className="text-gray-600">—</span>}
+                      </td>
+                    )}
                     {canWrite && (
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-1 justify-center">

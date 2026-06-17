@@ -99,14 +99,17 @@ ask_with_default() {
     fi
 }
 
-# Demande un mot de passe (saisie masquée) avec valeur par défaut
+# Demande un mot de passe (saisie masquée) avec valeur par défaut.
+# Le défaut n'est PAS affiché en clair dans le terminal — il sera enregistré
+# dans credentials.txt (droits 600, exclu de Git).
 ask_password_with_default() {
     local prompt="$1"
     local default="$2"
     local var_name="$3"
     local input
-    echo "${YELLOW}Défaut généré : $default${RESET}"
-    read -r -s -p "$prompt (Entrée pour utiliser le défaut) : " input
+    echo "${YELLOW}Un mot de passe a été pré-généré — appuyer sur Entrée pour l'utiliser,${RESET}"
+    echo "${YELLOW}ou saisir un mot de passe personnalisé (la saisie est masquée) :${RESET}"
+    read -r -s -p "$prompt : " input
     echo ""
     if [[ -z "$input" ]]; then
         printf -v "$var_name" '%s' "$default"
@@ -363,9 +366,9 @@ EOF
 
     log_title "Installation terminée"
     log_ok "Application accessible sur ${BOLD}https://localhost${RESET}"
-    log_ok "Identifiants admin : ${BOLD}$admin_email${RESET} / ${BOLD}$admin_password${RESET}"
-    log_warn "Les credentials sont également enregistrés dans : ${BOLD}credentials.txt${RESET}"
-    log_warn "[!] Penser à les copier dans un coffre-fort et à supprimer le fichier !"
+    log_ok "Compte admin : ${BOLD}$admin_email${RESET}"
+    log_info "Mot de passe : enregistré dans ${BOLD}credentials.txt${RESET} (droits 600, exclu de Git)"
+    log_warn "[!] Copier credentials.txt dans un coffre-fort de mots de passe, puis supprimer le fichier."
     pause
 }
 

@@ -161,6 +161,7 @@ services:
   # ── Redis — pub/sub pour les GraphQL subscriptions ─────────────────────────
   # Sur backend-network uniquement (internal: true).
   redis:
+    user: "999:999"
     image: redis:7.2-alpine
     command: redis-server --appendonly yes
     volumes:

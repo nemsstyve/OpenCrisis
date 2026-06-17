@@ -311,13 +311,23 @@ EOF
 
     # Build et démarrage
     log_title "Étape 4/5 — Build et démarrage de la stack"
-    log_info "Cette étape peut prendre plusieurs minutes la première fois…"
-    if ! docker compose up --build -d; then
-        log_error "Échec du démarrage de la stack"
-        log_info "Lancer : docker compose logs"
+    log_info "Build des images (peut prendre plusieurs minutes la première fois)…"
+    if ! docker compose build; then
+        log_error "Échec du build des images"
+        log_info "Relancer manuellement : docker compose build"
         pause
         return 1
     fi
+    log_ok "Build terminé"
+
+    log_info "Démarrage des conteneurs…"
+    if ! docker compose up -d; then
+        log_error "Échec du démarrage de la stack"
+        log_info "Vérifier les logs : docker compose logs"
+        pause
+        return 1
+    fi
+    log_ok "Conteneurs démarrés"
 
     log_info "Attente que le backend soit prêt (jusqu'à 90s)…"
     local attempts=0
@@ -371,7 +381,7 @@ update_admin_credentials() {
         -e NEW_EMAIL="$new_email" \
         -e NEW_PASSWORD="$new_password" \
         backend node -e '
-            const bcrypt = require("bcrypt");
+            const bcrypt = require("bcryptjs");
             const { PrismaClient } = require("@prisma/client");
             const prisma = new PrismaClient();
             (async () => {
@@ -458,7 +468,8 @@ action_start() {
         pause; return 1
     fi
 
-    docker compose up -d
+    log_info "Build et démarrage (peut prendre 1-2 min si les images doivent être (re)construites)…"
+    docker compose up --build -d
     echo ""
     log_info "Attente que la stack soit healthy…"
     sleep 5
@@ -521,7 +532,7 @@ change_admin_password() {
     fi
     if ! stack_is_running; then
         log_warn "La stack n'est pas démarrée — démarrage…"
-        docker compose up -d
+        docker compose up --build -d
         sleep 10
     fi
 
@@ -542,7 +553,7 @@ change_admin_password() {
         -e USER_EMAIL="$current_email" \
         -e NEW_PASSWORD="$new_password" \
         backend node -e '
-            const bcrypt = require("bcrypt");
+            const bcrypt = require("bcryptjs");
             const { PrismaClient } = require("@prisma/client");
             const prisma = new PrismaClient();
             (async () => {
@@ -601,7 +612,7 @@ change_postgres_password() {
     rm -f "$ENV_FILE.bak"
 
     log_info "Redémarrage de la stack…"
-    docker compose up -d
+    docker compose up --build -d
 
     log_info "Attente que le backend soit prêt…"
     local attempts=0
@@ -658,9 +669,19 @@ action_regenerate_certs() {
     if confirm "Écraser les certificats existants ?"; then
         rm -f "$CERTS_DIR/cert.pem" "$CERTS_DIR/key.pem"
         bash "$GENERATE_CERTS_SCRIPT" </dev/null
+
         if stack_is_running; then
-            log_info "Redémarrage de nginx…"
+            log_info "Redémarrage de nginx pour appliquer les nouveaux certificats…"
             docker compose restart nginx
+            log_ok "nginx redémarré"
+        else
+            log_warn "La stack n'est pas en cours d'exécution."
+            if confirm "La démarrer maintenant (build + up) ?"; then
+                docker compose up --build -d
+                log_ok "Stack démarrée avec les nouveaux certificats"
+            else
+                log_info "Pour démarrer plus tard : option 2 du menu, ou 'bash setup.sh start'"
+            fi
         fi
     fi
     pause

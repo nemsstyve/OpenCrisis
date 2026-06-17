@@ -33,16 +33,22 @@ install_back:
 lint_front:
   stage: lint
   script:
-    - echo "Lint frontend"
-  #  - cd 01-frontend
-  #  - npm run lint
+    - cd 01-frontend
+    - npm ci
+    - npx eslint . --format gitlab --output-file gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: 01-frontend/gl-code-quality-report.json
 
 lint_back:
   stage: lint
   script:
-    - echo "Lint backend"
-#    - cd 02-backend
-#    - npm run lint
+    - cd 02-backend
+    - npm ci
+    - npx eslint . --format gitlab --output-file gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: 02-backend/gl-code-quality-report.json
 
 #Verification des secrets
 gitleaks_scan:

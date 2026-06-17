@@ -20,7 +20,10 @@ export const openctiResolvers = {
       return searchOpenCTIEntities(query.trim());
     },
 
-    openctiStatus: () => process.env.OPENCTI_ENABLED === 'true',
+    openctiStatus: (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireAuth(ctx);
+      return process.env.OPENCTI_ENABLED === 'true';
+    },
   },
 
   Mutation: {

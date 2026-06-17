@@ -227,26 +227,31 @@ export async function exportIncidentToOpenCTI(
     },
   })) as { caseIncidentAdd?: { id: string; name: string; entity_type: string } };
 
-  const caseId = data?.caseIncidentAdd?.id;
+  const caseIncident = data?.caseIncidentAdd;
+  const caseId = caseIncident?.id;
 
-  if (caseId) {
-    await prisma.incident.update({ where: { id: incidentId }, data: { openctiCaseId: caseId } });
-
-    logAudit({
-      userId,
-      action: 'EXPORT_OPENCTI',
-      resource: 'TIMELINE',
-      resourceId: incidentId,
-      incidentId,
-      ipAddress,
-      metadata: { openctiCaseId: caseId },
+  if (!caseId) {
+    throw new GraphQLError("OpenCTI n'a pas retourné d'identifiant pour le case créé", {
+      extensions: { code: 'OPENCTI_EMPTY_RESPONSE' },
     });
   }
 
+  await prisma.incident.update({ where: { id: incidentId }, data: { openctiCaseId: caseId } });
+
+  logAudit({
+    userId,
+    action: 'EXPORT_OPENCTI',
+    resource: 'TIMELINE',
+    resourceId: incidentId,
+    incidentId,
+    ipAddress,
+    metadata: { openctiCaseId: caseId },
+  });
+
   return {
-    id: caseId ?? '',
-    name: data?.caseIncidentAdd?.name ?? incident.name,
-    entity_type: data?.caseIncidentAdd?.entity_type ?? 'Case-Incident',
+    id: caseId,
+    name: caseIncident.name,
+    entity_type: caseIncident.entity_type,
   };
 }
 
@@ -296,7 +301,7 @@ export async function createOpenCTIObservable(
     description,
   };
 
-  logAudit({ userId, action: 'CREATE_OPENCTI_OBSERVABLE', resource: 'TIMELINE', resourceId: result.id, ip });
+  logAudit({ userId, action: 'CREATE_OPENCTI_OBSERVABLE', resource: 'TIMELINE', resourceId: result.id, ipAddress: ip });
 
   return result;
 }

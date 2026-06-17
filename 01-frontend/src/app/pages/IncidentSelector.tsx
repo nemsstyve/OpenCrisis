@@ -4,9 +4,10 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
-import { AlertTriangle, Plus, Loader2, RefreshCw, LogOut } from "lucide-react";
+import { AlertTriangle, Plus, Loader2, RefreshCw, LogOut, ExternalLink } from "lucide-react";
 import { FormModal } from "../components/FormModal";
-import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
+import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION, EXPORT_INCIDENT_TO_OPENCTI_MUTATION } from "../../graphql/incident";
+import { OPENCTI_STATUS_QUERY } from "../../graphql/timeline";
 import { useAppStore } from "../../store/useAppStore";
 import { useLogout } from "../../hooks/useLogout";
 import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
@@ -43,6 +44,12 @@ export default function IncidentSelector() {
     refetchQueries: [{ query: INCIDENTS_QUERY }],
   });
 
+  const { data: octiStatusData } = useQuery<{ openctiStatus: boolean }>(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = octiStatusData?.openctiStatus ?? false;
+
+  const [exportToOpenCTI] = useMutation(EXPORT_INCIDENT_TO_OPENCTI_MUTATION);
+  const [exportingIncidentId, setExportingIncidentId] = useState<string | null>(null);
+
   const [statusFilter, setStatusFilter] = useState<"active" | "closed" | "all">("active");
   const [showModal, setShowModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -55,6 +62,19 @@ export default function IncidentSelector() {
     resolver: zodResolver(incidentSchema),
     defaultValues: { name: "", description: "", severity: "MEDIUM" },
   });
+
+  async function handleExportToOpenCTI(e: React.MouseEvent, incidentId: string) {
+    e.stopPropagation();
+    setExportingIncidentId(incidentId);
+    try {
+      await exportToOpenCTI({ variables: { incidentId } });
+      toast.success("Incident exporté vers OpenCTI");
+    } catch {
+      toast.error("Échec de l'export vers OpenCTI");
+    } finally {
+      setExportingIncidentId(null);
+    }
+  }
 
   function selectIncident(incident: GqlIncident) {
     setCurrentIncident(incident);
@@ -201,6 +221,20 @@ export default function IncidentSelector() {
                       {incident.severity}
                     </span>
                     <span className="text-xs text-gray-500">{STATUS_LABELS[incident.status]}</span>
+                    {openctiEnabled && (
+                      <button
+                        onClick={(e) => handleExportToOpenCTI(e, incident.id)}
+                        disabled={exportingIncidentId === incident.id}
+                        className="flex items-center gap-1 text-xs text-orange-400/70 hover:text-orange-400 transition-colors disabled:opacity-50"
+                        title="Exporter vers OpenCTI"
+                        aria-label="Exporter vers OpenCTI"
+                      >
+                        {exportingIncidentId === incident.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <ExternalLink className="w-3 h-3" />}
+                        CTI
+                      </button>
+                    )}
                   </div>
                 </div>
               </button>

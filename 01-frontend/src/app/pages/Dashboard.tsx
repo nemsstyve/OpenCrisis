@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useState, useEffect } from "react";
-import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock, Settings, ChevronDown } from "lucide-react";
+import { AlertTriangle, Clock, Loader2, Shield, AlertCircle, CheckCircle, Lock, Settings, ChevronDown, ExternalLink } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import { toast } from "sonner";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
@@ -8,7 +8,8 @@ import { useAppStore } from "../../store/useAppStore";
 import { FormModal } from "../components/FormModal";
 import { LOG_ENTRIES_QUERY } from "../../graphql/logEntry";
 import { TIMELINE_EVENTS_QUERY } from "../../graphql/timeline";
-import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY } from "../../graphql/incident";
+import { UPDATE_INCIDENT_MUTATION, INCIDENT_QUERY, EXPORT_INCIDENT_TO_OPENCTI_MUTATION } from "../../graphql/incident";
+import { OPENCTI_STATUS_QUERY } from "../../graphql/timeline";
 import type { GqlLogEntry, GqlTimelineEvent, GqlIncident, GqlIncidentStatus, GqlSeverity, GqlTimelineEventType } from "../../types/generated";
 
 // ── Constantes de présentation ────────────────────────────────────────────────
@@ -113,6 +114,7 @@ export default function Dashboard() {
   const now = useNow();
 
   const canWrite = hasPermission("DASHBOARD", "WRITE");
+  const canWriteTimeline = hasPermission("TIMELINE", "WRITE");
 
   const [updateIncident, { loading: updating }] = useMutation<
     { updateIncident: GqlIncident },
@@ -127,6 +129,14 @@ export default function Dashboard() {
     await updateIncident({ variables: { id: incidentId, input: { status } } });
     toast.success(`Statut mis à jour : ${STATUS_LABEL[status]}`);
   }
+
+  // OpenCTI — export incident
+  const { data: octiStatus } = useQuery<{ openctiStatus: boolean }>(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = octiStatus?.openctiStatus ?? false;
+  const [exportToOpenCTI, { loading: exporting }] = useMutation(EXPORT_INCIDENT_TO_OPENCTI_MUTATION, {
+    onCompleted: (d) => toast.success(`Incident exporté vers OpenCTI : ${d.exportIncidentToOpenCTI.name}`),
+    onError: () => toast.error("Erreur lors de l'export OpenCTI"),
+  });
 
   // III1 — ne requête que les cellules accessibles
   const canReadDir = hasPermission("MAIN_COURANTE_DIR", "READ");
@@ -209,6 +219,18 @@ export default function Dashboard() {
             <span className={`text-sm font-medium ${SEVERITY_COLOR[incident.severity]}`}>
               {incident.severity}
             </span>
+            {openctiEnabled && canWriteTimeline && (
+              <button
+                onClick={() => exportToOpenCTI({ variables: { incidentId } })}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 border border-orange-500/30 rounded hover:bg-orange-500/10 text-orange-400 hover:text-orange-300 transition-colors text-xs disabled:opacity-50"
+                title="Exporter vers OpenCTI"
+                aria-label="Exporter l'incident vers OpenCTI"
+              >
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                OpenCTI
+              </button>
+            )}
             {canWrite && (
               <button
                 onClick={() => setEditModal(true)}

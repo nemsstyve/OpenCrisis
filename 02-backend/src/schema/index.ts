@@ -7,7 +7,6 @@ import { documentTypeDefs } from './document';
 import { contactTypeDefs } from './contact';
 import { adminTypeDefs } from './admin';
 import { openctiTypeDefs } from './opencti';
-import { iocTypeDefs } from './ioc';
 
 // Base types — étendu par chaque module
 const baseTypeDefs = `#graphql
@@ -26,5 +25,4 @@ export const typeDefs = [
   contactTypeDefs,
   adminTypeDefs,
   openctiTypeDefs,
-  iocTypeDefs,
 ];

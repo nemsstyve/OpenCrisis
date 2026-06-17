@@ -6,7 +6,7 @@ const OPENCTI_ENABLED = process.env.OPENCTI_ENABLED === 'true';
 const OPENCTI_URL = process.env.OPENCTI_URL ?? '';
 const OPENCTI_TOKEN = process.env.OPENCTI_TOKEN ?? '';
 
-// ─── Types OpenCTI ────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface OpenCTIEntity {
   id: string;
@@ -15,7 +15,7 @@ export interface OpenCTIEntity {
   description?: string | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers privés ───────────────────────────────────────────────────────────
 
 function checkEnabled() {
   if (!OPENCTI_ENABLED) {
@@ -38,7 +38,7 @@ async function openctiQuery(query: string, variables: Record<string, unknown> = 
       Authorization: `Bearer ${OPENCTI_TOKEN}`,
     },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(10000), // 10s timeout
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
@@ -58,7 +58,7 @@ async function openctiQuery(query: string, variables: Record<string, unknown> = 
   return json.data;
 }
 
-// ─── Recherche d'entités OpenCTI ──────────────────────────────────────────────
+// ─── Recherche d'entités ──────────────────────────────────────────────────────
 
 export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntity[]> {
   checkEnabled();
@@ -70,44 +70,17 @@ export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntit
           node {
             id
             entity_type
-            ... on StixDomainObject {
-              standard_id
-            }
-            ... on IPv4Addr {
-              observable_value
-            }
-            ... on IPv6Addr {
-              observable_value
-            }
-            ... on DomainName {
-              observable_value
-            }
-            ... on Url {
-              observable_value
-            }
-            ... on StixCyberObservable {
-              observable_value
-            }
-            ... on Report {
-              name
-              description
-            }
-            ... on Malware {
-              name
-              description
-            }
-            ... on ThreatActor {
-              name
-              description
-            }
-            ... on AttackPattern {
-              name
-              description
-            }
-            ... on Indicator {
-              name
-              description
-            }
+            ... on StixDomainObject { standard_id }
+            ... on IPv4Addr          { observable_value }
+            ... on IPv6Addr          { observable_value }
+            ... on DomainName        { observable_value }
+            ... on Url               { observable_value }
+            ... on StixCyberObservable { observable_value }
+            ... on Report      { name description }
+            ... on Malware     { name description }
+            ... on ThreatActor { name description }
+            ... on AttackPattern { name description }
+            ... on Indicator   { name description }
           }
         }
       }
@@ -139,14 +112,13 @@ export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntit
       description: node.description ?? null,
     }));
   } catch (err) {
-    // Si OpenCTI ne répond pas, on retourne un tableau vide plutôt que de planter
     if (err instanceof GraphQLError) throw err;
     console.error('[OpenCTI] Erreur de recherche:', err);
     return [];
   }
 }
 
-// ─── Lier un événement Timeline à une entité OpenCTI ──────────────────────────
+// ─── Lier un événement Timeline à une entité OpenCTI ─────────────────────────
 
 export async function linkTimelineEventToOpenCTI(
   eventId: string,
@@ -157,7 +129,7 @@ export async function linkTimelineEventToOpenCTI(
 ) {
   checkEnabled();
 
-  const event = await prisma.timelineEvent.findUnique({ where: { id: eventId } });
+  const event = await prisma.timelineEvent.findFirst({ where: { id: eventId, deletedAt: null } });
   if (!event) {
     throw new GraphQLError('Événement introuvable', { extensions: { code: 'NOT_FOUND' } });
   }
@@ -181,7 +153,7 @@ export async function linkTimelineEventToOpenCTI(
   return updated;
 }
 
-// ─── Délier un événement Timeline d'OpenCTI ───────────────────────────────────
+// ─── Délier un événement Timeline d'OpenCTI ──────────────────────────────────
 
 export async function unlinkTimelineEventFromOpenCTI(
   eventId: string,
@@ -190,7 +162,7 @@ export async function unlinkTimelineEventFromOpenCTI(
 ) {
   checkEnabled();
 
-  const event = await prisma.timelineEvent.findUnique({ where: { id: eventId } });
+  const event = await prisma.timelineEvent.findFirst({ where: { id: eventId, deletedAt: null } });
   if (!event) {
     throw new GraphQLError('Événement introuvable', { extensions: { code: 'NOT_FOUND' } });
   }
@@ -213,7 +185,7 @@ export async function unlinkTimelineEventFromOpenCTI(
   return updated;
 }
 
-// ─── Export incident → Case STIX OpenCTI ──────────────────────────────────────
+// ─── Exporter un incident en Case STIX dans OpenCTI ──────────────────────────
 
 export async function exportIncidentToOpenCTI(
   incidentId: string,
@@ -222,8 +194,8 @@ export async function exportIncidentToOpenCTI(
 ) {
   checkEnabled();
 
-  const incident = await prisma.incident.findUnique({
-    where: { id: incidentId },
+  const incident = await prisma.incident.findFirst({
+    where: { id: incidentId, deletedAt: null },
     include: { timelineEvents: { where: { deletedAt: null } } },
   });
 
@@ -245,31 +217,29 @@ export async function exportIncidentToOpenCTI(
     }
   `;
 
-  const data = await openctiQuery(gql, {
+  const data = (await openctiQuery(gql, {
     input: {
       name: incident.name,
       description: incident.description ?? '',
       severity: severityMap[incident.severity] ?? 'medium',
-      priority: incident.severity === 'CRITICAL' ? 'P1' : incident.severity === 'HIGH' ? 'P2' : 'P3',
+      priority: incident.severity === 'CRITICAL' ? 'P1'
+        : incident.severity === 'HIGH' ? 'P2' : 'P3',
     },
-  }) as { caseIncidentAdd?: { id: string; name: string; entity_type: string } };
+  })) as { caseIncidentAdd?: { id: string; name: string; entity_type: string } };
 
   const caseId = data?.caseIncidentAdd?.id;
 
   if (caseId) {
-    await prisma.incident.update({
-      where: { id: incidentId },
-      data: { openctiCaseId: caseId },
-    });
+    await prisma.incident.update({ where: { id: incidentId }, data: { openctiCaseId: caseId } });
 
     logAudit({
       userId,
       action: 'EXPORT_OPENCTI',
-      resource: 'INCIDENT',
+      resource: 'TIMELINE',
       resourceId: incidentId,
       incidentId,
       ipAddress,
-      metadata: { openctiCaseId: caseId, caseEntityType: data?.caseIncidentAdd?.entity_type },
+      metadata: { openctiCaseId: caseId },
     });
   }
 
@@ -280,29 +250,34 @@ export async function exportIncidentToOpenCTI(
   };
 }
 
-// ─── Export incident → Case STIX OpenCTI ──────────────────────────────────────
+// ─── Créer un observable dans OpenCTI ────────────────────────────────────────
+// Utilisé pour pousser un IoC local vers OpenCTI quand il n'y figure pas encore.
 
-// ─── Créer un observable dans OpenCTI ─────────────────────────────────────────
+const VALID_OBSERVABLE_TYPES = new Set([
+  'IPv4-Addr', 'IPv6-Addr', 'Domain-Name', 'Hostname', 'StixFile', 'Url',
+]);
 
 export async function createOpenCTIObservable(
   type: string,
   value: string,
   description: string,
-) {
+  userId?: string,
+  ip?: string,
+): Promise<OpenCTIEntity> {
   checkEnabled();
 
-  const typeMap: Record<string, string> = {
-    'IPv4-Addr': 'iPv4AddrAdd',
-    'Domain-Name': 'domainNameAdd',
-    'Hostname': 'hostnameAdd',
-    'StixFile': 'stixFileAdd',
-  };
+  if (!VALID_OBSERVABLE_TYPES.has(type)) {
+    throw new GraphQLError(`Type d'observable non supporté : ${type}`, {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
 
-  const mutation = typeMap[type] ?? 'iPv4AddrAdd';
+  // OpenCTI attend le nom du champ d'input calé sur le type (ex: IPv4Addr, DomainName)
+  const inputKey = type.replace(/-/g, '').replace(/^(\w)/, (c) => c);
 
   const gql = `
-    mutation CreateObservable($type: String!, $IPv4Addr: IPv4AddrAddInput) {
-      stixCyberObservableAdd(type: $type, IPv4Addr: $IPv4Addr) {
+    mutation CreateObservable($type: String!, $value: String!) {
+      stixCyberObservableAdd(type: $type, ${inputKey}: { value: $value }) {
         id
         entity_type
         observable_value
@@ -310,16 +285,18 @@ export async function createOpenCTIObservable(
     }
   `;
 
-  const data = await openctiQuery(gql, {
-    type,
-    IPv4Addr: {
-      value,
-    },
-  }) as { stixCyberObservableAdd?: { id: string; entity_type: string; observable_value: string } };
+  const data = (await openctiQuery(gql, { type, value })) as {
+    stixCyberObservableAdd?: { id: string; entity_type: string; observable_value: string };
+  };
 
-  return {
+  const result = {
     id: data?.stixCyberObservableAdd?.id ?? '',
     name: data?.stixCyberObservableAdd?.observable_value ?? value,
     entity_type: data?.stixCyberObservableAdd?.entity_type ?? type,
+    description,
   };
+
+  logAudit({ userId, action: 'CREATE_OPENCTI_OBSERVABLE', resource: 'TIMELINE', resourceId: result.id, ip });
+
+  return result;
 }

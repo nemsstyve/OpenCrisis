@@ -8,11 +8,11 @@ L'application est composée de 5 services définis dans `docker-compose.yml`.
 
 | Service | Image | Port interne | Port hôte | Rôle |
 |---|---|---|---|---|
-| **nginx** | `nginx:1.27-alpine` | 80 / 443 | **80, 443** | Reverse proxy HTTPS, point d'entrée unique |
-| **frontend** | Build local (`nginxinc/nginx-unprivileged:1.28-alpine`) | 8080 | — | Serveur de fichiers statiques React, non-root |
-| **backend** | Build local (`node:20.19.0-alpine`) | 4000 | — | API Node.js + GraphQL + WebSocket |
-| **postgres** | `postgres:16.3-alpine` | 5432 | — | Base de données PostgreSQL |
-| **redis** | `redis:7.2-alpine` | 6379 | — | Pub/sub pour les subscriptions temps réel |
+| **nginx** | `nginx:alpine` | 80 / 443 | **80, 443** | Reverse proxy HTTPS, point d'entrée unique |
+| **frontend** | Build local (`nginxinc/nginx-unprivileged:alpine`) | 8080 | — | Serveur de fichiers statiques React, non-root |
+| **backend** | Build local (`node:alpine`) | 4000 | — | API Node.js + GraphQL + WebSocket |
+| **postgres** | `postgres:alpine` | 5432 | — | Base de données PostgreSQL |
+| **redis** | `redis:alpine` | 6379 | — | Pub/sub pour les subscriptions temps réel |
 
 **Seul nginx est exposé sur l'hôte** (ports 80 et 443). Tous les autres services sont accessibles uniquement depuis l'intérieur du réseau Docker.
 

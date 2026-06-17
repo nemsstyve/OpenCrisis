@@ -17,7 +17,7 @@
 #   bash setup.sh reset        # Réinitialisation complète (DANGER)
 # ════════════════════════════════════════════════════════════════════════════
 
-set -uo pipefail
+set -euo pipefail
 
 # ─── Localisation du projet ─────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

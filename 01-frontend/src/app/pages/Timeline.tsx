@@ -67,7 +67,12 @@ function parseIocs(raw: string | null | undefined): IocEntry[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.every((e) => e.iocType && e.value)) return parsed as IocEntry[];
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (e): e is IocEntry =>
+          IOC_TYPES.includes(e.iocType as IocType) && typeof e.value === "string" && e.value.length > 0,
+      );
+    }
     return [{ iocType: "hash", value: raw }];
   } catch {
     return [{ iocType: "hash", value: raw }];
@@ -268,28 +273,33 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           {fields.length > 0 && (
             <div className="space-y-2 max-h-32 overflow-y-auto pr-0.5">
               {fields.map((field, index) => (
-                <div key={field.id} className="flex gap-2 items-center">
-                  <select
-                    {...register(`iocs.${index}.iocType`)}
-                    className="w-24 shrink-0 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    {IOC_TYPES.map((t) => (
-                      <option key={t} value={t}>{IOC_TYPE_LABELS[t]}</option>
-                    ))}
-                  </select>
-                  <input
-                    {...register(`iocs.${index}.value`)}
-                    className="flex-1 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-xs font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="Valeur…"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => remove(index)}
-                    className="shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
-                    aria-label="Supprimer cet IOC"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                <div key={field.id} className="flex flex-col gap-0.5">
+                  <div className="flex gap-2 items-center">
+                    <select
+                      {...register(`iocs.${index}.iocType`)}
+                      className="w-24 shrink-0 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors"
+                    >
+                      {IOC_TYPES.map((t) => (
+                        <option key={t} value={t}>{IOC_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                    <input
+                      {...register(`iocs.${index}.value`)}
+                      className={`flex-1 bg-[#0a0b0d] border rounded-md px-3 py-2 text-white text-xs font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors ${errors.iocs?.[index]?.value ? "border-red-500" : "border-[#1e2229]"}`}
+                      placeholder="Valeur…"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
+                      aria-label="Supprimer cet IOC"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {errors.iocs?.[index]?.value?.message && (
+                    <p className="text-red-400 text-xs pl-[6.5rem]">{errors.iocs?.[index]?.value?.message}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -496,7 +506,7 @@ export default function Timeline() {
             ioc: serializeIocs(form.iocs),
           },
         },
-        ...(form.type === "DETECTION" && form.isFirstDetection
+        ...(form.type === "DETECTION"
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
@@ -532,7 +542,7 @@ export default function Timeline() {
             ioc: serializeIocs(form.iocs),
           },
         },
-        ...(form.type === "DETECTION" && form.isFirstDetection
+        ...(form.type === "DETECTION"
           ? { refetchQueries: [{ query: TIMELINE_EVENTS_QUERY, variables: { incidentId } }] }
           : {}),
       });
@@ -1021,7 +1031,7 @@ export default function Timeline() {
                           return (
                             <div className="flex flex-col gap-1 items-center">
                               {iocs.map((ioc, i) => (
-                                <div key={i} className="flex items-center gap-1.5">
+                                <div key={`${ioc.iocType}-${ioc.value}-${i}`} className="flex items-center gap-1.5">
                                   <span className="shrink-0 text-xs text-gray-500 bg-[#1a1d24] px-1.5 py-0.5 rounded">
                                     {IOC_TYPE_LABELS[ioc.iocType]}
                                   </span>
@@ -1110,8 +1120,14 @@ export default function Timeline() {
       <ConfirmDialog
         open={!!confirmDeleteId}
         description="Supprimer cet événement de la timeline ?"
-        onConfirm={() => {
-          if (confirmDeleteId) deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+        onConfirm={async () => {
+          if (confirmDeleteId) {
+            try {
+              await deleteTimelineEvent({ variables: { id: confirmDeleteId } });
+            } catch {
+              toast.error("Erreur lors de la suppression");
+            }
+          }
           setConfirmDeleteId(null);
         }}
         onCancel={() => setConfirmDeleteId(null)}

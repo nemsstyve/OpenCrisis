@@ -38,6 +38,17 @@ const CELL_LABELS: Record<string, string> = {
   SHARED: 'Partagé',
 };
 
+const IOC_TYPE_LABELS: Record<string, string> = { hash: 'Hash', domain: 'Domaine', ip: 'IP' };
+
+function formatIocsForExport(raw: string | null): string {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as Array<{ iocType: string; value: string }>;
+    if (Array.isArray(parsed)) return parsed.map((e) => `[${IOC_TYPE_LABELS[e.iocType] ?? e.iocType}] ${e.value}`).join('\n');
+    return raw;
+  } catch { return raw; }
+}
+
 // ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────
 // Export de la main courante — filtré sur les cellules accessibles (DÉC-1)
 
@@ -264,16 +275,6 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       ESCALATION: 'Escalade',
       RESOLUTION: 'Résolution',
     };
-
-    const IOC_TYPE_LABELS: Record<string, string> = { hash: 'Hash', domain: 'Domaine', ip: 'IP' };
-    function formatIocsForExport(raw: string | null): string {
-      if (!raw) return '';
-      try {
-        const parsed = JSON.parse(raw) as Array<{ iocType: string; value: string }>;
-        if (Array.isArray(parsed)) return parsed.map((e) => `[${IOC_TYPE_LABELS[e.iocType] ?? e.iocType}] ${e.value}`).join('\n');
-        return raw;
-      } catch { return raw; }
-    }
 
     for (const event of timelineEvents) {
       const row = tlSheet.addRow({

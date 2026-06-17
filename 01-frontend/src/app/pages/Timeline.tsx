@@ -101,6 +101,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
     register,
     handleSubmit,
     watch,
+    setValue,
     control,
     formState: { errors },
   } = useForm<NewEventForm>({
@@ -109,6 +110,37 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
   });
 
   const isDetection = watch("type") === "DETECTION";
+  const titleValue = watch("title");
+  const iocValue = watch("ioc");
+
+  // Recherche OpenCTI sur le titre
+  const [searchByTitle, { data: titleData, loading: titleSearching }] = useLazyQuery<{ searchOpenCTI: OpenCTIEntity[] }>(SEARCH_OPENCTI_QUERY);
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+
+  // Recherche OpenCTI sur l'IoC
+  const [searchByIoc, { data: iocData, loading: iocSearching }] = useLazyQuery<{ searchOpenCTI: OpenCTIEntity[] }>(SEARCH_OPENCTI_QUERY);
+  const [showIocSuggestions, setShowIocSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (!titleValue || titleValue.trim().length < 3) { setShowTitleSuggestions(false); return; }
+    const timer = setTimeout(() => {
+      searchByTitle({ variables: { query: titleValue.trim() } });
+      setShowTitleSuggestions(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [titleValue]);
+
+  useEffect(() => {
+    if (!iocValue || iocValue.trim().length < 2) { setShowIocSuggestions(false); return; }
+    const timer = setTimeout(() => {
+      searchByIoc({ variables: { query: iocValue.trim() } });
+      setShowIocSuggestions(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [iocValue]);
+
+  const titleSuggestions = titleData?.searchOpenCTI ?? [];
+  const iocSuggestions = iocData?.searchOpenCTI ?? [];
 
   const inputCls =
     "w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors";
@@ -150,14 +182,33 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             </div>
           )}
 
-          <div>
+          <div className="relative">
             <label className="block text-sm text-gray-400 mb-1.5">Titre *</label>
-            <input
-              {...register("title")}
-              className={inputCls}
-              placeholder="Ex : Détection d'un accès non autorisé"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                {...register("title")}
+                className={inputCls}
+                placeholder="Ex : Détection d'un accès non autorisé"
+                onFocus={() => titleValue && titleValue.length >= 3 && setShowTitleSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 200)}
+                autoComplete="off"
+              />
+              {titleSearching && <Loader2 className="w-4 h-4 animate-spin text-orange-400 shrink-0" />}
+            </div>
             {errors.title && <p className={errCls}>{errors.title.message}</p>}
+            {showTitleSuggestions && titleSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1d24] border border-orange-500/30 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto">
+                <p className="px-3 py-1.5 text-xs text-orange-400 border-b border-[#1e2229]">Entités OpenCTI correspondantes</p>
+                {titleSuggestions.map((s) => (
+                  <button key={s.id} type="button"
+                    onMouseDown={() => { setValue("title", s.name); setShowTitleSuggestions(false); toast.success("Entité CTI liée : " + s.name); }}
+                    className="w-full text-left px-3 py-2 hover:bg-[#2a2e39] transition-colors flex items-center justify-between gap-2">
+                    <span className="text-sm text-white truncate">{s.name}</span>
+                    <span className="text-xs text-orange-400 shrink-0">{s.entity_type}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -208,14 +259,42 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             />
           </div>
 
-          <div>
+          <div className="relative">
             <label className="block text-sm text-gray-400 mb-1.5">IOC</label>
-            <input
-              {...register("ioc")}
-              className={inputCls}
-              placeholder="Hash, domaine, IP…"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                {...register("ioc")}
+                className={inputCls}
+                placeholder="Hash, domaine, IP…"
+                onFocus={() => iocValue && iocValue.length >= 2 && setShowIocSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowIocSuggestions(false), 200)}
+                autoComplete="off"
+              />
+              {iocSearching && <Loader2 className="w-4 h-4 animate-spin text-orange-400 shrink-0" />}
+            </div>
             {errors.ioc && <p className={errCls}>{errors.ioc.message}</p>}
+            {showIocSuggestions && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1d24] border border-orange-500/30 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto">
+                {iocSuggestions.length > 0 ? (
+                  <>
+                    <p className="px-3 py-1.5 text-xs text-orange-400 border-b border-[#1e2229]">Trouvé dans OpenCTI</p>
+                    {iocSuggestions.map((s) => (
+                      <button key={s.id} type="button"
+                        onMouseDown={() => { setValue("ioc", s.name); setShowIocSuggestions(false); toast.success("IoC lié : " + s.name); }}
+                        className="w-full text-left px-3 py-2 hover:bg-[#2a2e39] transition-colors flex items-center justify-between gap-2">
+                        <span className="text-sm text-white font-mono truncate">{s.name}</span>
+                        <span className="text-xs text-orange-400 shrink-0">{s.entity_type}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : iocData && !iocSearching ? (
+                  <div className="px-3 py-2 text-xs text-gray-500 flex items-center gap-2">
+                    <span>Non trouvé dans OpenCTI —</span>
+                    <span className="text-green-400">sera créé à la sauvegarde</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {error && (

@@ -17,7 +17,7 @@ services:
   # Nginx route le trafic vers frontend et backend, applique les headers de
   # sécurité et le rate limiting. Sur frontend-network uniquement.
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.31.1-alpine
     ports:
       - "80:80"                   # Redirection 301 vers HTTPS
       - "443:443"                 # HTTPS (TLS 1.2/1.3)
@@ -132,7 +132,7 @@ services:
   # Sur backend-network uniquement (internal: true), pas d'accès internet.
   # Aucun port exposé sur l'hôte en mode prod (le dev compose ajoute 5432).
   postgres:
-    image: postgres:16.3-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-opencrisis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -168,7 +168,7 @@ services:
   # Sur backend-network uniquement (internal: true).
   redis:
     user: "999:999"
-    image: redis:7.2-alpine
+    image: redis:8.4-alpine
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data

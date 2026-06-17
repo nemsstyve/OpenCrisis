@@ -52,7 +52,7 @@ lint_back:
 
 #Verification des secrets
 gitleaks_scan:
-  stage: lint
+  stage: security
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]

@@ -18,6 +18,9 @@ RUN pnpm build
 # (port non-privilégié > 1024), et écrit PID/temp dans /tmp.
 FROM nginxinc/nginx-unprivileged:1.28-alpine AS runner
 
+# wget nécessaire pour le healthcheck Docker (busybox wget présent mais expliciter la dépendance)
+RUN apk add --no-cache wget
+
 # Config nginx pour SPA (fallback sur index.html pour le routing React)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { Users, Phone, Mail, Search, Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
+import { FormModal } from "../components/FormModal";
+import { Users, Phone, Mail, Search, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import {
   CONTACTS_QUERY,
@@ -52,18 +53,13 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
   const errCls = "text-red-400 text-xs mt-1";
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">
-            {initial ? "Modifier le contact" : "Ajouter un contact"}
-          </h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
+    <FormModal
+      open
+      onClose={onClose}
+      title={initial ? "Modifier le contact" : "Ajouter un contact"}
+      contentClassName="sm:max-w-lg"
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Prénom *</label>
@@ -77,15 +73,16 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Rôle *</label>
-            <input {...register("role")} className={inputCls} placeholder="Chef cellule opérationnelle" />
-            {errors.role && <p className={errCls}>{errors.role.message}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Organisation</label>
-            <input {...register("organization")} className={inputCls} placeholder="TechCorp SA" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Rôle *</label>
+              <input {...register("role")} className={inputCls} placeholder="Chef cellule opérationnelle" />
+              {errors.role && <p className={errCls}>{errors.role.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Organisation</label>
+              <input {...register("organization")} className={inputCls} placeholder="TechCorp SA" />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -139,8 +136,7 @@ function ContactModal({ initial, onClose, onSubmit, submitting, error }: Contact
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </FormModal>
   );
 }
 
@@ -204,8 +200,10 @@ export default function Annuaire() {
       };
       if (modal.contact) {
         await updateContact({ variables: { id: modal.contact.id, input } });
+        toast.success("Contact modifié");
       } else {
         await createContact({ variables: { input } });
+        toast.success("Contact ajouté");
       }
       setModal({ open: false });
     } catch (err: unknown) {
@@ -245,7 +243,7 @@ export default function Annuaire() {
   return (
     <div className="p-8 bg-[#0f1116] min-h-screen">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl mb-2 text-white">Annuaire</h1>
           <p className="text-gray-400">Répertoire des membres de la cellule de crise</p>
@@ -306,9 +304,9 @@ export default function Annuaire() {
                     <th
                       key={h}
                       scope="col"
-                      className={`px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}
+                      className="px-6 py-4 text-left text-sm text-gray-400 uppercase tracking-wider"
                     >
-                      {h}
+                      {h === "Actions" ? <span className="sr-only">{h}</span> : h}
                     </th>
                   ))}
                 </tr>

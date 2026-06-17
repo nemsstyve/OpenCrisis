@@ -33,20 +33,26 @@ install_back:
 lint_front:
   stage: lint
   script:
-    - echo "Lint frontend"
-  #  - cd 01-frontend
-  #  - npm run lint
+    - cd 01-frontend
+    - npm ci
+    - npx eslint . --format gitlab --output-file gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: 01-frontend/gl-code-quality-report.json
 
 lint_back:
   stage: lint
   script:
-    - echo "Lint backend"
-#    - cd 02-backend
-#    - npm run lint
+    - cd 02-backend
+    - npm ci
+    - npx eslint . --format gitlab --output-file gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: 02-backend/gl-code-quality-report.json
 
 #Verification des secrets
 gitleaks_scan:
-  stage: lint
+  stage: security
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
@@ -124,62 +130,3 @@ trivy_fs_scan:
   allow_failure: true
 
 
-.docker_rules: &docker_rules
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"
- 
-docker_front:
-  stage: docker
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_TLS_CERTDIR: "" #"/certs"
-    DOCKER_HOST: tcp://docker:2375
-  <<: *docker_rules
-  script:
-    - echo "Build Docker image — frontend"
-    - docker build -t $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/01-frontend:latest 01-frontend
-    - docker push $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA
-    - docker push $CI_REGISTRY_IMAGE/01-frontend:latest
- 
-docker_back:
-  stage: docker
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_TLS_CERTDIR: "" #"/certs"
-    DOCKER_HOST: tcp://docker:2375
-  <<: *docker_rules
-  script:
-    - echo "Build Docker image — backend"
-    - docker build -t $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/02-backend:latest 02-backend
-    - docker push $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA
-    - docker push $CI_REGISTRY_IMAGE/02-backend:latest
-
-trivy_image_scan:
-  stage: docker
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_TLS_CERTDIR: "" #"/certs"
-    DOCKER_HOST: tcp://docker:2375
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"
-  needs:
-    - docker_front
-    - docker_back
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-  script:
-    - trivy image $CI_REGISTRY_IMAGE/01-frontend:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-01-frontend-report.json --no-progress || true
-    - trivy image $CI_REGISTRY_IMAGE/02-backend:$CI_COMMIT_SHORT_SHA --severity HIGH,CRITICAL --format json --output trivy-02-backend-report.json --no-progress || true
-  artifacts:
-    when: always
-    paths:
-      - trivy-01-frontend-report.json
-      - trivy-02-backend-report.json
-    expire_in: 1 week
-  allow_failure: true

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
+    "@as-integrations/express4": "^1.1.2",
     "@graphql-tools/schema": "^10.0.3",
     "@prisma/client": "5.22.0",
     "bcryptjs": "^2.4.3",

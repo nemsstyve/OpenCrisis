@@ -88,10 +88,12 @@ export const createTimelineEventSchema = z.object({
   title: shortText('Le titre'),
   description: optionalText,
   occurredAt: z.string().datetime({ message: 'Date invalide' }),
+  isFirstDetection: z.boolean().optional().nullable(),
   actorId: z.string().uuid().optional().nullable(),
   ipAddress: z.string().trim().max(64).optional().nullable(),
   assetName: z.string().trim().max(200).optional().nullable(),
   affectedUser: z.string().trim().max(200).optional().nullable(),
+  ioc: z.string().trim().max(5000).optional().nullable(),
 });
 
 export const updateTimelineEventSchema = z.object({
@@ -99,9 +101,11 @@ export const updateTimelineEventSchema = z.object({
   title: shortText('Le titre').optional().nullable(),
   description: optionalText,
   occurredAt: z.string().datetime({ message: 'Date invalide' }).optional().nullable(),
+  isFirstDetection: z.boolean().optional().nullable(),
   ipAddress: z.string().trim().max(64).optional().nullable(),
   assetName: z.string().trim().max(200).optional().nullable(),
   affectedUser: z.string().trim().max(200).optional().nullable(),
+  ioc: z.string().trim().max(5000).optional().nullable(),
 });
 
 // ─── Tag ────────────────────────────────────────────────────────────────────────

@@ -41,6 +41,19 @@ export async function requireHttpPermission(
   return true;
 }
 
+/**
+ * True si l'utilisateur doit encore changer son mot de passe temporaire.
+ * Les routes REST hors requireHttpPermission (ex. exports) l'utilisent pour
+ * refuser toute opération gardée, en cohérence avec requirePermission/requireHttpPermission.
+ */
+export async function passwordChangeRequired(userId: string): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, isActive: true },
+    select: { mustChangePassword: true },
+  });
+  return user?.mustChangePassword ?? false;
+}
+
 export async function getUserReadableResources(userId: string): Promise<Set<PermissionResource>> {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null, isActive: true },

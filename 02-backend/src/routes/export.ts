@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
-import { getUserReadableResources, type AuthRequest } from '../middleware/httpPermission';
+import { getUserReadableResources, passwordChangeRequired, type AuthRequest } from '../middleware/httpPermission';
 import { logAudit } from '../middleware/audit';
 
 const router = Router();
@@ -62,6 +62,13 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
+
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
 
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {
@@ -172,6 +179,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
+
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
 
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {

@@ -278,7 +278,7 @@ export async function createOpenCTIObservable(
   }
 
   // OpenCTI attend le nom du champ d'input calé sur le type (ex: IPv4Addr, DomainName)
-  const inputKey = type.replace(/-/g, '').replace(/^(\w)/, (c) => c);
+  const inputKey = type.replace(/-/g, '');
 
   const gql = `
     mutation CreateObservable($type: String!, $value: String!) {

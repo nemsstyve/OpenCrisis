@@ -5,6 +5,31 @@ import { prisma } from '../prisma';
 import { USER_INCLUDE } from './auth';
 import { passwordSchema } from '../utils/validation';
 
+// ── Garde "dernier administrateur" ──────────────────────────────────────────────
+// Empêche de retirer le dernier compte capable d'administrer (ADMIN:WRITE) via
+// suppression, désactivation ou retrait du rôle admin — ce qui verrouillerait
+// définitivement l'administration.
+
+const ADMIN_WRITE_VIA_ROLE = {
+  some: { role: { permissions: { some: { permission: { resource: 'ADMIN', action: 'WRITE' } } } } },
+} as const;
+
+async function countOtherActiveAdmins(excludeUserId: string): Promise<number> {
+  return prisma.user.count({
+    where: { id: { not: excludeUserId }, deletedAt: null, isActive: true, roleAssignments: ADMIN_WRITE_VIA_ROLE },
+  });
+}
+
+async function assertNotLastAdmin(userId: string): Promise<void> {
+  const isAdmin =
+    (await prisma.user.count({ where: { id: userId, deletedAt: null, roleAssignments: ADMIN_WRITE_VIA_ROLE } })) > 0;
+  if (isAdmin && (await countOtherActiveAdmins(userId)) === 0) {
+    throw new GraphQLError('Action impossible : il doit rester au moins un administrateur actif', {
+      extensions: { code: 'LAST_ADMIN' },
+    });
+  }
+}
+
 // ── Users ──────────────────────────────────────────────────────────────────────
 
 export async function getUsers() {
@@ -81,10 +106,14 @@ export async function updateUser(
   if (data.site !== undefined) update.site = data.site;
   if (data.isActive != null) update.isActive = data.isActive;
 
+  // Ne pas désactiver le dernier administrateur actif.
+  if (data.isActive === false) await assertNotLastAdmin(id);
+
   return prisma.user.update({ where: { id }, data: update, include: USER_INCLUDE });
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
+  await assertNotLastAdmin(id);
   await prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
   return true;
 }
@@ -116,6 +145,25 @@ export async function assignRole(userId: string, roleId: string): Promise<boolea
 }
 
 export async function removeRole(userId: string, roleId: string): Promise<boolean> {
+  // Si ce rôle confère ADMIN:WRITE et que l'utilisateur perdrait tout accès
+  // d'administration, s'assurer qu'il reste au moins un autre administrateur actif.
+  const roleGrantsAdmin =
+    (await prisma.rolePermission.count({ where: { roleId, permission: { resource: 'ADMIN', action: 'WRITE' } } })) > 0;
+  if (roleGrantsAdmin) {
+    const keepsAdminViaOtherRole =
+      (await prisma.roleAssignment.count({
+        where: {
+          userId,
+          roleId: { not: roleId },
+          role: { permissions: { some: { permission: { resource: 'ADMIN', action: 'WRITE' } } } },
+        },
+      })) > 0;
+    if (!keepsAdminViaOtherRole && (await countOtherActiveAdmins(userId)) === 0) {
+      throw new GraphQLError('Action impossible : il doit rester au moins un administrateur actif', {
+        extensions: { code: 'LAST_ADMIN' },
+      });
+    }
+  }
   await prisma.roleAssignment.deleteMany({ where: { userId, roleId } });
   return true;
 }

@@ -21,6 +21,12 @@ export async function requireHttpPermission(
     return false;
   }
 
+  // Mot de passe temporaire non changé : aucune opération REST gardée autorisée.
+  if (user.mustChangePassword) {
+    res.status(403).json({ error: 'Changement de mot de passe requis' });
+    return false;
+  }
+
   const allowed = user.roleAssignments.some(ra =>
     ra.role.permissions.some(
       rp => rp.permission.resource === resource && rp.permission.action === action,
@@ -33,6 +39,19 @@ export async function requireHttpPermission(
   }
 
   return true;
+}
+
+/**
+ * True si l'utilisateur doit encore changer son mot de passe temporaire.
+ * Les routes REST hors requireHttpPermission (ex. exports) l'utilisent pour
+ * refuser toute opération gardée, en cohérence avec requirePermission/requireHttpPermission.
+ */
+export async function passwordChangeRequired(userId: string): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, isActive: true },
+    select: { mustChangePassword: true },
+  });
+  return user?.mustChangePassword ?? false;
 }
 
 export async function getUserReadableResources(userId: string): Promise<Set<PermissionResource>> {

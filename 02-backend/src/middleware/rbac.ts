@@ -59,6 +59,15 @@ export async function requirePermission(
     throw new GraphQLError('Utilisateur introuvable', { extensions: { code: 'UNAUTHENTICATED' } });
   }
 
+  // Tant que le mot de passe temporaire n'est pas changé, aucune opération gardée
+  // n'est autorisée (le forçage n'était jusqu'ici appliqué que côté front). Les
+  // résolveurs me/logout/refreshToken/changePassword n'utilisent pas requirePermission.
+  if (user.mustChangePassword) {
+    throw new GraphQLError('Vous devez changer votre mot de passe avant de continuer', {
+      extensions: { code: 'PASSWORD_CHANGE_REQUIRED' },
+    });
+  }
+
   const hasPermission = user.roleAssignments.some(ra =>
     ra.role.permissions.some(
       rp => rp.permission.resource === resource && rp.permission.action === action,

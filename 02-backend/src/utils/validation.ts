@@ -121,7 +121,7 @@ const optionalPhone = z.string().trim().max(50).optional().nullable();
 const optionalShort = z.string().trim().max(200).optional().nullable();
 
 export const adminCreateUserSchema = z.object({
-  email: z.string().trim().email('Email invalide').max(200),
+  email: z.string().trim().toLowerCase().email('Email invalide').max(200),
   password: passwordSchema,
   firstName: shortText('Le prénom'),
   lastName: shortText('Le nom'),

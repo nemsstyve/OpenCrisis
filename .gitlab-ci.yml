@@ -9,19 +9,15 @@ stages:
 image: node:22
 
 # Install
-lint_front:
-  stage: lint
-  image: node:22-alpine
-  dependencies:
-    - install_front
+install_front:
+  stage: install
   script:
-    - cd 01-frontend
-    - npx eslint . \
-        --format eslint-formatter-gitlab \
-        --output-file gl-codequality.json
+    - echo "Installation frontend"
+    - cd 01-frontend 
+    - npm install
   artifacts:
-    reports:
-      codequality: 01-frontend/gl-codequality.json
+    paths:
+      - 01-frontend/node_modules/
 
 install_back:
   stage: install
@@ -37,8 +33,13 @@ install_back:
 lint_front:
   stage: lint
   image: node:22-alpine
+  dependencies:
+    - install_front
   script:
-    - npx eslint 01-frontend --format gitlab --output-file gl-codequality-front.json
+    - cd 01-frontend
+    - npx eslint . \
+        --format eslint-formatter-gitlab \
+        --output-file gl-codequality.json
   artifacts:
     reports:
       codequality: 01-frontend/gl-codequality.json

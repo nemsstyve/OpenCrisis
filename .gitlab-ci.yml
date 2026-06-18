@@ -45,8 +45,10 @@ lint_front:
 lint_back:
   stage: lint
   image: node:22-alpine
+  dependencies:
+    - install_back
   script:
-    - npx eslint 02-backend --format gitlab --output-file gl-codequality-back.json
+    - npx eslint . --format eslint-formatter-gitlab --output-file gl-codequality.json
   artifacts:
     reports:
       codequality: 02-backend/gl-codequality.json

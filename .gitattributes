@@ -1,0 +1,3 @@
+# Les scripts shell doivent rester en LF même sur Windows : un fichier en CRLF
+# fait échouer bash (Linux/WSL/macOS, conteneurs Docker) sur les retours chariot.
+*.sh text eol=lf

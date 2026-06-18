@@ -6,6 +6,7 @@ import { timelineResolvers } from './timeline';
 import { documentResolvers } from './document';
 import { contactResolvers } from './contact';
 import { adminResolvers } from './admin';
+import { openctiResolvers } from './opencti';
 
 export const resolvers = [
   authResolvers,
@@ -16,4 +17,5 @@ export const resolvers = [
   documentResolvers,
   contactResolvers,
   adminResolvers,
+  openctiResolvers,
 ];

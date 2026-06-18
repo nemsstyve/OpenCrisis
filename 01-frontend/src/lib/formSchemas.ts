@@ -61,13 +61,24 @@ export function userSchema(isEdit: boolean) {
 }
 export type UserForm = z.infer<ReturnType<typeof userSchema>>;
 
+export const IOC_TYPES = ["hash", "domain", "ip"] as const;
+export type IocType = typeof IOC_TYPES[number];
+
+export const iocEntrySchema = z.object({
+  iocType: z.enum(IOC_TYPES),
+  value: z.string().min(1, "Valeur requise").max(500, "Valeur trop longue"),
+});
+export type IocEntry = z.infer<typeof iocEntrySchema>;
+
 export const timelineEventSchema = z.object({
   type: z.enum(["DETECTION", "ACTION", "DECISION", "COMMUNICATION", "ESCALATION", "RESOLUTION"]),
   title: requiredText("Le titre"),
   description: z.string().max(2000),
   occurredAt: z.string().min(1, "La date est requise"),
+  isFirstDetection: z.boolean(),
   ipAddress: z.string().max(64),
   assetName: z.string().max(200),
   affectedUser: z.string().max(200),
+  iocs: z.array(iocEntrySchema).default([]),
 });
 export type TimelineEventForm = z.infer<typeof timelineEventSchema>;

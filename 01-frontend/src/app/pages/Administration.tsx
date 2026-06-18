@@ -17,10 +17,12 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { FormModal } from "../components/FormModal";
 import { toast } from "sonner";
 import type {
-  GqlAdminUser, GqlRoleDetail, GqlAdminPermission, GqlAuditLogPage, GqlAuditLogEntry,
+  GqlRoleDetail, GqlPermission, GqlAuditLogPage, GqlAuditLogEntry,
 } from "../../types/generated";
+import type { AdminUser } from "../../types/admin";
 
 type Tab = "users" | "roles" | "audit";
 
@@ -44,7 +46,7 @@ function gqlError(err: unknown): string {
 // ── Modal utilisateur ─────────────────────────────────────────────────────────
 
 interface UserModalProps {
-  user?: GqlAdminUser | null;
+  user?: AdminUser | null;
   roles: GqlRoleDetail[];
   onClose: () => void;
   onSuccess: () => void;
@@ -117,6 +119,7 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
           },
         });
       }
+      toast.success(user ? "Utilisateur modifié" : "Utilisateur créé");
       onSuccess();
       onClose();
     } catch (err) {
@@ -125,13 +128,13 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#13151a] border border-[#1e2229] rounded-lg w-full max-w-lg max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2229]">
-          <h2 className="text-white font-medium">{user ? "Modifier l'utilisateur" : "Créer un utilisateur"}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
+    <FormModal
+      open
+      onClose={onClose}
+      title={user ? "Modifier l'utilisateur" : "Créer un utilisateur"}
+      contentClassName="sm:max-w-lg"
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">Prénom *</label>
@@ -221,8 +224,7 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </FormModal>
   );
 }
 
@@ -230,13 +232,13 @@ function UserModal({ user, roles, onClose, onSuccess }: UserModalProps) {
 
 function UsersTab() {
   const currentUser = useAppStore((s) => s.currentUser);
-  const [modal, setModal] = useState<{ open: boolean; user?: GqlAdminUser | null }>({ open: false });
+  const [modal, setModal] = useState<{ open: boolean; user?: AdminUser | null }>({ open: false });
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetPwd, setResetPwd] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<GqlAdminUser | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AdminUser | null>(null);
 
-  const { data, loading, error } = useQuery<{ adminUsers: GqlAdminUser[] }>(ADMIN_USERS_QUERY, {
+  const { data, loading, error } = useQuery<{ adminUsers: AdminUser[] }>(ADMIN_USERS_QUERY, {
     fetchPolicy: "cache-and-network",
   });
   const { data: rolesData } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY);
@@ -248,14 +250,14 @@ function UsersTab() {
         if (!variables?.id) return;
         cache.updateQuery({ query: ADMIN_USERS_QUERY }, (prev) => {
           if (!prev) return prev;
-          return { adminUsers: prev.adminUsers.filter((u: GqlAdminUser) => u.id !== variables.id) };
+          return { adminUsers: prev.adminUsers.filter((u: AdminUser) => u.id !== variables.id) };
         });
       },
     }
   );
   const [resetPassword] = useMutation(ADMIN_RESET_PASSWORD_MUTATION);
 
-  async function handleDeleteConfirmed(user: GqlAdminUser) {
+  async function handleDeleteConfirmed(user: AdminUser) {
     setConfirmDelete(null);
     try {
       await deleteUser({ variables: { id: user.id } });
@@ -270,8 +272,11 @@ function UsersTab() {
     setResetSubmitting(true);
     try {
       await resetPassword({ variables: { userId: resetUserId, newPassword: resetPwd } });
+      toast.success("Mot de passe réinitialisé");
       setResetUserId(null);
       setResetPwd("");
+    } catch {
+      toast.error("Erreur lors de la réinitialisation");
     } finally {
       setResetSubmitting(false);
     }
@@ -288,7 +293,7 @@ function UsersTab() {
           onClick={() => setModal({ open: true, user: null })}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
         >
-          <Plus className="w-4 h-4" />Ajouter
+          <Plus className="w-4 h-4" />Ajouter un utilisateur
         </button>
       </div>
 
@@ -296,11 +301,14 @@ function UsersTab() {
       {error && <p className="text-red-400 text-sm">{error.message}</p>}
 
       <div className="bg-[#13151a] border border-[#1e2229] rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-[#0a0b0d] border-b border-[#1e2229]">
             <tr>
               {["Nom", "Email", "Rôles", "Statut", "Actions"].map((h) => (
-                <th key={h} scope="col" className={`px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider${h === "Actions" ? " sr-only" : ""}`}>{h}</th>
+                <th key={h} scope="col" className="px-4 py-3 text-left text-xs text-gray-400 uppercase tracking-wider">
+                  {h === "Actions" ? <span className="sr-only">{h}</span> : h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -327,10 +335,10 @@ function UsersTab() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setModal({ open: true, user })} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Modifier"><Pencil className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setResetUserId(user.id)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-yellow-400" title="Réinitialiser le mot de passe"><Key className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setModal({ open: true, user })} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Modifier" aria-label="Modifier l'utilisateur"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setResetUserId(user.id)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-yellow-400" title="Réinitialiser le mot de passe" aria-label="Réinitialiser le mot de passe"><Key className="w-3.5 h-3.5" /></button>
                     {user.id !== currentUser?.id && (
-                      <button onClick={() => setConfirmDelete(user)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setConfirmDelete(user)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer" aria-label="Supprimer l'utilisateur"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                   </div>
                 </td>
@@ -338,6 +346,7 @@ function UsersTab() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Inline reset password form */}
@@ -354,7 +363,7 @@ function UsersTab() {
           <button onClick={handleResetPwd} disabled={!resetPwd || resetSubmitting} className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded disabled:opacity-50">
             {resetSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Valider"}
           </button>
-          <button onClick={() => { setResetUserId(null); setResetPwd(""); }} className="p-1 text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
+          <button onClick={() => { setResetUserId(null); setResetPwd(""); }} aria-label="Annuler la réinitialisation" className="p-1 text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -390,7 +399,7 @@ function RolesTab() {
   const { data: rolesData, loading: rolesLoading } = useQuery<{ adminRoles: GqlRoleDetail[] }>(ADMIN_ROLES_QUERY, {
     fetchPolicy: "cache-and-network",
   });
-  const { data: permsData } = useQuery<{ adminPermissions: GqlAdminPermission[] }>(ADMIN_PERMISSIONS_QUERY);
+  const { data: permsData } = useQuery<{ adminPermissions: GqlPermission[] }>(ADMIN_PERMISSIONS_QUERY);
 
   const [deleteRole] = useMutation<{ adminDeleteRole: boolean }, { id: string }>(ADMIN_DELETE_ROLE_MUTATION, {
     update(cache, _, { variables }) {
@@ -410,7 +419,7 @@ function RolesTab() {
   const allPerms = permsData?.adminPermissions ?? [];
 
   // Group permissions by resource for the permission matrix
-  const byResource = allPerms.reduce<Record<string, GqlAdminPermission[]>>((acc, p) => {
+  const byResource = allPerms.reduce<Record<string, GqlPermission[]>>((acc, p) => {
     (acc[p.resource] ??= []).push(p);
     return acc;
   }, {});
@@ -425,7 +434,10 @@ function RolesTab() {
     setSaving(true);
     try {
       await updateRolePerms({ variables: { roleId: editingRole.id, permissionIds: Array.from(editPerms) } });
+      toast.success("Permissions mises à jour");
       setEditingRole(null);
+    } catch {
+      toast.error("Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
@@ -439,8 +451,11 @@ function RolesTab() {
       await createRole({
         variables: { input: { name: newRoleName.trim(), description: newRoleDesc || null, permissionIds: [] } },
       });
+      toast.success("Rôle créé");
       setShowCreateRole(false);
       setNewRoleName(""); setNewRoleDesc("");
+    } catch {
+      toast.error("Erreur lors de la création du rôle");
     } finally {
       setSaving(false);
     }
@@ -485,8 +500,8 @@ function RolesTab() {
               </div>
               {!role.isSystem && (
                 <div className="flex gap-1">
-                  <button onClick={() => startEdit(role)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Éditer les permissions"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setConfirmDeleteRole(role)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => startEdit(role)} className="p-1 hover:bg-[#2a2e39] rounded text-gray-500 hover:text-white" title="Éditer les permissions" aria-label="Éditer les permissions"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setConfirmDeleteRole(role)} className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400" title="Supprimer" aria-label="Supprimer le rôle"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               )}
             </div>
@@ -627,11 +642,11 @@ function AuditTab() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
-          <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] disabled:opacity-40 text-gray-400">
+          <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Page précédente" className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] disabled:opacity-40 text-gray-400">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm text-gray-400">{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] disabled:opacity-40 text-gray-400">
+          <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Page suivante" className="p-1.5 border border-[#1e2229] rounded hover:bg-[#1e2229] disabled:opacity-40 text-gray-400">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@apollo/client";
-import { AlertTriangle, Plus, Loader2, RefreshCw } from "lucide-react";
-import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION } from "../../graphql/incident";
+import { AlertTriangle, Plus, Loader2, RefreshCw, LogOut, ExternalLink } from "lucide-react";
+import { FormModal } from "../components/FormModal";
+import { INCIDENTS_QUERY, CREATE_INCIDENT_MUTATION, EXPORT_INCIDENT_TO_OPENCTI_MUTATION } from "../../graphql/incident";
+import { OPENCTI_STATUS_QUERY } from "../../graphql/timeline";
 import { useAppStore } from "../../store/useAppStore";
+import { useLogout } from "../../hooks/useLogout";
 import { incidentSchema, type IncidentForm } from "../../lib/formSchemas";
-import type { GqlIncident, Severity } from "../../types/generated";
+import type { GqlIncident, GqlSeverity } from "../../types/generated";
 
-const SEVERITY_COLORS: Record<Severity, string> = {
+const SEVERITY_COLORS: Record<GqlSeverity, string> = {
   LOW: "text-green-400 bg-green-400/10",
   MEDIUM: "text-yellow-400 bg-yellow-400/10",
   HIGH: "text-orange-400 bg-orange-400/10",
@@ -22,10 +26,11 @@ const STATUS_LABELS: Record<GqlIncident["status"], string> = {
   CLOSED: "Clos",
 };
 
-const SEVERITY_OPTIONS: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const SEVERITY_OPTIONS: GqlSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function IncidentSelector() {
   const navigate = useNavigate();
+  const handleLogout = useLogout();
   const setCurrentIncident = useAppStore((s) => s.setCurrentIncident);
   const currentUser = useAppStore((s) => s.currentUser);
   const hasPermission = useAppStore((s) => s.hasPermission);
@@ -39,6 +44,12 @@ export default function IncidentSelector() {
     refetchQueries: [{ query: INCIDENTS_QUERY }],
   });
 
+  const { data: octiStatusData } = useQuery<{ openctiStatus: boolean }>(OPENCTI_STATUS_QUERY);
+  const openctiEnabled = octiStatusData?.openctiStatus ?? false;
+
+  const [exportToOpenCTI] = useMutation(EXPORT_INCIDENT_TO_OPENCTI_MUTATION);
+  const [exportingIncidentId, setExportingIncidentId] = useState<string | null>(null);
+
   const [statusFilter, setStatusFilter] = useState<"active" | "closed" | "all">("active");
   const [showModal, setShowModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -51,6 +62,19 @@ export default function IncidentSelector() {
     resolver: zodResolver(incidentSchema),
     defaultValues: { name: "", description: "", severity: "MEDIUM" },
   });
+
+  async function handleExportToOpenCTI(e: React.MouseEvent, incidentId: string) {
+    e.stopPropagation();
+    setExportingIncidentId(incidentId);
+    try {
+      await exportToOpenCTI({ variables: { incidentId } });
+      toast.success("Incident exporté vers OpenCTI");
+    } catch {
+      toast.error("Échec de l'export vers OpenCTI");
+    } finally {
+      setExportingIncidentId(null);
+    }
+  }
 
   function selectIncident(incident: GqlIncident) {
     setCurrentIncident(incident);
@@ -71,6 +95,7 @@ export default function IncidentSelector() {
       });
       setShowModal(false);
       reset();
+      toast.success("Incident créé");
       if (d?.createIncident) selectIncident(d.createIncident);
     } catch (err: unknown) {
       const msg = (err as { graphQLErrors?: Array<{ message: string }> })?.graphQLErrors?.[0]?.message
@@ -104,13 +129,24 @@ export default function IncidentSelector() {
               Bonjour{currentUser ? `, ${currentUser.firstName}` : ""} — sélectionnez un incident
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="p-2 text-gray-500 hover:text-gray-300 transition-colors"
-            title="Rafraîchir"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => refetch()}
+              className="p-2 text-gray-500 hover:text-gray-300 transition-colors"
+              title="Rafraîchir"
+              aria-label="Rafraîchir la liste"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+              title="Se déconnecter"
+              aria-label="Se déconnecter"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* States */}
@@ -185,6 +221,20 @@ export default function IncidentSelector() {
                       {incident.severity}
                     </span>
                     <span className="text-xs text-gray-500">{STATUS_LABELS[incident.status]}</span>
+                    {openctiEnabled && (
+                      <button
+                        onClick={(e) => handleExportToOpenCTI(e, incident.id)}
+                        disabled={exportingIncidentId === incident.id}
+                        className="flex items-center gap-1 text-xs text-orange-400/70 hover:text-orange-400 transition-colors disabled:opacity-50"
+                        title="Exporter vers OpenCTI"
+                        aria-label="Exporter vers OpenCTI"
+                      >
+                        {exportingIncidentId === incident.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <ExternalLink className="w-3 h-3" />}
+                        CTI
+                      </button>
+                    )}
                   </div>
                 </div>
               </button>
@@ -206,9 +256,8 @@ export default function IncidentSelector() {
 
       {/* Create incident modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#13151a] border border-[#1e2229] rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-white font-medium mb-4">Déclarer un incident</h2>
+        <FormModal open onClose={closeModal} title="Déclarer un incident">
+          <div className="p-6">
             <form onSubmit={handleSubmit(onCreate)} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Nom *</label>
@@ -266,7 +315,7 @@ export default function IncidentSelector() {
               </div>
             </form>
           </div>
-        </div>
+        </FormModal>
       )}
     </div>
   );

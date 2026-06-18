@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
@@ -96,7 +96,7 @@ async function main() {
   app.use(
     '/api/graphql',
     expressMiddleware(server, {
-      context: async ({ req, res }) => {
+      context: async ({ req, res }: { req: express.Request; res: express.Response }) => {
         const token = extractBearerToken(req.headers.authorization);
         const payload = token ? verifyAccessToken(token) : null;
         return { userId: payload?.userId ?? null, req, res } satisfies GraphQLContext;

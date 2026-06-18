@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
-import { getUserReadableResources, type AuthRequest } from '../middleware/httpPermission';
+import { getUserReadableResources, passwordChangeRequired, type AuthRequest } from '../middleware/httpPermission';
 import { logAudit } from '../middleware/audit';
 
 const router = Router();
@@ -38,6 +38,23 @@ const CELL_LABELS: Record<string, string> = {
   SHARED: 'Partagé',
 };
 
+const IOC_TYPE_LABELS: Record<string, string> = { hash: 'Hash', domain: 'Domaine', ip: 'IP' };
+
+// Préfixe les valeurs débutant par un caractère de formule Excel (=, +, -, @, tab, CR)
+// pour les traiter comme du texte brut et éviter l'injection de formule (CWE-1236).
+function xlsxSafeString(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+function formatIocsForExport(raw: string | null): string {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as Array<{ iocType: string; value: string }>;
+    if (Array.isArray(parsed)) return parsed.map((e) => `[${IOC_TYPE_LABELS[e.iocType] ?? e.iocType}] ${e.value}`).join('\n');
+    return xlsxSafeString(raw);
+  } catch { return xlsxSafeString(raw); }
+}
+
 // ─── GET /api/export/:incidentId/pdf ──────────────────────────────────────────
 // Export de la main courante — filtré sur les cellules accessibles (DÉC-1)
 
@@ -45,6 +62,13 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
+
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
 
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {
@@ -156,6 +180,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
 
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
+
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {
       res.status(403).json({ error: 'Permission refusée' });
@@ -198,8 +229,8 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     ];
     infoSheet.getColumn('label').font = { bold: true };
     infoSheet.addRows([
-      { label: 'Nom', value: incident.name },
-      { label: 'Description', value: incident.description ?? '' },
+      { label: 'Nom', value: xlsxSafeString(incident.name) },
+      { label: 'Description', value: xlsxSafeString(incident.description ?? '') },
       { label: 'Statut', value: incident.status },
       { label: 'Sévérité', value: incident.severity },
       { label: 'Ouvert le', value: new Date(incident.startedAt).toLocaleString('fr-FR') },
@@ -230,10 +261,10 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     for (const entry of entries) {
       const row = logSheet.addRow({
         createdAt: new Date(entry.createdAt).toLocaleString('fr-FR'),
-        author: `${entry.author.firstName} ${entry.author.lastName}`,
+        author: xlsxSafeString(`${entry.author.firstName} ${entry.author.lastName}`),
         cell: CELL_LABELS_SHORT[entry.cell] ?? entry.cell,
-        content: entry.content,
-        tags: entry.tags.map((t) => t.tag.name).join(', '),
+        content: xlsxSafeString(entry.content),
+        tags: xlsxSafeString(entry.tags.map((t) => t.tag.name).join(', ')),
         isEdited: entry.isEdited ? 'Oui' : 'Non',
       });
       row.getCell('content').alignment = { wrapText: true, vertical: 'top' };
@@ -249,6 +280,7 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       { header: 'Acteur', key: 'actor', width: 26 },
       { header: 'Asset', key: 'assetName', width: 20 },
       { header: 'Adresse IP', key: 'ipAddress', width: 16 },
+      { header: 'IOC', key: 'ioc', width: 36 },
       { header: 'Utilisateur affecté', key: 'affectedUser', width: 28 },
     ];
     const tlHeader = tlSheet.getRow(1);
@@ -265,16 +297,18 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     };
 
     for (const event of timelineEvents) {
-      tlSheet.addRow({
+      const row = tlSheet.addRow({
         occurredAt: new Date(event.occurredAt).toLocaleString('fr-FR'),
         type: TYPE_LABELS[event.type] ?? event.type,
-        title: event.title,
-        description: event.description ?? '',
-        actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
-        assetName: event.assetName ?? '',
-        ipAddress: event.ipAddress ?? '',
-        affectedUser: event.affectedUser ?? '',
+        title: xlsxSafeString(event.title),
+        description: xlsxSafeString(event.description ?? ''),
+        actor: xlsxSafeString(event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : ''),
+        assetName: xlsxSafeString(event.assetName ?? ''),
+        ipAddress: xlsxSafeString(event.ipAddress ?? ''),
+        ioc: formatIocsForExport(event.ioc),
+        affectedUser: xlsxSafeString(event.affectedUser ?? ''),
       });
+      row.getCell('ioc').alignment = { wrapText: true, vertical: 'top' };
     }
 
     res.setHeader(

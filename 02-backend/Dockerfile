@@ -1,5 +1,5 @@
 # ─── Stage 1 : Build TypeScript ───────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # OpenSSL requis pour que Prisma génère le bon binary (linux-musl-openssl-3.0.x)
@@ -19,7 +19,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # ─── Stage 2 : Image de production ────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 # OpenSSL requis au runtime par le Prisma Client

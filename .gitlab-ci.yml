@@ -18,6 +18,8 @@ install_front:
   artifacts:
     paths:
       - 01-frontend/node_modules/
+    expire_in: 1 hour
+      
 
 install_back:
   stage: install
@@ -28,6 +30,7 @@ install_back:
   artifacts:
     paths:
       - 02-backend/node_modules/
+    expire_in: 1 hour
 
 #Lint
 lint_front:
@@ -41,6 +44,7 @@ lint_front:
   artifacts:
     reports:
       codequality: 01-frontend/gl-codequality.json
+    expire_in: 1 hour
 
 lint_back:
   stage: lint
@@ -53,6 +57,7 @@ lint_back:
   artifacts:
     reports:
       codequality: 02-backend/gl-codequality.json
+    expire_in: 1 hour
 
 #Verification des secrets
 gitleaks_scan:
@@ -66,7 +71,7 @@ gitleaks_scan:
     when: always
     paths:
       - gitleaks-report.json
-    expire_in: 1 week
+    expire_in: 1 hour
   allow_failure: true
 
 # Build
@@ -114,7 +119,7 @@ semgrep_scan:
     when: always
     paths:
       - semgrep-report.json
-    expire_in: 1 week
+    expire_in: 1 hour
   allow_failure: true
   when: manual
 
@@ -133,7 +138,7 @@ trivy_fs_scan:
     paths:
       - trivy-fs-report.json
       - trivy-config-report.json
-    expire_in: 1 week
+    expire_in: 1 hour
   allow_failure: true
 
 

@@ -136,6 +136,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
     handleSubmit,
     watch,
     control,
+    setValue,
     formState: { errors },
   } = useForm<NewEventForm>({
     resolver: zodResolver(timelineEventSchema),
@@ -192,7 +193,7 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
                       onClick={() => field.onChange(t)}
                       className={`py-1.5 rounded-full text-xs font-medium border transition-colors text-center ${
                         active
-                          ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                          ? `${EVENT_TYPE_COLORS[t]} border-current`
                           : "bg-transparent border-[#1e2229] text-gray-400 hover:border-gray-500 hover:text-gray-200"
                       }`}
                     >
@@ -245,13 +246,22 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
             {errors.title && <p className={errCls}>{errors.title.message}</p>}
             {showOctiSuggestions && octiSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1d24] border border-orange-500/30 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto">
-                <p className="px-3 pt-2 pb-1 text-xs text-orange-400 font-medium">OpenCTI — entités correspondantes</p>
+                <p className="px-3 pt-2 pb-1 text-xs text-orange-400 font-medium">OpenCTI — entités correspondantes (cliquer pour sélectionner)</p>
                 {octiSuggestions.map((e) => (
-                  <div key={e.id} className="px-3 py-2 hover:bg-[#0a0b0d] cursor-default border-t border-[#1e2229]">
+                  <button
+                    key={e.id}
+                    type="button"
+                    onMouseDown={(ev) => {
+                      ev.preventDefault();
+                      setValue("title", e.name, { shouldValidate: true });
+                      setShowOctiSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-[#0f1116] cursor-pointer border-t border-[#1e2229] transition-colors"
+                  >
                     <span className="text-xs text-gray-400 bg-orange-500/10 px-1.5 py-0.5 rounded mr-2">{e.entity_type}</span>
                     <span className="text-sm text-white">{e.name}</span>
                     {e.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{e.description}</p>}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -267,95 +277,165 @@ function EventModal({ onClose, onSubmit, submitting, error, initial, mode }: Eve
           </div>
         </div>
 
-        {/* ── Section Contexte technique ──────────────────────── */}
+        {/* ── Section Contexte — champs dynamiques selon le type ── */}
         <div className="border-t border-[#1e2229] pt-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contexte technique</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            {watch("type") === "DETECTION" && "Contexte technique"}
+            {watch("type") === "ACTION" && "Contexte de l'action"}
+            {watch("type") === "DECISION" && "Contexte de la décision"}
+            {watch("type") === "COMMUNICATION" && "Contexte de la communication"}
+            {watch("type") === "ESCALATION" && "Contexte de l'escalade"}
+            {watch("type") === "RESOLUTION" && "Contexte de la résolution"}
+          </p>
         </div>
 
-        {/* Utilisateur affecté — pleine largeur */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
-          <input
-            {...register("affectedUser")}
-            className={inputCls}
-            placeholder="jean.martin@company.com"
-          />
-        </div>
-
-        {/* Asset | Adresse IP */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
-            <input
-              {...register("assetName")}
-              className={inputCls}
-              placeholder="Serveur-DB-01"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
-            <input
-              {...register("ipAddress")}
-              className={inputCls}
-              placeholder="10.0.1.15"
-            />
-          </div>
-        </div>
-
-        {/* IOC — liste dynamique type + valeur */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm text-gray-400">IOC</label>
-            <button
-              type="button"
-              onClick={() => append({ iocType: "hash", value: "" })}
-              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              <Plus className="w-3 h-3" /> Ajouter
-            </button>
-          </div>
-          {fields.length > 0 && (
-            <div className="space-y-2 max-h-32 overflow-y-auto pr-0.5">
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex flex-col gap-0.5">
-                  <div className="flex gap-2 items-center">
-                    <select
-                      {...register(`iocs.${index}.iocType`)}
-                      className="w-24 shrink-0 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors"
-                    >
-                      {IOC_TYPES.map((t) => (
-                        <option key={t} value={t}>{IOC_TYPE_LABELS[t]}</option>
-                      ))}
-                    </select>
-                    <input
-                      {...register(`iocs.${index}.value`)}
-                      className={`flex-1 bg-[#0a0b0d] border rounded-md px-3 py-2 text-white text-xs font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors ${errors.iocs?.[index]?.value ? "border-red-500" : "border-[#1e2229]"}`}
-                      placeholder="Valeur…"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => remove(index)}
-                      className="shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
-                      aria-label="Supprimer cet IOC"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  {errors.iocs?.[index]?.value?.message && (
-                    <p className="text-red-400 text-xs pl-[6.5rem]">{errors.iocs?.[index]?.value?.message}</p>
-                  )}
-                </div>
-              ))}
+        {/* DÉTECTION : IP + Asset + Utilisateur affecté + IoC */}
+        {watch("type") === "DETECTION" && (
+          <>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Utilisateur affecté</label>
+              <input {...register("affectedUser")} className={inputCls} placeholder="jean.martin@company.com" />
             </div>
-          )}
-        </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Asset</label>
+                <input {...register("assetName")} className={inputCls} placeholder="Serveur-DB-01" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
+                <input {...register("ipAddress")} className={inputCls} placeholder="10.0.1.15" />
+              </div>
+            </div>
+          </>
+        )}
 
-        {/* Description */}
+        {/* ACTION : Responsable + Asset concerné + IP */}
+        {watch("type") === "ACTION" && (
+          <>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Responsable de l'action</label>
+              <input {...register("affectedUser")} className={inputCls} placeholder="jean.martin@company.com" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Asset concerné</label>
+                <input {...register("assetName")} className={inputCls} placeholder="Serveur-DB-01" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Adresse IP</label>
+                <input {...register("ipAddress")} className={inputCls} placeholder="10.0.1.15" />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* DÉCISION : Décideur */}
+        {watch("type") === "DECISION" && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">Décideur</label>
+            <input {...register("affectedUser")} className={inputCls} placeholder="Directeur IT / RSSI…" />
+          </div>
+        )}
+
+        {/* COMMUNICATION : Destinataire + Canal */}
+        {watch("type") === "COMMUNICATION" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Destinataire</label>
+              <input {...register("affectedUser")} className={inputCls} placeholder="CNIL / DG / Médias…" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Canal</label>
+              <input {...register("assetName")} className={inputCls} placeholder="Email / Téléphone / Courrier…" />
+            </div>
+          </div>
+        )}
+
+        {/* ESCALADE : Escaladé vers + Niveau */}
+        {watch("type") === "ESCALATION" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Escaladé vers</label>
+              <input {...register("affectedUser")} className={inputCls} placeholder="RSSI / DG / CERT…" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Niveau d'escalade</label>
+              <input {...register("assetName")} className={inputCls} placeholder="N1 / N2 / N3 / Exécutif…" />
+            </div>
+          </div>
+        )}
+
+        {/* RÉSOLUTION : Cause racine + Résolu par */}
+        {watch("type") === "RESOLUTION" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Cause racine</label>
+              <input {...register("assetName")} className={inputCls} placeholder="Credential volé / Vulnérabilité 0-day…" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Résolu par</label>
+              <input {...register("affectedUser")} className={inputCls} placeholder="jean.martin@company.com" />
+            </div>
+          </div>
+        )}
+
+        {/* IOC — uniquement pour DÉTECTION et ACTION */}
+        {(watch("type") === "DETECTION" || watch("type") === "ACTION") && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-gray-400">IOC</label>
+              <button
+                type="button"
+                onClick={() => append({ iocType: "hash", value: "" })}
+                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Ajouter
+              </button>
+            </div>
+            {fields.length > 0 && (
+              <div className="space-y-2 max-h-32 overflow-y-auto pr-0.5">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex flex-col gap-0.5">
+                    <div className="flex gap-2 items-center">
+                      <select
+                        {...register(`iocs.${index}.iocType`)}
+                        className="w-28 shrink-0 bg-[#0a0b0d] border border-[#1e2229] rounded-md px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors"
+                      >
+                        {IOC_TYPES.map((t) => (
+                          <option key={t} value={t}>{IOC_TYPE_LABELS[t]}</option>
+                        ))}
+                      </select>
+                      <input
+                        {...register(`iocs.${index}.value`)}
+                        className={`flex-1 bg-[#0a0b0d] border rounded-md px-3 py-2 text-white text-xs font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors ${errors.iocs?.[index]?.value ? "border-red-500" : "border-[#1e2229]"}`}
+                        placeholder="Ex: 5d41402abc4b… / 10.0.1.15 / evil.com"
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
+                        aria-label="Supprimer cet IOC"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {errors.iocs?.[index]?.value?.message && (
+                      <p className="text-red-400 text-xs pl-[7.5rem]">{errors.iocs?.[index]?.value?.message}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Description — toujours visible */}
         <div>
           <label className="block text-sm text-gray-400 mb-1.5">Description</label>
           <textarea
             {...register("description")}
-            rows={1}
+            rows={2}
             className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
             placeholder="Description détaillée de l'événement…"
           />

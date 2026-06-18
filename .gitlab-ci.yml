@@ -126,7 +126,9 @@ trivy_fs_scan:
     entrypoint: [""]
   script:
     - trivy fs . --severity HIGH,CRITICAL --format json --output trivy-fs-report.json --no-progress || true
-    - trivy config . --severity HIGH,CRITICAL --format json --output trivy-config-report.json || true
+    #- trivy config . --severity HIGH,CRITICAL --format json --output trivy-config-report.json || true
+    - trivy config . --debug
+    - find . -name Dockerfile
   artifacts:
     when: always
     paths:

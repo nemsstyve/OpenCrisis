@@ -39,6 +39,36 @@ async function checkCanModifyEntry(ctx: GraphQLContext, entryId: string, userId:
   return entry;
 }
 
+// Construit le `subscribe` d'une subscription main courante.
+//  - avec `cell` explicite : autorise et ne diffuse que cette cellule ;
+//  - sans `cell` : ne diffuse QUE les cellules réellement lisibles (readableCells),
+//    ce qui empêche la fuite inter-cellules (un membre Directionnel ne doit pas
+//    recevoir les entrées Opérationnelles en temps réel, et inversement).
+function subscribeLogEntry(topicFn: (incidentId: string, cell: Cell) => string) {
+  return async (
+    _: unknown,
+    { incidentId, cell }: { incidentId: string; cell?: Cell },
+    ctx: GraphQLContext,
+  ) => {
+    if (cell) {
+      const resource = cellToResource(cell);
+      await requirePermission(ctx, resource, 'READ');
+      return authorizedIterator(
+        pubsub.asyncIterator(topicFn(incidentId, cell)),
+        () => hasPermission(ctx, resource, 'READ'),
+      );
+    }
+    const cells = await readableCells(ctx);
+    if (cells.length === 0) {
+      throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
+    }
+    return authorizedIterator(
+      pubsub.asyncIterator(cells.map((c) => topicFn(incidentId, c))),
+      async () => (await readableCells(ctx)).length > 0,
+    );
+  };
+}
+
 export const logEntryResolvers = {
   Query: {
     logEntries: async (
@@ -116,34 +146,8 @@ export const logEntryResolvers = {
   },
 
   Subscription: {
-    logEntryAdded: {
-      subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
-        const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
-        await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
-        // F4 — sans filtre cell, souscrire aux 3 topics réels au lieu du topic _ALL inexistant
-        const topics = cell
-          ? TOPICS.LOG_ENTRY_ADDED(incidentId, cell)
-          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_ADDED(incidentId, c));
-        return authorizedIterator(
-          pubsub.asyncIterator(topics),
-          () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
-        );
-      },
-    },
-    logEntryUpdated: {
-      subscribe: async (_: unknown, { incidentId, cell }: { incidentId: string; cell?: Cell }, ctx: GraphQLContext) => {
-        const resource = cell ? cellToResource(cell) : 'MAIN_COURANTE_DIR';
-        await requirePermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ');
-        // F4 — même correction pour logEntryUpdated
-        const topics = cell
-          ? TOPICS.LOG_ENTRY_UPDATED(incidentId, cell)
-          : (['DIRECTIONAL', 'OPERATIONAL', 'SHARED'] as const).map(c => TOPICS.LOG_ENTRY_UPDATED(incidentId, c));
-        return authorizedIterator(
-          pubsub.asyncIterator(topics),
-          () => hasPermission(ctx, resource as Parameters<typeof requirePermission>[1], 'READ'),
-        );
-      },
-    },
+    logEntryAdded: { subscribe: subscribeLogEntry(TOPICS.LOG_ENTRY_ADDED) },
+    logEntryUpdated: { subscribe: subscribeLogEntry(TOPICS.LOG_ENTRY_UPDATED) },
   },
 
   LogEntry: {

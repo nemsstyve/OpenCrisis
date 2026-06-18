@@ -30,7 +30,11 @@ fi
 
 echo "→ Génération des certificats TLS auto-signés (RSA 2048, 365 jours)..."
 
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+# MSYS2_ARG_CONV_EXCL='/C=' : sous Git Bash/MSYS, openssl recevrait "/C=FR/..."
+# converti en chemin Windows, faisant échouer la génération. On exclut UNIQUEMENT
+# l'argument -subj de la conversion (ciblé sur son préfixe "/C="), pour que les
+# chemins -keyout/-out restent, eux, correctement convertis. Ignoré sur Linux/WSL/macOS.
+MSYS2_ARG_CONV_EXCL='/C=' openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout "${CERT_DIR}/key.pem" \
     -out "${CERT_DIR}/cert.pem" \
     -subj "/C=FR/ST=Ile-de-France/L=Paris/O=OpenCrisis/CN=localhost" \

@@ -70,8 +70,11 @@ validate_app_password() {
 # DATABASE_URL (délimiteurs URI RFC 3986) ou la substitution sed (métacaractères).
 validate_pg_password() {
     local pwd="$1"
-    [[ ${#pwd} -ge 12 ]]                        || { echo "Au moins 12 caractères requis"; return 1; }
-    [[ ! "$pwd" =~ [/@:?#%|&\\[:space:]] ]]     || { echo "Caractères interdits : / @ : ? # % | & \\ espace"; return 1; }
+    # Le motif est stocké dans une variable : une regex non quotée contenant & ou |
+    # dans [[ =~ ]] casse le parseur de bash (reproduit sur 3.2, 4.4, 5.1, 5.2).
+    local forbidden='[[:space:]/@:?#%|&\]'
+    [[ ${#pwd} -ge 12 ]]               || { echo "Au moins 12 caractères requis"; return 1; }
+    [[ ! "$pwd" =~ $forbidden ]]       || { echo "Caractères interdits : / @ : ? # % | & \\ espace"; return 1; }
     return 0
 }
 
@@ -304,7 +307,7 @@ NODE_ENV=production
 PORT=4000
 CORS_ORIGIN=https://localhost
 
-# ─── OpenCTI (optionnel, non implémenté) ────────────────────────────────────
+# ─── OpenCTI (optionnel, désactivé par défaut) ──────────────────────────────
 OPENCTI_ENABLED=false
 OPENCTI_URL=
 OPENCTI_TOKEN=

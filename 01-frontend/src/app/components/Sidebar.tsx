@@ -15,6 +15,7 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { useLogout } from "../../hooks/useLogout";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useCurrentIncident } from "../../hooks/useCurrentIncident";
 
 interface NavItem {
   path: string;
@@ -68,7 +69,9 @@ export default function Sidebar() {
   const { incidentId } = useParams<{ incidentId: string }>();
   const handleLogout = useLogout();
   const currentUser = useAppStore((s) => s.currentUser);
-  const currentIncident = useAppStore((s) => s.currentIncident);
+  // Récupère l'incident depuis le store, ou le charge si absent (ex. rechargement
+  // direct d'une route profonde / page 404), pour afficher son nom plutôt que l'UUID.
+  const { incident: currentIncident } = useCurrentIncident();
   const hasPermission = useAppStore((s) => s.hasPermission);
 
   // Replié manuellement (persisté) OU forcé sous le seuil tablette (< 1024px)

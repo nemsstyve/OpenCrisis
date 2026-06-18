@@ -270,7 +270,11 @@ function DocumentTable({
                     </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <span className="text-xs text-gray-500 font-mono">{doc.mimeType.split("/")[1] ?? doc.mimeType}</span>
+                    <span className="text-xs text-gray-500 font-mono uppercase">
+                      {doc.name.includes(".")
+                        ? doc.name.split(".").pop()
+                        : doc.mimeType.split("/")[1] ?? doc.mimeType}
+                    </span>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
                     {formatBytes(doc.sizeBytes)}

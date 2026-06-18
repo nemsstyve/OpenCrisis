@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
 import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
-import { getUserReadableResources, type AuthRequest } from '../middleware/httpPermission';
+import { getUserReadableResources, passwordChangeRequired, type AuthRequest } from '../middleware/httpPermission';
 import { logAudit } from '../middleware/audit';
 
 const router = Router();
@@ -62,6 +62,13 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
   try {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
+
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
 
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {
@@ -173,6 +180,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
 
+    // Mot de passe temporaire non changé : refuser l'export (cohérent avec
+    // requirePermission / requireHttpPermission).
+    if (await passwordChangeRequired(userId)) {
+      res.status(403).json({ error: 'Changement de mot de passe requis' });
+      return;
+    }
+
     const accessibleCells = await getAccessibleCells(userId);
     if (accessibleCells.length === 0) {
       res.status(403).json({ error: 'Permission refusée' });
@@ -215,8 +229,8 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     ];
     infoSheet.getColumn('label').font = { bold: true };
     infoSheet.addRows([
-      { label: 'Nom', value: incident.name },
-      { label: 'Description', value: incident.description ?? '' },
+      { label: 'Nom', value: xlsxSafeString(incident.name) },
+      { label: 'Description', value: xlsxSafeString(incident.description ?? '') },
       { label: 'Statut', value: incident.status },
       { label: 'Sévérité', value: incident.severity },
       { label: 'Ouvert le', value: new Date(incident.startedAt).toLocaleString('fr-FR') },
@@ -247,10 +261,10 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     for (const entry of entries) {
       const row = logSheet.addRow({
         createdAt: new Date(entry.createdAt).toLocaleString('fr-FR'),
-        author: `${entry.author.firstName} ${entry.author.lastName}`,
+        author: xlsxSafeString(`${entry.author.firstName} ${entry.author.lastName}`),
         cell: CELL_LABELS_SHORT[entry.cell] ?? entry.cell,
-        content: entry.content,
-        tags: entry.tags.map((t) => t.tag.name).join(', '),
+        content: xlsxSafeString(entry.content),
+        tags: xlsxSafeString(entry.tags.map((t) => t.tag.name).join(', ')),
         isEdited: entry.isEdited ? 'Oui' : 'Non',
       });
       row.getCell('content').alignment = { wrapText: true, vertical: 'top' };
@@ -286,13 +300,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       const row = tlSheet.addRow({
         occurredAt: new Date(event.occurredAt).toLocaleString('fr-FR'),
         type: TYPE_LABELS[event.type] ?? event.type,
-        title: event.title,
-        description: event.description ?? '',
-        actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
-        assetName: event.assetName ?? '',
-        ipAddress: event.ipAddress ?? '',
+        title: xlsxSafeString(event.title),
+        description: xlsxSafeString(event.description ?? ''),
+        actor: xlsxSafeString(event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : ''),
+        assetName: xlsxSafeString(event.assetName ?? ''),
+        ipAddress: xlsxSafeString(event.ipAddress ?? ''),
         ioc: formatIocsForExport(event.ioc),
-        affectedUser: event.affectedUser ?? '',
+        affectedUser: xlsxSafeString(event.affectedUser ?? ''),
       });
       row.getCell('ioc').alignment = { wrapText: true, vertical: 'top' };
     }

@@ -215,8 +215,8 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     ];
     infoSheet.getColumn('label').font = { bold: true };
     infoSheet.addRows([
-      { label: 'Nom', value: incident.name },
-      { label: 'Description', value: incident.description ?? '' },
+      { label: 'Nom', value: xlsxSafeString(incident.name) },
+      { label: 'Description', value: xlsxSafeString(incident.description ?? '') },
       { label: 'Statut', value: incident.status },
       { label: 'Sévérité', value: incident.severity },
       { label: 'Ouvert le', value: new Date(incident.startedAt).toLocaleString('fr-FR') },
@@ -247,10 +247,10 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     for (const entry of entries) {
       const row = logSheet.addRow({
         createdAt: new Date(entry.createdAt).toLocaleString('fr-FR'),
-        author: `${entry.author.firstName} ${entry.author.lastName}`,
+        author: xlsxSafeString(`${entry.author.firstName} ${entry.author.lastName}`),
         cell: CELL_LABELS_SHORT[entry.cell] ?? entry.cell,
-        content: entry.content,
-        tags: entry.tags.map((t) => t.tag.name).join(', '),
+        content: xlsxSafeString(entry.content),
+        tags: xlsxSafeString(entry.tags.map((t) => t.tag.name).join(', ')),
         isEdited: entry.isEdited ? 'Oui' : 'Non',
       });
       row.getCell('content').alignment = { wrapText: true, vertical: 'top' };
@@ -286,13 +286,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       const row = tlSheet.addRow({
         occurredAt: new Date(event.occurredAt).toLocaleString('fr-FR'),
         type: TYPE_LABELS[event.type] ?? event.type,
-        title: event.title,
-        description: event.description ?? '',
-        actor: event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : '',
-        assetName: event.assetName ?? '',
-        ipAddress: event.ipAddress ?? '',
+        title: xlsxSafeString(event.title),
+        description: xlsxSafeString(event.description ?? ''),
+        actor: xlsxSafeString(event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : ''),
+        assetName: xlsxSafeString(event.assetName ?? ''),
+        ipAddress: xlsxSafeString(event.ipAddress ?? ''),
         ioc: formatIocsForExport(event.ioc),
-        affectedUser: event.affectedUser ?? '',
+        affectedUser: xlsxSafeString(event.affectedUser ?? ''),
       });
       row.getCell('ioc').alignment = { wrapText: true, vertical: 'top' };
     }

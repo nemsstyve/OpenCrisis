@@ -126,10 +126,12 @@ trivy_fs_scan:
     entrypoint: [""]
   script:
     - trivy fs . --severity HIGH,CRITICAL --format json --output trivy-fs-report.json --no-progress || true
+    - trivy config . --severity HIGH,CRITICAL --format json --output trivy-config-report.json || true
   artifacts:
     when: always
     paths:
       - trivy-fs-report.json
+      - trivy-config-report.json
     expire_in: 1 week
   allow_failure: true
 

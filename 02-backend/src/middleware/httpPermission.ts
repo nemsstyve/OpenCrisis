@@ -21,6 +21,12 @@ export async function requireHttpPermission(
     return false;
   }
 
+  // Mot de passe temporaire non changé : aucune opération REST gardée autorisée.
+  if (user.mustChangePassword) {
+    res.status(403).json({ error: 'Changement de mot de passe requis' });
+    return false;
+  }
+
   const allowed = user.roleAssignments.some(ra =>
     ra.role.permissions.some(
       rp => rp.permission.resource === resource && rp.permission.action === action,

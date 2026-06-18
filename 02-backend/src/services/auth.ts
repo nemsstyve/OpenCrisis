@@ -96,7 +96,10 @@ export async function login(
   // C1 — vérifier le rate limit avant tout traitement
   checkLoginRateLimit(ipAddress ?? 'unknown');
 
-  const user = await findActiveUser({ email });
+  // Email insensible à la casse : normalisé à la connexion comme à la création
+  // (adminCreateUserSchema applique aussi .toLowerCase()).
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await findActiveUser({ email: normalizedEmail });
 
   // C4 — anti-timing : toujours exécuter bcrypt même si l'utilisateur est introuvable
   const DUMMY_HASH = '$2a$12$invalidhashpaddingtoconstanttime000000000000000000000000';

@@ -37,9 +37,7 @@ lint_front:
     - install_front
   script:
     - cd 01-frontend
-    - npx eslint . \
-        --format eslint-formatter-gitlab \
-        --output-file gl-codequality.json
+    - npx eslint . --format eslint-formatter-gitlab --output-file gl-codequality.json
   artifacts:
     reports:
       codequality: 01-frontend/gl-codequality.json

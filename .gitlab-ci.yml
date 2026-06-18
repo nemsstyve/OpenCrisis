@@ -48,7 +48,7 @@ lint_back:
   dependencies:
     - install_back
   script:
-    - cd 02-backtend
+    - cd 02-backend
     - npx eslint . --format eslint-formatter-gitlab --output-file gl-codequality.json
   artifacts:
     reports:

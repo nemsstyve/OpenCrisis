@@ -140,5 +140,3 @@ trivy_fs_scan:
       - trivy-config-report.json
     expire_in: 1 hour
   allow_failure: true
-
-

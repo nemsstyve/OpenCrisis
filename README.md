@@ -91,3 +91,9 @@ opencrisis/
 ├── 03-nginx/             # Configuration Nginx
 └── 04-documentation/     # Documentation complète
 ```
+
+## Auteurs
+Pierre Moutiers, Vigine Zhang, Styve Nematcha, Ambre Traina, Sas0ri
+
+## Licence
+Apache 2.0 — voir le fichier LICENSE

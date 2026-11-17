@@ -55,7 +55,7 @@ export async function createUser(
   // C3 — validation de la complexité du mot de passe
   const result = passwordSchema.safeParse(data.password);
   if (!result.success) {
-    throw new GraphQLError(result.error.errors[0].message, {
+    throw new GraphQLError(result.error.issues[0].message, {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }
@@ -122,7 +122,7 @@ export async function resetPassword(userId: string, newPassword: string): Promis
   // C3 — valider la complexité et forcer le changement au prochain login
   const result = passwordSchema.safeParse(newPassword);
   if (!result.success) {
-    throw new GraphQLError(result.error.errors[0].message, {
+    throw new GraphQLError(result.error.issues[0].message, {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }

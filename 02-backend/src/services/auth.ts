@@ -177,7 +177,7 @@ export async function changePassword(
 ): Promise<boolean> {
   const result = passwordSchema.safeParse(newPassword);
   if (!result.success) {
-    throw new GraphQLError(result.error.errors[0].message, {
+    throw new GraphQLError(result.error.issues[0].message, {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }

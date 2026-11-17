@@ -1,9 +1,53 @@
 {
   "version": 1,
   "repository": "nemsstyve/opencrisis",
-  "tasks": [],
+  "tasks": [
+    {
+      "id": "cmvjycbyx00423dnz8dhl70i9",
+      "status": "DONE",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": "Intégration livrée par d066a39 (18/06/2026). Le 17/11/2026, b0ff90b rétablit le modèle IoC absent du schéma Prisma (migration 20261117000000_add_ioc_model). Migration non rejouée sur une base réelle dans cette vérification."
+    },
+    {
+      "id": "cmvjycbyx00433dnzlt4x6su4",
+      "status": "DONE",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": ".gitlab-ci.yml contient eslint (front et back), gitleaks, semgrep et Trivy. Les scans gitleaks et Trivy se terminent par « || true » et ne bloquent donc pas le pipeline. Le 17/11/2026, 5cf8e27 met à jour les dépendances vulnérables du backend (package-lock.json)."
+    },
+    {
+      "id": "cmvjycbyy004a3dnzbbp3iv04",
+      "status": "IN_PROGRESS",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": "Premier fichier de tests : 02-backend/tests/incident-lifecycle.test.mjs (b0e2607), 6 tests node:test réussis le 17/11/2026 avec Node 24. Aucun script npm test dans 02-backend/package.json ; les autres modules ne sont pas couverts."
+    }
+  ],
   "milestones": [],
   "deliverables": [],
   "indicators": [],
-  "additions": []
+  "additions": [
+    {
+      "key": "tableau-de-bord-global",
+      "title": "Tableau de bord global des incidents",
+      "description": "Vue d'ensemble de toutes les crises en cours, accessible depuis le menu.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": "8aede91 (17/11/2026) : page 01-frontend/src/app/pages/GlobalDashboard.tsx, route et entrée du menu. Code présent ; ni compilation ni test d'interface dans cette vérification."
+    },
+    {
+      "key": "cycle-de-vie-incidents",
+      "title": "Règles de clôture et de réouverture des incidents",
+      "description": "Un incident suit des étapes contrôlées : actif, contenu, clos, avec une date de résolution cohérente.",
+      "status": "DONE",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": "b0e2607 (17/11/2026) : 02-backend/src/services/incidentLifecycle.ts appelé par le service incident. 6 tests réussis (fermeture, confinement, réouverture, transitions refusées). Non vérifié sur un déploiement."
+    },
+    {
+      "key": "acces-lab-deteris",
+      "title": "Accès limité au réseau du lab et lecture par Détéris",
+      "description": "Le service n'écoute plus que sur le réseau du lab et l'accès privé, et Détéris peut lire les incidents.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-17T13:16:40+01:00",
+      "evidence": "b0ff90b (17/11/2026) : docker-compose.yml publie les ports 80 et 443 uniquement sur LAN_IP et TAILSCALE_IP ; nginx ajoute /graphql en POST seul vers le backend et retire une suite TLS inexistante. Configuration non testée sur le lab dans cette vérification."
+    }
+  ]
 }

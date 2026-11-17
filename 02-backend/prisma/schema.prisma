@@ -32,6 +32,7 @@ model User {
   contacts        Contact[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+  createdIoCs     IoC[]
 
   @@index([deletedAt])
   @@index([isActive])
@@ -186,6 +187,7 @@ model TimelineEvent {
   incident  Incident   @relation(fields: [incidentId], references: [id])
   actor     User?      @relation(fields: [actorId], references: [id])
   documents Document[]
+  iocs      IoC[]
 
   @@index([incidentId, occurredAt])
   @@index([deletedAt])
@@ -312,4 +314,36 @@ enum PermissionResource {
   BIBLIOTHEQUE
   ANNUAIRE
   ADMIN
+}
+
+
+// --- INDICATEURS DE COMPROMISSION (IoC) ---
+
+model IoC {
+  id              String        @id @default(uuid())
+  timelineEventId String
+  type            IoCType
+  value           String
+  description     String?
+  createdAt       DateTime      @default(now())
+  createdById     String
+
+  timelineEvent TimelineEvent @relation(fields: [timelineEventId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([timelineEventId, createdAt])
+  @@index([createdById])
+}
+
+enum IoCType {
+  IPV4
+  IPV6
+  HASH_MD5
+  HASH_SHA1
+  HASH_SHA256
+  DOMAIN
+  URL
+  EMAIL
+  YARA
+  OTHER
 }

@@ -3,6 +3,10 @@ import type { IncidentStatus, Severity } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
+import {
+  planIncidentLifecycle,
+  IncidentLifecycleError,
+} from './incidentLifecycle';
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -73,12 +77,27 @@ export async function updateIncident(
 ) {
   const existing = await getIncident(id);
 
+  let lifecycle;
+  try {
+    lifecycle = planIncidentLifecycle(existing, input, new Date());
+  } catch (error) {
+    if (error instanceof IncidentLifecycleError) {
+      throw new GraphQLError(error.message, {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+    throw error;
+  }
+
   const incident = await prisma.incident.update({
     where: { id },
     data: {
       ...(input.name != null && { name: input.name }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.status != null && { status: input.status, resolvedAt: input.status === 'CLOSED' ? new Date() : existing.resolvedAt }),
+      ...(input.status != null && {
+        status: lifecycle.status,
+        resolvedAt: lifecycle.resolvedAt,
+      }),
       ...(input.severity != null && { severity: input.severity }),
     },
   });

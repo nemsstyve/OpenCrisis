@@ -89,7 +89,30 @@ export default function Sidebar() {
     });
   }
 
-  const navSections = incidentId ? buildNavSections(incidentId) : [];
+  const globalSections: NavSection[] = [
+    {
+      title: "Espace general",
+      items: [
+        {
+          path: "/dashboard",
+          label: "Vue generale",
+          icon: LayoutDashboard,
+          permission: "DASHBOARD",
+        },
+        {
+          path: "/incidents",
+          label: "Tous les incidents",
+          icon: FileText,
+          permission: "DASHBOARD",
+        },
+      ],
+    },
+  ];
+
+  const navSections = [
+    ...globalSections,
+    ...(incidentId ? buildNavSections(incidentId) : []),
+  ];
   const visibleSections = navSections
     .map((section) => ({
       ...section,

@@ -21,7 +21,7 @@ export default function Login() {
 
   // Déjà connecté → rediriger via composant (pas d'appel navigate pendant le rendu)
   if (isAuthenticated && currentUser) {
-    const from = (location.state as { from?: string })?.from ?? "/incidents";
+    const from = (location.state as { from?: string })?.from ?? "/dashboard";
     return <Navigate to={from} replace />;
   }
 
@@ -33,7 +33,7 @@ export default function Login() {
         navigate("/change-password", { replace: true });
         return;
       }
-      const from = (location.state as { from?: string })?.from ?? "/incidents";
+      const from = (location.state as { from?: string })?.from ?? "/dashboard";
       navigate(from, { replace: true });
     } catch (err: unknown) {
       const graphqlMsg =

@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import IncidentSelector from "./pages/IncidentSelector";
 import Dashboard from "./pages/Dashboard";
+import GlobalDashboard from "./pages/GlobalDashboard";
 import Annuaire from "./pages/Annuaire";
 import Bibliotheque from "./pages/Bibliotheque";
 import MainCouranteDirection from "./pages/MainCouranteDirection";
@@ -22,7 +23,7 @@ function guarded(resource: string, Page: React.ComponentType) {
 export const router = createBrowserRouter([
   {
     path: "/",
-    loader: () => redirect("/incidents"),
+    loader: () => redirect("/dashboard"),
   },
   {
     path: "/login",
@@ -36,6 +37,16 @@ export const router = createBrowserRouter([
   {
     Component: ProtectedOutlet,
     children: [
+      {
+        path: "/dashboard",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("DASHBOARD", GlobalDashboard),
+          },
+        ],
+      },
       {
         path: "/incidents",
         Component: IncidentSelector,

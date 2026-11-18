@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
 import { assertIncidentWritable } from './incident';
+import { requireTenantId } from '../middleware/tenant';
 
 const LOG_ENTRY_INCLUDE = {
   author: true,
@@ -39,7 +40,7 @@ export async function createLogEntry(
   authorId: string,
   ipAddress?: string | null,
 ) {
-  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
+  await assertIncidentWritable(incidentId, authorId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const entry = await prisma.logEntry.create({
     data: { incidentId, cell, content, authorId },
     include: LOG_ENTRY_INCLUDE,
@@ -57,7 +58,7 @@ export async function editLogEntry(
 ) {
   const existing = await prisma.logEntry.findFirst({ where: { id, deletedAt: null }, select: { incidentId: true } });
   if (!existing) throw new GraphQLError('Entrée introuvable', { extensions: { code: 'NOT_FOUND' } });
-  await assertIncidentWritable(existing.incidentId); // F1 — refuser l'édition sur un incident clôturé
+  await assertIncidentWritable(existing.incidentId, editedById); // F1 — refuser l'édition sur un incident clôturé
   const entry = await prisma.logEntry.update({
     where: { id },
     data: { content, isEdited: true, editedAt: new Date(), editedById },
@@ -75,22 +76,118 @@ export async function deleteLogEntry(id: string, userId: string, ipAddress?: str
   return true;
 }
 
-export async function addTagToLogEntry(logEntryId: string, tagId: string, userId: string) {
-  const entry = await getEntry(logEntryId);
-  await assertIncidentWritable(entry.incidentId);
+async function getScopedTagEntry(
+  logEntryId: string,
+  tagId: string,
+  userId: string,
+) {
+  const tenantId = await requireTenantId({
+    userId,
+    req: null,
+    res: null,
+  });
+
+  const entry = await prisma.logEntry.findFirst({
+    where: {
+      id: logEntryId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
+    select: { id: true, incidentId: true },
+  });
+
+  if (!entry) {
+    throw new GraphQLError('Entrée introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
+
+  const tag = await prisma.tag.findFirst({
+    where: { id: tagId, tenantId },
+    select: { id: true },
+  });
+
+  if (!tag) {
+    throw new GraphQLError('Tag introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
+
+  await assertIncidentWritable(entry.incidentId, userId);
+
+  return { entry, tenantId };
+}
+
+export async function addTagToLogEntry(
+  logEntryId: string,
+  tagId: string,
+  userId: string,
+) {
+  const { entry } = await getScopedTagEntry(
+    logEntryId,
+    tagId,
+    userId,
+  );
+
+  // Le trigger LogEntryTag_tenant_guard effectue aussi
+  // le controle des deux tenants dans PostgreSQL.
   await prisma.logEntryTag.upsert({
     where: { logEntryId_tagId: { logEntryId, tagId } },
     create: { logEntryId, tagId },
     update: {},
   });
-  logAudit({ userId, action: 'TAG_ADD', resource: 'MAIN_COURANTE', resourceId: logEntryId, incidentId: entry.incidentId });
+
+  logAudit({
+    userId,
+    action: 'TAG_ADD',
+    resource: 'MAIN_COURANTE',
+    resourceId: logEntryId,
+    incidentId: entry.incidentId,
+  });
+
   return getEntry(logEntryId);
 }
 
-export async function removeTagFromLogEntry(logEntryId: string, tagId: string, userId: string) {
-  const entry = await getEntry(logEntryId);
-  await assertIncidentWritable(entry.incidentId);
-  await prisma.logEntryTag.deleteMany({ where: { logEntryId, tagId } });
-  logAudit({ userId, action: 'TAG_REMOVE', resource: 'MAIN_COURANTE', resourceId: logEntryId, incidentId: entry.incidentId });
+export async function removeTagFromLogEntry(
+  logEntryId: string,
+  tagId: string,
+  userId: string,
+) {
+  const { entry, tenantId } = await getScopedTagEntry(
+    logEntryId,
+    tagId,
+    userId,
+  );
+
+  // Protection maintenue au moment du DELETE SQL,
+  // y compris si les relations ont change entre-temps.
+  await prisma.logEntryTag.deleteMany({
+    where: {
+      logEntryId,
+      tagId,
+      logEntry: {
+        deletedAt: null,
+        incident: {
+          tenantId,
+          deletedAt: null,
+        },
+      },
+      tag: {
+        tenantId,
+      },
+    },
+  });
+
+  logAudit({
+    userId,
+    action: 'TAG_REMOVE',
+    resource: 'MAIN_COURANTE',
+    resourceId: logEntryId,
+    incidentId: entry.incidentId,
+  });
+
   return getEntry(logEntryId);
 }

@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAuth } from '../middleware/rbac';
+import { requireTenantId } from '../middleware/tenant';
 import { logAudit } from '../middleware/audit';
 import { validate, adminCreateUserSchema, adminUpdateUserSchema, adminCreateRoleSchema, passwordSchema } from '../utils/validation';
 import * as adminService from '../services/admin';
@@ -26,12 +27,14 @@ export const adminResolvers = {
   Query: {
     adminUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ADMIN', 'READ');
-      return adminService.getUsers();
+      const tenantId = await requireTenantId(ctx);
+      return adminService.getUsers(tenantId);
     },
 
     adminRoles: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ADMIN', 'READ');
-      const roles = await adminService.getRoles();
+      const tenantId = await requireTenantId(ctx);
+      const roles = await adminService.getRoles(tenantId);
       return roles.map(mapRoleDetail);
     },
 
@@ -46,7 +49,9 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'READ');
-      const { items, total } = await adminService.getAuditLogs(args);
+      const tenantId = await requireTenantId(ctx);
+      const { items, total } =
+        await adminService.getAuditLogs(tenantId, args);
       return {
         total,
         items: items.map((log) => ({
@@ -66,8 +71,10 @@ export const adminResolvers = {
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
       const data = validate(adminCreateUserSchema, input);
-      const user = await adminService.createUser(data, roleIds);
-      logAudit({ userId: ctx.userId, action: 'CREATE', resource: 'ADMIN', resourceId: user.id, metadata: { target: 'user', email: input.email } });
+      const tenantId = await requireTenantId(ctx);
+      const user = await adminService.createUser(
+        data, roleIds, tenantId, requireAuth(ctx),
+      );
       return user;
     },
 
@@ -83,8 +90,9 @@ export const adminResolvers = {
         });
       }
       const data = validate(adminUpdateUserSchema, input);
-      const user = await adminService.updateUser(id, data);
-      logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: id, metadata: { target: 'user' } });
+      const tenantId = await requireTenantId(ctx);
+      const user = await adminService.updateUser(
+        id, data, tenantId, requireAuth(ctx),);
       return user;
     },
 
@@ -95,8 +103,8 @@ export const adminResolvers = {
           extensions: { code: 'FORBIDDEN' },
         });
       }
-      const deleted = await adminService.deleteUser(id);
-      logAudit({ userId: ctx.userId, action: 'DELETE', resource: 'ADMIN', resourceId: id, metadata: { target: 'user' } });
+      const tenantId = await requireTenantId(ctx);
+      const deleted = await adminService.deleteUser(id, tenantId, requireAuth(ctx));
       return deleted;
     },
 
@@ -106,8 +114,10 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const assigned = await adminService.assignRole(userId, roleId);
-      logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'role_assign', roleId } });
+      const tenantId = await requireTenantId(ctx);
+      const assigned = await adminService.assignRole(
+        userId, roleId, tenantId, requireAuth(ctx),
+      );
       return assigned;
     },
 
@@ -117,8 +127,9 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const removed = await adminService.removeRole(userId, roleId);
-      logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'role_remove', roleId } });
+      const tenantId = await requireTenantId(ctx);
+      const removed = await adminService.removeRole(
+        userId, roleId, tenantId, requireAuth(ctx),);
       return removed;
     },
 
@@ -129,15 +140,18 @@ export const adminResolvers = {
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
       const data = validate(adminCreateRoleSchema, input);
-      const role = await adminService.createRole(data);
-      logAudit({ userId: ctx.userId, action: 'CREATE', resource: 'ADMIN', resourceId: role.id, metadata: { target: 'role', name: input.name } });
+      const tenantId = await requireTenantId(ctx);
+      const role = await adminService.createRole(
+        data, tenantId, requireAuth(ctx),
+      );
       return mapRoleDetail(role);
     },
 
     adminDeleteRole: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const deletedRole = await adminService.deleteRole(id);
-      logAudit({ userId: ctx.userId, action: 'DELETE', resource: 'ADMIN', resourceId: id, metadata: { target: 'role' } });
+      const tenantId = await requireTenantId(ctx);
+      const deletedRole = await adminService.deleteRole(
+        id, tenantId, requireAuth(ctx),);
       return deletedRole;
     },
 
@@ -147,8 +161,10 @@ export const adminResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
-      const role = await adminService.updateRolePermissions(roleId, permissionIds);
-      logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: roleId, metadata: { target: 'role_permissions', count: permissionIds.length } });
+      const tenantId = await requireTenantId(ctx);
+      const role = await adminService.updateRolePermissions(
+        roleId, permissionIds, tenantId, requireAuth(ctx),
+      );
       return mapRoleDetail(role);
     },
 
@@ -159,8 +175,9 @@ export const adminResolvers = {
     ) => {
       await requirePermission(ctx, 'ADMIN', 'WRITE');
       validate(passwordSchema, newPassword);
-      const reset = await adminService.resetPassword(userId, newPassword);
-      logAudit({ userId: ctx.userId, action: 'UPDATE', resource: 'ADMIN', resourceId: userId, metadata: { target: 'password_reset' } });
+      const tenantId = await requireTenantId(ctx);
+      const reset = await adminService.resetPassword(
+        userId, newPassword, tenantId, requireAuth(ctx),);
       return reset;
     },
   },

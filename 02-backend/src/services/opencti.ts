@@ -1,5 +1,6 @@
 import { GraphQLError } from 'graphql';
 import { prisma } from '../prisma';
+import { requireTenantId } from '../middleware/tenant';
 import { logAudit } from '../middleware/audit';
 
 const OPENCTI_ENABLED = process.env.OPENCTI_ENABLED === 'true';
@@ -7,6 +8,17 @@ const OPENCTI_URL = process.env.OPENCTI_URL ?? '';
 const OPENCTI_TOKEN = process.env.OPENCTI_TOKEN ?? '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+function rejectSharedOpenCTI(): never {
+  throw new GraphQLError(
+    'Intégration OpenCTI externe suspendue : isolation par entreprise non configurée',
+    { extensions: { code: 'FORBIDDEN' } },
+  );
+}
+
+function blockExternalOpenCTI(): void {
+  rejectSharedOpenCTI();
+}
 
 export interface OpenCTIEntity {
   id: string;
@@ -62,6 +74,7 @@ async function openctiQuery(query: string, variables: Record<string, unknown> = 
 
 export async function searchOpenCTIEntities(query: string): Promise<OpenCTIEntity[]> {
   checkEnabled();
+  blockExternalOpenCTI();
 
   const gql = `
     query SearchEntities($search: String!) {
@@ -129,16 +142,62 @@ export async function linkTimelineEventToOpenCTI(
 ) {
   checkEnabled();
 
-  const event = await prisma.timelineEvent.findFirst({ where: { id: eventId, deletedAt: null } });
+  const tenantId = await requireTenantId({
+    userId,
+    req: null,
+    res: null,
+  });
+
+  const event = await prisma.timelineEvent.findFirst({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
+    select: { incidentId: true },
+  });
   if (!event) {
     throw new GraphQLError('Événement introuvable', { extensions: { code: 'NOT_FOUND' } });
   }
 
-  const updated = await prisma.timelineEvent.update({
-    where: { id: eventId },
+  const result = await prisma.timelineEvent.updateMany({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
     data: { openctiEntityId, openctiEntityType },
+  });
+
+  if (result.count !== 1) {
+    throw new GraphQLError('Événement introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
+
+  const updated = await prisma.timelineEvent.findFirst({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
     include: { actor: true },
   });
+
+  if (!updated) {
+    throw new GraphQLError('Événement introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
 
   logAudit({
     userId,
@@ -162,16 +221,65 @@ export async function unlinkTimelineEventFromOpenCTI(
 ) {
   checkEnabled();
 
-  const event = await prisma.timelineEvent.findFirst({ where: { id: eventId, deletedAt: null } });
+  const tenantId = await requireTenantId({
+    userId,
+    req: null,
+    res: null,
+  });
+
+  const event = await prisma.timelineEvent.findFirst({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
+    select: { incidentId: true },
+  });
   if (!event) {
     throw new GraphQLError('Événement introuvable', { extensions: { code: 'NOT_FOUND' } });
   }
 
-  const updated = await prisma.timelineEvent.update({
-    where: { id: eventId },
-    data: { openctiEntityId: null, openctiEntityType: null },
+  const result = await prisma.timelineEvent.updateMany({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
+    data: {
+      openctiEntityId: null,
+      openctiEntityType: null,
+    },
+  });
+
+  if (result.count !== 1) {
+    throw new GraphQLError('Événement introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
+
+  const updated = await prisma.timelineEvent.findFirst({
+    where: {
+      id: eventId,
+      deletedAt: null,
+      incident: {
+        tenantId,
+        deletedAt: null,
+      },
+    },
     include: { actor: true },
   });
+
+  if (!updated) {
+    throw new GraphQLError('Événement introuvable', {
+      extensions: { code: 'NOT_FOUND' },
+    });
+  }
 
   logAudit({
     userId,
@@ -193,6 +301,7 @@ export async function exportIncidentToOpenCTI(
   ipAddress?: string | null,
 ) {
   checkEnabled();
+  blockExternalOpenCTI();
 
   const incident = await prisma.incident.findFirst({
     where: { id: incidentId, deletedAt: null },
@@ -270,6 +379,7 @@ export async function createOpenCTIObservable(
   ip?: string,
 ): Promise<OpenCTIEntity> {
   checkEnabled();
+  blockExternalOpenCTI();
 
   if (!VALID_OBSERVABLE_TYPES.has(type)) {
     throw new GraphQLError(`Type d'observable non supporté : ${type}`, {

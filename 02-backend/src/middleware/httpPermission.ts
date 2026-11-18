@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { PermissionResource, PermissionAction } from '@prisma/client';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from '../services/auth';
+import { requireTenantId } from './tenant';
 
 export type AuthRequest = Request & { userId: string };
 
@@ -27,9 +28,31 @@ export async function requireHttpPermission(
     return false;
   }
 
+  // Deriver l'entreprise active depuis la base,
+  // jamais depuis les parametres du client.
+  let tenantId: string;
+  try {
+    tenantId = await requireTenantId({
+      userId: req.userId,
+      req,
+      res,
+    });
+  } catch {
+    res.status(403).json({
+      error: 'Entreprise non autorisée',
+    });
+    return false;
+  }
+
   const allowed = user.roleAssignments.some(ra =>
+    (
+      ra.role.isSystem
+        ? ra.role.tenantId === null
+        : ra.role.tenantId === tenantId
+    ) &&
     ra.role.permissions.some(
-      rp => rp.permission.resource === resource && rp.permission.action === action,
+      rp => rp.permission.resource === resource &&
+        rp.permission.action === action,
     ),
   );
 
@@ -61,9 +84,33 @@ export async function getUserReadableResources(userId: string): Promise<Set<Perm
   });
 
   const resources = new Set<PermissionResource>();
-  if (!user) return resources;
+
+  // Aucun droit exportable si le compte n'est pas
+  // actif ou si le mot de passe doit etre change.
+  if (!user || user.mustChangePassword) {
+    return resources;
+  }
+
+  let tenantId: string;
+
+  try {
+    tenantId = await requireTenantId({
+      userId,
+      req: null,
+      res: null,
+    });
+  } catch {
+    // Echec ferme : entreprise absente ou inactive.
+    return resources;
+  }
 
   for (const ra of user.roleAssignments) {
+    const roleAllowed = ra.role.isSystem
+      ? ra.role.tenantId === null
+      : ra.role.tenantId === tenantId;
+
+    if (!roleAllowed) continue;
+
     for (const rp of ra.role.permissions) {
       if (rp.permission.action === 'READ') {
         resources.add(rp.permission.resource);

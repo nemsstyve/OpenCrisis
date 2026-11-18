@@ -48,7 +48,7 @@ export async function createTimelineEvent(
   userId: string,
   ipAddress?: string | null,
 ) {
-  await assertIncidentWritable(incidentId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
+  await assertIncidentWritable(incidentId, userId); // N5 — refuser l'écriture sur un incident supprimé/clôturé
   const createOp = prisma.timelineEvent.create({
     data: {
       incidentId,
@@ -101,7 +101,7 @@ export async function updateTimelineEvent(
   ipAddress?: string | null,
 ) {
   const existing = await getEvent(id); // garantit que l'événement existe et n'est pas supprimé
-  await assertIncidentWritable(existing.incidentId); // F1 — refuser l'édition sur un incident clôturé
+  await assertIncidentWritable(existing.incidentId, userId); // F1 — refuser l'édition sur un incident clôturé
   const updateOp = prisma.timelineEvent.update({
     where: { id },
     data: {

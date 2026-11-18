@@ -4,17 +4,22 @@ import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import type { Cell } from '@prisma/client';
 import { prisma } from '../prisma';
-import { verifyAccessToken, extractBearerToken } from '../middleware/auth';
+import { verifyActiveAccessToken, extractBearerToken } from '../middleware/auth';
 import { getUserReadableResources, passwordChangeRequired, type AuthRequest } from '../middleware/httpPermission';
 import { logAudit } from '../middleware/audit';
+import { requireTenantId } from '../middleware/tenant';
 
 const router = Router();
 
 // ─── Middleware d'authentification ────────────────────────────────────────────
 
-function requireAuth(req: Request, res: Response, next: NextFunction): void {
+async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   const token = extractBearerToken(req.headers.authorization);
-  const payload = token ? verifyAccessToken(token) : null;
+  const payload = token ? await verifyActiveAccessToken(token) : null;
   if (!payload) { res.status(401).json({ error: 'Non authentifié' }); return; }
   (req as AuthRequest).userId = payload.userId;
   next();
@@ -63,6 +68,13 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
 
+    // Entreprise issue exclusivement de l'utilisateur authentifie.
+    const tenantId = await requireTenantId({
+      userId,
+      req,
+      res,
+    });
+
     // Mot de passe temporaire non changé : refuser l'export (cohérent avec
     // requirePermission / requireHttpPermission).
     if (await passwordChangeRequired(userId)) {
@@ -77,9 +89,23 @@ router.get('/:incidentId/pdf', requireAuth, async (req, res) => {
     }
 
     const [incident, entries] = await Promise.all([
-      prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
+      prisma.incident.findFirst({
+        where: {
+          id: incidentId,
+          tenantId,
+          deletedAt: null,
+        },
+      }),
       prisma.logEntry.findMany({
-        where: { incidentId, deletedAt: null, cell: { in: accessibleCells } },
+        where: {
+          incidentId,
+          deletedAt: null,
+          cell: { in: accessibleCells },
+          incident: {
+            tenantId,
+            deletedAt: null,
+          },
+        },
         include: {
           author: { select: { firstName: true, lastName: true } },
           tags: { include: { tag: { select: { name: true } } } },
@@ -180,6 +206,13 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     const { incidentId } = req.params;
     const userId = (req as AuthRequest).userId;
 
+    // Entreprise issue exclusivement de l'utilisateur authentifie.
+    const tenantId = await requireTenantId({
+      userId,
+      req,
+      res,
+    });
+
     // Mot de passe temporaire non changé : refuser l'export (cohérent avec
     // requirePermission / requireHttpPermission).
     if (await passwordChangeRequired(userId)) {
@@ -197,9 +230,23 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
     const canReadTimeline = (await getUserReadableResources(userId)).has('TIMELINE');
 
     const [incident, entries, timelineEvents] = await Promise.all([
-      prisma.incident.findFirst({ where: { id: incidentId, deletedAt: null } }),
+      prisma.incident.findFirst({
+        where: {
+          id: incidentId,
+          tenantId,
+          deletedAt: null,
+        },
+      }),
       prisma.logEntry.findMany({
-        where: { incidentId, deletedAt: null, cell: { in: accessibleCells } },
+        where: {
+          incidentId,
+          deletedAt: null,
+          cell: { in: accessibleCells },
+          incident: {
+            tenantId,
+            deletedAt: null,
+          },
+        },
         include: {
           author: { select: { firstName: true, lastName: true } },
           tags: { include: { tag: { select: { name: true } } } },
@@ -208,7 +255,14 @@ router.get('/:incidentId/xlsx', requireAuth, async (req, res) => {
       }),
       canReadTimeline
         ? prisma.timelineEvent.findMany({
-            where: { incidentId, deletedAt: null },
+            where: {
+              incidentId,
+              deletedAt: null,
+              incident: {
+                tenantId,
+                deletedAt: null,
+              },
+            },
             include: { actor: { select: { firstName: true, lastName: true } } },
             orderBy: { occurredAt: 'asc' },
           })

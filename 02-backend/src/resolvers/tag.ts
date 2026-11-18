@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { GraphQLContext } from '../context';
 import { hasPermission, requireAuth } from '../middleware/rbac';
+import { requireTenantId } from '../middleware/tenant';
 import { validate, createTagSchema } from '../utils/validation';
 import { getTags, createTag, deleteTag } from '../services/tag';
 
@@ -8,7 +9,7 @@ export const tagResolvers = {
   Query: {
     tags: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireAuth(ctx);
-      return getTags();
+      return getTags(await requireTenantId(ctx));
     },
   },
 
@@ -25,7 +26,12 @@ export const tagResolvers = {
         await hasPermission(ctx, 'MAIN_COURANTE_OPS', 'WRITE');
       if (!canWrite) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
       const data = validate(createTagSchema, { name, color });
-      return createTag(data.name, data.color, userId);
+      return createTag(
+        data.name,
+        data.color,
+        userId,
+        await requireTenantId(ctx),
+      );
     },
 
     deleteTag: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
@@ -34,7 +40,7 @@ export const tagResolvers = {
         await hasPermission(ctx, 'MAIN_COURANTE_DIR', 'WRITE') ||
         await hasPermission(ctx, 'MAIN_COURANTE_OPS', 'WRITE');
       if (!canWrite) throw new GraphQLError('Permission refusée', { extensions: { code: 'FORBIDDEN' } });
-      return deleteTag(id, userId);
+      return deleteTag(id, userId, await requireTenantId(ctx));
     },
   },
 };

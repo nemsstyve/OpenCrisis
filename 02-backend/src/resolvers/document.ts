@@ -1,5 +1,8 @@
 import type { DocumentCategory } from '@prisma/client';
 import type { GraphQLContext } from '../context';
+import { requireTenantId } from '../middleware/tenant';
+import { getIncident } from '../services/incident';
+import { tenantEventFilter } from '../middleware/tenantEventFilter';
 import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { pubsub, TOPICS } from '../pubsub';
 import { getDocuments, getDocument, deleteDocument } from '../services/document';
@@ -12,11 +15,13 @@ export const documentResolvers = {
       ctx: GraphQLContext,
     ) => {
       await requirePermission(ctx, 'DOCUMENTS', 'READ');
-      return getDocuments(incidentId, category);
+      const tenantId = await requireTenantId(ctx);
+      return getDocuments(tenantId, incidentId, category);
     },
     document: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'DOCUMENTS', 'READ');
-      return getDocument(id);
+      const tenantId = await requireTenantId(ctx);
+      return getDocument(id, tenantId);
     },
   },
 
@@ -24,7 +29,8 @@ export const documentResolvers = {
     deleteDocument: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'DOCUMENTS', 'WRITE');
       const userId = requireAuth(ctx);
-      return deleteDocument(id, userId, ctx.req?.ip);
+      const tenantId = await requireTenantId(ctx);
+      return deleteDocument(id, userId, tenantId, ctx.req?.ip);
     },
   },
 
@@ -32,9 +38,18 @@ export const documentResolvers = {
     documentUploaded: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'DOCUMENTS', 'READ');
-        return authorizedIterator(
-          pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId)),
-          () => hasPermission(ctx, 'DOCUMENTS', 'READ'),
+        const tenantId = await requireTenantId(ctx);
+        await getIncident(incidentId, tenantId);
+
+        return tenantEventFilter(
+          authorizedIterator(
+            pubsub.asyncIterator(TOPICS.DOCUMENT_UPLOADED(incidentId)),
+            () => hasPermission(ctx, 'DOCUMENTS', 'READ'),
+            ctx,
+          ),
+          tenantId,
+          () => requireTenantId(ctx),
+          (event) => event?.documentUploaded?.tenantId,
         );
       },
     },

@@ -10,20 +10,49 @@ datasource db {
 
 // ─── IDENTITÉ & ACCÈS ─────────────────────────────────────────────────────────
 
+// --- ISOLATION MULTI-TENANT ---
+
+model Tenant {
+  incidentIngestionMode IncidentIngestionMode @default(MANUAL)
+  automaticCreationApproved Boolean @default(false)
+  incidentProposals IncidentProposal[]
+  wazuhConnectors WazuhConnector[]
+
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  incidents Incident[]
+  documents Document[]
+  roles     Role[]
+  auditLogs AuditLog[]
+  tags      Tag[]
+  contacts  Contact[]
+}
+
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  phone        String?
-  company      String?
-  site         String?
-  isActive            Boolean   @default(true)
-  mustChangePassword  Boolean   @default(false)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  deletedAt           DateTime?
+  reviewedIncidentProposals IncidentProposal[] @relation("IncidentProposalReviewer")
+
+  tenantId           String?
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  phone              String?
+  company            String?
+  site               String?
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  sessionVersion     Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   roleAssignments RoleAssignment[]
   logEntries      LogEntry[]
@@ -36,18 +65,24 @@ model User {
 
   @@index([deletedAt])
   @@index([isActive])
+  @@index([tenantId])
 }
 
 model Role {
-  id          String    @id @default(uuid())
-  name        String    @unique
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id          String   @id @default(uuid())
+  name        String
   description String?
-  isSystem    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   assignments RoleAssignment[]
   permissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Permission {
@@ -98,6 +133,10 @@ model RefreshToken {
 // ─── INCIDENT (WORKSPACE CENTRAL) ─────────────────────────────────────────────
 
 model Incident {
+  originatingProposal IncidentProposal?
+
+  tenantId      String?
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id            String         @id @default(uuid())
   name          String
   description   String?
@@ -119,6 +158,7 @@ model Incident {
   @@index([status])
   @@index([deletedAt])
   @@index([createdById])
+  @@index([tenantId])
 }
 
 // ─── MAIN COURANTE ────────────────────────────────────────────────────────────
@@ -146,11 +186,16 @@ model LogEntry {
 }
 
 model Tag {
-  id    String @id @default(uuid())
-  name  String @unique
-  color String @default("#6B7280")
+  id       String  @id @default(uuid())
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name     String
+  color    String  @default("#6B7280")
 
   logEntries LogEntryTag[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model LogEntryTag {
@@ -196,6 +241,8 @@ model TimelineEvent {
 // ─── DOCUMENTS, BIBLIOTHÈQUE & ARTEFACTS ──────────────────────────────────────
 
 model Document {
+  tenantId          String?
+  tenant            Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id                String           @id @default(uuid())
   incidentId        String?
   timelineEventId   String?
@@ -216,11 +263,14 @@ model Document {
 
   @@index([incidentId, deletedAt])
   @@index([uploadedById])
+  @@index([tenantId, incidentId])
 }
 
 // ─── ANNUAIRE ─────────────────────────────────────────────────────────────────
 
 model Contact {
+  tenantId     String?
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id           String    @id @default(uuid())
   firstName    String
   lastName     String
@@ -238,11 +288,14 @@ model Contact {
   createdBy User @relation(fields: [createdById], references: [id])
 
   @@index([deletedAt])
+  @@index([tenantId, deletedAt])
 }
 
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 
 model AuditLog {
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id         String   @id @default(uuid())
   userId     String?
   action     String
@@ -260,6 +313,7 @@ model AuditLog {
   @@index([userId])
   @@index([incidentId])
   @@index([resource, action])
+  @@index([tenantId, createdAt])
 }
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
@@ -316,20 +370,19 @@ enum PermissionResource {
   ADMIN
 }
 
-
 // --- INDICATEURS DE COMPROMISSION (IoC) ---
 
 model IoC {
-  id              String        @id @default(uuid())
+  id              String   @id @default(uuid())
   timelineEventId String
   type            IoCType
   value           String
   description     String?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime @default(now())
   createdById     String
 
   timelineEvent TimelineEvent @relation(fields: [timelineEventId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy     User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([timelineEventId, createdAt])
   @@index([createdById])
@@ -346,4 +399,76 @@ enum IoCType {
   EMAIL
   YARA
   OTHER
+}
+
+
+// Configuration de l'ingestion des alertes.
+enum IncidentIngestionMode {
+  MANUAL
+  SEMI_AUTOMATIC
+  AUTOMATIC
+}
+
+// Etat de traitement d'une proposition.
+enum IncidentProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+// Proposition issue d'une source externe authentifiee.
+// Aucun payload brut d'alerte n'est stocke ici.
+// Le tenant doit etre resolu cote serveur.
+model IncidentProposal {
+  id              String @id @default(uuid())
+  tenantId        String
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  sourceType      String
+  sourceId        String
+  externalEventId String
+
+  title           String
+  description     String?
+  severity        Severity
+  status          IncidentProposalStatus @default(PENDING)
+
+  reviewedById    String?
+  reviewedBy      User? @relation("IncidentProposalReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt      DateTime?
+
+  incidentId      String? @unique
+  incident        Incident? @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+
+  receivedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, sourceId, externalEventId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, severity])
+}
+
+
+// Identite machine d'une source Wazuh.
+// Le secret brut n'est jamais conserve en base.
+model WazuhConnector {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  name       String
+  sourceId   String
+  secretHash String   @db.VarChar(64)
+
+  isActive   Boolean  @default(true)
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, sourceId])
+  @@index([tenantId, isActive])
 }

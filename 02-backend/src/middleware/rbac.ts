@@ -4,6 +4,8 @@ import type { GraphQLContext } from '../context';
 import { prisma } from '../prisma';
 import { USER_INCLUDE } from '../services/auth';
 import { logAudit } from './audit';
+import { requireTenantId } from './tenant';
+import { verifyActiveAccessToken } from './auth';
 
 /**
  * Exige une session authentifiée et renvoie l'identifiant utilisateur garanti non-null.
@@ -33,8 +35,21 @@ export async function hasPermission(
   });
 
   if (!user) return false;
+  if (user.mustChangePassword) return false;
+
+  let tenantId: string;
+  try {
+    tenantId = await requireTenantId(ctx);
+  } catch {
+    return false;
+  }
 
   return user.roleAssignments.some(ra =>
+    (
+      ra.role.isSystem
+        ? ra.role.tenantId === null
+        : ra.role.tenantId === tenantId
+    ) &&
     ra.role.permissions.some(
       rp => rp.permission.resource === resource && rp.permission.action === action,
     ),
@@ -68,7 +83,14 @@ export async function requirePermission(
     });
   }
 
+  const tenantId = await requireTenantId(ctx);
+
   const hasPermission = user.roleAssignments.some(ra =>
+    (
+      ra.role.isSystem
+        ? ra.role.tenantId === null
+        : ra.role.tenantId === tenantId
+    ) &&
     ra.role.permissions.some(
       rp => rp.permission.resource === resource && rp.permission.action === action,
     ),
@@ -88,32 +110,60 @@ export async function requirePermission(
 }
 
 /**
- * N6 — ré-autorise un flux d'abonnement périodiquement.
- * Un utilisateur dont la permission est révoquée cesse de recevoir les événements
- * dans le délai cacheTtlMs (défaut 60s). Évite une requête DB par événement (F6).
- * Échec fermé : toute erreur d'autorisation supprime l'événement.
+ * Revalide chaque evenement d'abonnement :
+ * - JWT et version de session, sans cache ;
+ * - ressource concernee si applicable ;
+ * - permissions courantes, sans cache.
+ *
+ * Toute revocation ou erreur ferme le flux.
  */
 export async function* authorizedIterator<T>(
   source: AsyncIterator<T>,
   authorize: () => Promise<boolean>,
-  cacheTtlMs = 60_000,
+  ctx: GraphQLContext,
+  verifyResource?: () => Promise<void>,
+  filterEvent?: (event: T) => Promise<boolean>,
 ): AsyncGenerator<T> {
-  let lastCheck = 0;
-  let cachedAllowed = false;
   try {
     while (true) {
       const { value, done } = await source.next();
+
       if (done) return;
-      const now = Date.now();
-      if (now - lastCheck >= cacheTtlMs) {
-        try {
-          cachedAllowed = await authorize();
-        } catch {
-          cachedAllowed = false;
-        }
-        lastCheck = now;
+
+      // Authentification et version de session
+      // reverifiees avant chaque evenement.
+      if (!ctx.userId || !ctx.accessToken) return;
+
+      const payload = await verifyActiveAccessToken(
+        ctx.accessToken,
+      );
+
+      if (!payload || payload.userId !== ctx.userId) {
+        return;
       }
-      if (cachedAllowed) yield value;
+
+      try {
+        if (verifyResource) {
+          await verifyResource();
+        }
+
+        if (!(await authorize())) {
+          return;
+        }
+
+        // Un evenement peut devenir interdit alors
+        // que l'utilisateur conserve d'autres droits.
+        // On ignore cet evenement sans fermer
+        // l'abonnement toujours legitime.
+        if (filterEvent && !(await filterEvent(value))) {
+          continue;
+        }
+      } catch {
+        // Erreur de verification : fermer le flux.
+        return;
+      }
+
+      yield value;
     }
   } finally {
     await source.return?.(undefined);

@@ -1,4 +1,5 @@
 import type { GraphQLContext } from '../context';
+import { assertIncidentReadable } from '../middleware/tenant';
 import { requirePermission, requireAuth, hasPermission, authorizedIterator } from '../middleware/rbac';
 import { validate, createTimelineEventSchema, updateTimelineEventSchema } from '../utils/validation';
 import { pubsub, TOPICS } from '../pubsub';
@@ -11,11 +12,14 @@ export const timelineResolvers = {
   Query: {
     timelineEvents: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'TIMELINE', 'READ');
+      await assertIncidentReadable(incidentId, requireAuth(ctx));
       return getTimelineEvents(incidentId);
     },
     timelineEvent: async (_: unknown, { id }: { id: string }, ctx: GraphQLContext) => {
       await requirePermission(ctx, 'TIMELINE', 'READ');
-      return getTimelineEvent(id);
+      const event = await getTimelineEvent(id);
+      await assertIncidentReadable(event.incidentId, requireAuth(ctx));
+      return event;
     },
   },
 
@@ -53,9 +57,15 @@ export const timelineResolvers = {
     timelineEventAdded: {
       subscribe: async (_: unknown, { incidentId }: { incidentId: string }, ctx: GraphQLContext) => {
         await requirePermission(ctx, 'TIMELINE', 'READ');
+        await assertIncidentReadable(incidentId, requireAuth(ctx));
         return authorizedIterator(
           pubsub.asyncIterator(TOPICS.TIMELINE_EVENT_ADDED(incidentId)),
           () => hasPermission(ctx, 'TIMELINE', 'READ'),
+          ctx,
+          () => assertIncidentReadable(
+            incidentId,
+            requireAuth(ctx),
+          ),
         );
       },
     },

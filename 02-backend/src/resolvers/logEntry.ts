@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { Cell } from '@prisma/client';
 import type { GraphQLContext } from '../context';
+import { assertIncidentReadable } from '../middleware/tenant';
 import { requirePermission, hasPermission, requireAuth, authorizedIterator } from '../middleware/rbac';
 import { validate, createLogEntrySchema } from '../utils/validation';
 import { prisma } from '../prisma';
@@ -50,12 +51,27 @@ function subscribeLogEntry(topicFn: (incidentId: string, cell: Cell) => string) 
     { incidentId, cell }: { incidentId: string; cell?: Cell },
     ctx: GraphQLContext,
   ) => {
+    await assertIncidentReadable(incidentId, requireAuth(ctx));
     if (cell) {
-      const resource = cellToResource(cell);
-      await requirePermission(ctx, resource, 'READ');
+      // SHARED est lisible avec le droit sur
+      // au moins une des deux cellules principales.
+      const permittedCells = await readableCells(ctx);
+
+      if (!permittedCells.includes(cell)) {
+        throw new GraphQLError(
+          'Permission refusée',
+          { extensions: { code: 'FORBIDDEN' } },
+        );
+      }
+
       return authorizedIterator(
         pubsub.asyncIterator(topicFn(incidentId, cell)),
-        () => hasPermission(ctx, resource, 'READ'),
+        async () => (await readableCells(ctx)).includes(cell),
+        ctx,
+        () => assertIncidentReadable(
+          incidentId,
+          requireAuth(ctx),
+        ),
       );
     }
     const cells = await readableCells(ctx);
@@ -65,6 +81,31 @@ function subscribeLogEntry(topicFn: (incidentId: string, cell: Cell) => string) 
     return authorizedIterator(
       pubsub.asyncIterator(cells.map((c) => topicFn(incidentId, c))),
       async () => (await readableCells(ctx)).length > 0,
+      ctx,
+      () => assertIncidentReadable(
+        incidentId,
+        requireAuth(ctx),
+      ),
+      async (event) => {
+        // L'abonnement peut rester ouvert pour OPS
+        // meme apres la revocation du droit DIR.
+        // La cellule reelle de chaque message
+        // est alors verifiee avant sa diffusion.
+        const payload = event as {
+          logEntryAdded?: { cell: Cell };
+          logEntryUpdated?: { cell: Cell };
+        };
+
+        const eventCell =
+          payload.logEntryAdded?.cell ??
+          payload.logEntryUpdated?.cell;
+
+        if (!eventCell) return false;
+
+        return (await readableCells(ctx)).includes(
+          eventCell,
+        );
+      },
     );
   };
 }
@@ -76,6 +117,7 @@ export const logEntryResolvers = {
       { incidentId, cell }: { incidentId: string; cell?: Cell },
       ctx: GraphQLContext,
     ) => {
+      await assertIncidentReadable(incidentId, requireAuth(ctx));
       // Cellule explicite : vérifier la permission sur cette seule cellule.
       if (cell) {
         await requirePermission(ctx, cellToResource(cell), 'READ');

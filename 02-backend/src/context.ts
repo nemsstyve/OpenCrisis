@@ -4,4 +4,5 @@ export interface GraphQLContext {
   userId: string | null;
   req: Request | null;
   res: Response | null;
+  accessToken?: string | null;
 }

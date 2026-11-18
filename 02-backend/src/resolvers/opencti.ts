@@ -1,5 +1,6 @@
 import type { GraphQLContext } from '../context';
 import { requireAuth, requirePermission } from '../middleware/rbac';
+import { requireTenantId } from '../middleware/tenant';
 import {
   searchOpenCTIEntities,
   linkTimelineEventToOpenCTI,
@@ -17,12 +18,13 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'READ');
       if (!query || query.trim().length < 2) return [];
-      return searchOpenCTIEntities(query.trim());
+      await requireTenantId(ctx);
+        return searchOpenCTIEntities(query.trim());
     },
 
     openctiStatus: (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireAuth(ctx);
-      return process.env.OPENCTI_ENABLED === 'true';
+      return false;
     },
   },
 
@@ -38,7 +40,13 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       const userId = requireAuth(ctx);
-      return linkTimelineEventToOpenCTI(eventId, openctiEntityId, openctiEntityType, userId, ctx.req?.ip);
+      return linkTimelineEventToOpenCTI(
+          eventId,
+          openctiEntityId,
+          openctiEntityType,
+          userId,
+          ctx.req?.ip,
+        );
     },
 
     unlinkTimelineEventFromOpenCTI: async (
@@ -48,7 +56,11 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       const userId = requireAuth(ctx);
-      return unlinkTimelineEventFromOpenCTI(eventId, userId, ctx.req?.ip);
+      return unlinkTimelineEventFromOpenCTI(
+          eventId,
+          userId,
+          ctx.req?.ip,
+        );
     },
 
     exportIncidentToOpenCTI: async (
@@ -58,7 +70,12 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       const userId = requireAuth(ctx);
-      return exportIncidentToOpenCTI(incidentId, userId, ctx.req?.ip);
+      await requireTenantId(ctx);
+        return exportIncidentToOpenCTI(
+          incidentId,
+          userId,
+          ctx.req?.ip,
+        );
     },
 
     createOpenCTIObservable: async (
@@ -68,7 +85,14 @@ export const openctiResolvers = {
     ) => {
       await requirePermission(ctx, 'TIMELINE', 'WRITE');
       const userId = requireAuth(ctx);
-      return createOpenCTIObservable(type, value, description ?? '', userId, ctx.req?.ip);
+      await requireTenantId(ctx);
+        return createOpenCTIObservable(
+          type,
+          value,
+          description ?? '',
+          userId,
+          ctx.req?.ip,
+        );
     },
   },
 };

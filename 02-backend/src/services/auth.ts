@@ -1,5 +1,6 @@
 import { GraphQLError } from 'graphql';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { Response } from 'express';
 import type { Prisma } from '@prisma/client';
@@ -56,8 +57,12 @@ function checkLoginRateLimit(ip: string): void {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export function generateAccessToken(userId: string, email: string): string {
-  return jwt.sign({ userId, email }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL, algorithm: 'HS256' });
+export function generateAccessToken(
+  userId: string,
+  email: string,
+  sessionVersion: number,
+): string {
+  return jwt.sign({ userId, email, sessionVersion }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL, algorithm: 'HS256' });
 }
 
 async function findActiveUser(filter: { id?: string; email?: string }): Promise<UserWithRoles | null> {
@@ -76,13 +81,65 @@ function setRefreshCookie(res: Response, token: string): void {
 }
 
 async function issueRefreshToken(userId: string, res: Response): Promise<void> {
-  const token = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET!, {
+  const token = jwt.sign({ userId, jti: randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
     expiresIn: `${REFRESH_TTL_DAYS}d`,
     algorithm: 'HS256',
   });
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
   await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
   setRefreshCookie(res, token);
+}
+
+async function issueRefreshTokenForVerifiedLogin(userId: string, verifiedPasswordHash: string, res: Response): Promise<number> {
+  const token = jwt.sign({ userId, jti: randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
+    expiresIn: `${REFRESH_TTL_DAYS}d`,
+    algorithm: 'HS256',
+  });
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
+  const sessionVersion = await prisma.$transaction(async tx => {
+    // Le verrou reste actif jusqu'au COMMIT du jeton.
+    // Une reinitialisation du compte doit attendre cette
+    // transaction, ou etre observee avant l'emission.
+    const locked = await tx.$queryRaw<
+      Array<{ passwordHash: string; sessionVersion: number }>
+    >`
+      SELECT "passwordHash", "sessionVersion"
+      FROM "User"
+      WHERE "id" = ${userId}
+        AND "deletedAt" IS NULL
+        AND "isActive" = TRUE
+      FOR UPDATE
+    `;
+
+    if (
+      locked.length !== 1 ||
+      locked[0].passwordHash !== verifiedPasswordHash
+    ) {
+      throw new GraphQLError(
+        'Session invalidee : veuillez vous reconnecter',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
+
+    await tx.refreshToken.create({
+      data: { token, userId, expiresAt },
+    });
+
+    return locked[0].sessionVersion;
+  });
+
+  if (
+    !Number.isSafeInteger(sessionVersion) ||
+    sessionVersion < 0
+  ) {
+    throw new GraphQLError(
+      'Version de session invalide',
+      { extensions: { code: 'UNAUTHENTICATED' } },
+    );
+  }
+
+  setRefreshCookie(res, token);
+  return sessionVersion;
 }
 
 // ─── Auth operations ──────────────────────────────────────────────────────────
@@ -114,8 +171,8 @@ export async function login(
     });
   }
 
-  await issueRefreshToken(user.id, res);
-  const accessToken = generateAccessToken(user.id, user.email);
+  const sessionVersion = await issueRefreshTokenForVerifiedLogin(user.id, user.passwordHash, res);
+  const accessToken = generateAccessToken(user.id, user.email, sessionVersion);
 
   logAudit({ userId: user.id, action: 'LOGIN', resource: 'AUTH', ipAddress });
 
@@ -144,20 +201,102 @@ export async function rotateRefreshToken(
     throw new GraphQLError('Session expirée', { extensions: { code: 'UNAUTHENTICATED' } });
   }
 
-  const stored = await prisma.refreshToken.findUnique({ where: { token: currentToken } });
-  if (!stored || stored.expiresAt < new Date()) {
-    throw new GraphQLError('Session expirée', { extensions: { code: 'UNAUTHENTICATED' } });
-  }
+  // La ligne utilisateur est verrouillee avant la
+  // verification du jeton. Reset et rotation ne peuvent
+  // plus passer l'un apres l'autre sans observer l'etat
+  // reel de la base PostgreSQL.
+  const rotated = await prisma.$transaction(async tx => {
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "User"
+      WHERE "id" = ${payload.userId}
+        AND "deletedAt" IS NULL
+        AND "isActive" = TRUE
+      FOR UPDATE
+    `;
 
-  await prisma.refreshToken.delete({ where: { token: currentToken } });
+    if (locked.length !== 1) {
+      throw new GraphQLError(
+        'Session expiree',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
 
-  const user = await findActiveUser({ id: payload.userId });
-  if (!user) {
-    throw new GraphQLError('Utilisateur introuvable', { extensions: { code: 'UNAUTHENTICATED' } });
-  }
+    // La verification du jeton suit le verrou :
+    // une revocation administrative deja validee
+    // doit etre visible ici.
+    const stored = await tx.refreshToken.findUnique({
+      where: { token: currentToken },
+    });
 
-  await issueRefreshToken(user.id, res);
-  return { accessToken: generateAccessToken(user.id, user.email), user };
+    if (
+      !stored ||
+      stored.userId !== payload.userId ||
+      stored.expiresAt <= new Date()
+    ) {
+      throw new GraphQLError(
+        'Session expiree',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
+
+    const user = await tx.user.findFirst({
+      where: {
+        id: payload.userId,
+        deletedAt: null,
+        isActive: true,
+      },
+      include: USER_INCLUDE,
+    });
+
+    if (!user) {
+      throw new GraphQLError(
+        'Utilisateur introuvable',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
+
+    // La consommation de l'ancien jeton et la creation
+    // du suivant sont atomiques.
+    await tx.refreshToken.delete({
+      where: { token: currentToken },
+    });
+
+    const nextToken = jwt.sign(
+      { userId: user.id, jti: randomUUID() },
+      process.env.JWT_REFRESH_SECRET!,
+      {
+        expiresIn: `${REFRESH_TTL_DAYS}d`,
+        algorithm: 'HS256',
+      },
+    );
+
+    const expiresAt = new Date(
+      Date.now() + REFRESH_TTL_DAYS * 86_400_000,
+    );
+
+    await tx.refreshToken.create({
+      data: {
+        token: nextToken,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    return { user, nextToken };
+  });
+
+  // Cookie emis seulement apres le COMMIT.
+  setRefreshCookie(res, rotated.nextToken);
+
+  return {
+    accessToken: generateAccessToken(
+      rotated.user.id,
+      rotated.user.email,
+      rotated.user.sessionVersion,
+    ),
+    user: rotated.user,
+  };
 }
 
 export async function getMe(userId: string): Promise<UserWithRoles | null> {
@@ -193,15 +332,55 @@ export async function changePassword(
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { passwordHash, mustChangePassword: false },
+
+  // Compare-And-Swap : le hash valide doit encore etre celui
+  // qui a ete verifie avec bcrypt.compare plus haut.
+  // Une reinitialisation concurrente rend donc ce changement
+  // impossible, meme si elle intervient pendant le bcrypt.
+  await prisma.$transaction(async tx => {
+    const updated = await tx.user.updateMany({
+      where: {
+        id: userId,
+        passwordHash: user.passwordHash,
+        deletedAt: null,
+        isActive: true,
+      },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+        sessionVersion: { increment: 1 },
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new GraphQLError(
+        'Mot de passe modifie entre-temps : recommencez',
+        { extensions: { code: 'FORBIDDEN' } },
+      );
+    }
+
+    // La mise a jour et la revocation des anciennes sessions
+    // appartiennent a la meme transaction PostgreSQL.
+    await tx.refreshToken.deleteMany({
+      where: { userId },
+    });
   });
 
-  // N1 — révoquer toutes les sessions existantes après changement de mot de passe,
-  // puis ré-émettre un token pour la session courante (continuité côté front).
-  await prisma.refreshToken.deleteMany({ where: { userId } });
-  if (res) await issueRefreshToken(userId, res);
+  // Continuité de la session courante apres validation.
+  // La concurrence d'emission des nouveaux tokens sera
+  // auditee separement.
+
+  // Une reinitialisation administrative peut intervenir
+  // apres le COMMIT du changement de mot de passe.
+  // Le helper verrouille alors le compte et refuse
+  // toute emission si le hash vient de changer.
+  if (res) {
+    await issueRefreshTokenForVerifiedLogin(
+      userId,
+      passwordHash,
+      res,
+    );
+  }
 
   logAudit({ userId, action: 'CHANGE_PASSWORD', resource: 'AUTH', ipAddress });
   return true;

@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import type { IncidentStatus, Severity } from '@prisma/client';
 import { prisma } from '../prisma';
+import { requireTenantId } from '../middleware/tenant';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
 import {
@@ -10,23 +11,23 @@ import {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function getIncidents() {
+export async function getIncidents(tenantId: string) {
   const incidents = await prisma.incident.findMany({
-    where: { deletedAt: null },
+    where: { tenantId, deletedAt: null },
     orderBy: { startedAt: 'desc' },
   });
   // N7 — précharger les créateurs en une seule requête (évite le N+1 sur Incident.createdBy,
   // createdById n'ayant pas de relation Prisma).
   const creatorIds = [...new Set(incidents.map((i) => i.createdById))];
-  const creators = await prisma.user.findMany({ where: { id: { in: creatorIds } } });
+  const creators = await prisma.user.findMany({ where: { id: { in: creatorIds }, tenantId } });
   const byId = new Map(creators.map((u) => [u.id, u]));
   return incidents.map((i) => ({ ...i, createdBy: byId.get(i.createdById) ?? null }));
 }
 
-export async function getIncident(id: string) {
-  const incident = await prisma.incident.findFirst({ where: { id, deletedAt: null } });
+export async function getIncident(id: string, tenantId: string) {
+  const incident = await prisma.incident.findFirst({ where: { id, tenantId, deletedAt: null } });
   if (!incident) throw new GraphQLError('Incident introuvable', { extensions: { code: 'NOT_FOUND' } });
-  const createdBy = await prisma.user.findFirst({ where: { id: incident.createdById } });
+  const createdBy = await prisma.user.findFirst({ where: { id: incident.createdById, tenantId } });
   return { ...incident, createdBy: createdBy ?? null };
 }
 
@@ -34,9 +35,24 @@ export async function getIncident(id: string) {
  * N5 — un incident doit être ouvert à l'écriture (existant, non supprimé, non clôturé)
  * avant d'y créer une entrée de main courante ou un événement de timeline.
  */
-export async function assertIncidentWritable(incidentId: string): Promise<void> {
+export async function assertIncidentWritable(
+  incidentId: string,
+  userId: string,
+): Promise<void> {
+  // Le tenant provient exclusivement de l'utilisateur actif en base.
+  // L'absence de tenant valide provoque un refus.
+  const tenantId = await requireTenantId({
+    userId,
+    req: null,
+    res: null,
+  });
+
   const incident = await prisma.incident.findFirst({
-    where: { id: incidentId, deletedAt: null },
+    where: {
+      id: incidentId,
+      tenantId,
+      deletedAt: null,
+    },
     select: { status: true },
   });
   if (!incident) {
@@ -54,6 +70,7 @@ export async function assertIncidentWritable(incidentId: string): Promise<void> 
 export async function createIncident(
   input: { name: string; description?: string | null; severity?: Severity | null },
   createdById: string,
+  tenantId: string,
   ipAddress?: string | null,
 ) {
   const incident = await prisma.incident.create({
@@ -62,6 +79,7 @@ export async function createIncident(
       description: input.description,
       severity: input.severity ?? 'MEDIUM',
       createdById,
+      tenantId,
     },
   });
   logAudit({ userId: createdById, action: 'CREATE', resource: 'INCIDENT', resourceId: incident.id, ipAddress });
@@ -73,9 +91,10 @@ export async function updateIncident(
   id: string,
   input: { name?: string | null; description?: string | null; status?: IncidentStatus | null; severity?: Severity | null },
   userId: string,
+  tenantId: string,
   ipAddress?: string | null,
 ) {
-  const existing = await getIncident(id);
+  const existing = await getIncident(id, tenantId);
 
   let lifecycle;
   try {
@@ -90,7 +109,7 @@ export async function updateIncident(
   }
 
   const incident = await prisma.incident.update({
-    where: { id },
+    where: { id, tenantId, deletedAt: null },
     data: {
       ...(input.name != null && { name: input.name }),
       ...(input.description !== undefined && { description: input.description }),
@@ -111,9 +130,17 @@ export async function updateIncident(
   return incident;
 }
 
-export async function deleteIncident(id: string, userId: string, ipAddress?: string | null) {
-  await getIncident(id);
-  await prisma.incident.update({ where: { id }, data: { deletedAt: new Date() } });
+export async function deleteIncident(
+  id: string,
+  userId: string,
+  tenantId: string,
+  ipAddress?: string | null,
+) {
+  await getIncident(id, tenantId);
+  await prisma.incident.update({
+    where: { id, tenantId, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
   logAudit({ userId, action: 'DELETE', resource: 'INCIDENT', resourceId: id, ipAddress });
   return true;
 }

@@ -14,9 +14,12 @@ import { typeDefs } from './schema';
 import { resolvers } from './resolvers';
 import { prisma } from './prisma';
 import { pubsub } from './pubsub';
-import { verifyAccessToken, extractBearerToken } from './middleware/auth';
+import { verifyActiveAccessToken, extractBearerToken } from './middleware/auth';
 import filesRouter from './routes/files';
 import exportRouter from './routes/export';
+import wazuhIngestionRouter, {
+  preparseWazuhRateLimit,
+} from './routes/wazuhIngestion';
 import { loadEnv } from './utils/env';
 import type { GraphQLContext } from './context';
 
@@ -34,6 +37,28 @@ async function main() {
   app.set('trust proxy', 1); // D3 — IP réelle derrière nginx
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
   app.use(cookieParser());
+
+  // Protection avant lecture du JSON, y compris en cas d'erreur
+  // de syntaxe ou de depassement de taille.
+  app.use('/api/integrations/wazuh', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  });
+
+  // Controle reseau avant toute lecture du JSON.
+  // Les requetes rejetees n'atteignent pas le parseur.
+  app.use(
+    '/api/integrations/wazuh',
+    preparseWazuhRateLimit,
+  );
+
+  // Limite sur les octets recus, y compris avec Transfer-Encoding:
+  // chunked. Le reste de l'API conserve sa limite de 1 Mo.
+  app.use(
+    '/api/integrations/wazuh',
+    express.json({ limit: '64kb' }),
+  );
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {
@@ -42,6 +67,9 @@ async function main() {
 
   app.use('/files', filesRouter);
   app.use('/export', exportRouter);
+
+  // API machine Wazuh, independante des JWT GraphQL.
+  app.use('/api/integrations/wazuh', wazuhIngestionRouter);
 
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 
@@ -54,8 +82,13 @@ async function main() {
       context: async (wsCtx) => {
         const authHeader = wsCtx.connectionParams?.Authorization as string | undefined;
         const token = authHeader ? extractBearerToken(authHeader) : null;
-        const payload = token ? verifyAccessToken(token) : null;
-        return { userId: payload?.userId ?? null, req: null, res: null } satisfies GraphQLContext;
+        const payload = token ? await verifyActiveAccessToken(token) : null;
+        return {
+          userId: payload?.userId ?? null,
+          req: null,
+          res: null,
+          accessToken: token,
+        } satisfies GraphQLContext;
       },
     },
     wsServer,
@@ -93,12 +126,21 @@ async function main() {
 
   await server.start();
 
+  // Les reponses GraphQL peuvent contenir des donnees sensibles,
+  // notamment les secrets des connecteurs Wazuh.
+  // Aucun navigateur ou cache intermediaire ne doit les conserver.
+  app.use('/api/graphql', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  });
+
   app.use(
     '/api/graphql',
     expressMiddleware(server, {
       context: async ({ req, res }: { req: express.Request; res: express.Response }) => {
         const token = extractBearerToken(req.headers.authorization);
-        const payload = token ? verifyAccessToken(token) : null;
+        const payload = token ? await verifyActiveAccessToken(token) : null;
         return { userId: payload?.userId ?? null, req, res } satisfies GraphQLContext;
       },
     }),

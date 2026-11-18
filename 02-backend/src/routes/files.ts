@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import { openVerifiedUpload } from '../services/fileStorageSafety';
 import { DocumentCategory } from '@prisma/client';
 import { GraphQLError } from 'graphql';
 import { verifyActiveAccessToken, extractBearerToken } from '../middleware/auth';
@@ -21,9 +22,17 @@ const router = Router();
 const TEMP_DIR = path.join(UPLOADS_DIR, 'tmp');
 
 const storage = multer.diskStorage({
-  destination: async (_req, _file, cb) => {
-    await fs.mkdir(TEMP_DIR, { recursive: true });
-    cb(null, TEMP_DIR);
+  destination: (_req, _file, cb) => {
+    void fs.mkdir(TEMP_DIR, { recursive: true })
+      .then(() => cb(null, TEMP_DIR))
+      .catch((error: unknown) => {
+        cb(
+          error instanceof Error
+            ? error
+            : new Error('Stockage temporaire indisponible'),
+          TEMP_DIR,
+        );
+      });
   },
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -197,14 +206,36 @@ router.get('/:id', requireAuth, async (req, res) => {
     });
 
     // F5 — garantir que le chemin résolu reste dans UPLOADS_DIR (path traversal)
-    const resolved = path.resolve(UPLOADS_DIR, doc.filePath);
-    if (!resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep) && resolved !== path.resolve(UPLOADS_DIR)) {
-      res.status(400).json({ error: 'Chemin de fichier invalide' });
-      return;
-    }
-    res.setHeader('Content-Type', doc.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.name)}"`);
-    res.sendFile(resolved);
+      const handle = await openVerifiedUpload(
+        UPLOADS_DIR,
+        doc.filePath,
+      );
+
+      res.setHeader('Content-Type', doc.mimeType);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(doc.name)}"`,
+      );
+
+      const stream = handle.createReadStream({
+        autoClose: true,
+      });
+
+      res.once('close', () => {
+        stream.destroy();
+      });
+
+      stream.once('error', () => {
+        if (!res.headersSent) {
+          res.status(404).json({
+            error: 'Document introuvable',
+          });
+        } else {
+          res.destroy();
+        }
+      });
+
+      stream.pipe(res);
   } catch {
     res.status(404).json({ error: 'Document introuvable' });
   }

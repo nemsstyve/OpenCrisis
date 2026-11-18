@@ -1,8 +1,7 @@
 import { GraphQLError } from 'graphql';
-import path from 'path';
-import fs from 'fs/promises';
 import type { DocumentCategory } from '@prisma/client';
 import { prisma } from '../prisma';
+import { removeVerifiedUpload } from './fileStorageSafety';
 import { logAudit } from '../middleware/audit';
 import { pubsub, TOPICS } from '../pubsub';
 import { assertIncidentWritable, getIncident } from './incident';
@@ -191,8 +190,15 @@ export async function deleteDocument(
 
   if (result.count !== 1) return notFound();
 
-  fs.unlink(path.join(UPLOADS_DIR, doc.filePath))
-    .catch(() => undefined);
+  void removeVerifiedUpload(
+    UPLOADS_DIR,
+    doc.filePath,
+  ).catch(error => {
+    console.error(
+      '[document] suppression physique refusee ou impossible',
+      error,
+    );
+  });
 
   logAudit({
     userId,

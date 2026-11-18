@@ -14,6 +14,8 @@ import MainCouranteDirection from "./pages/MainCouranteDirection";
 import MainCouranteOperationnelle from "./pages/MainCouranteOperationnelle";
 import Timeline from "./pages/Timeline";
 import Administration from "./pages/Administration";
+import IncidentProposals from "./pages/IncidentProposals";
+import WazuhConnectors from "./pages/WazuhConnectors";
 import NotFound from "./pages/NotFound";
 
 function guarded(resource: string, Page: React.ComponentType) {
@@ -44,6 +46,26 @@ export const router = createBrowserRouter([
           {
             index: true,
             Component: guarded("DASHBOARD", GlobalDashboard),
+          },
+        ],
+      },
+      {
+        path: "/propositions-incidents",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("DASHBOARD", IncidentProposals),
+          },
+        ],
+      },
+      {
+        path: "/connecteurs-wazuh",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("ADMIN", WazuhConnectors),
           },
         ],
       },

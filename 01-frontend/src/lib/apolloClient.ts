@@ -1,4 +1,5 @@
 import {
+  ApolloLink,
   ApolloClient,
   InMemoryCache,
   split,
@@ -12,6 +13,10 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { createClient } from "graphql-ws";
 import { tokenStore } from "./tokenStore";
+import {
+  serializeCookieOperation,
+  serializedAuthFetch,
+} from "./cookieMutationQueue";
 
 const httpUrl = import.meta.env.VITE_API_URL ?? "/api/graphql";
 const wsUrl =
@@ -22,18 +27,37 @@ const wsUrl =
 // Une seule promesse de refresh en cours à la fois pour éviter les doublons.
 
 let refreshPromise: Promise<string | null> | null = null;
+let sessionEpoch = 0;
 
 async function fetchNewToken(): Promise<string | null> {
+  const epoch = sessionEpoch;
   try {
-    const res = await fetch(httpUrl, {
+    const res = await serializeCookieOperation(() => {
+      // Verifier la session APRES l'attente dans
+      // la file, juste avant l'envoi HTTP.
+      if (epoch !== sessionEpoch) {
+        return Promise.resolve(null);
+      }
+
+      return fetch(httpUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
         query: `mutation { refreshToken { accessToken } }`,
       }),
+      });
     });
+
+    // La session a change pendant l'attente :
+    // aucun appel HTTP n'a ete effectue.
+    if (res === null) return null;
+
     const data = await res.json();
+
+    // Ignorer toute reponse appartenant a une session invalidee.
+    if (epoch !== sessionEpoch) return null;
+
     const token: string | undefined = data?.data?.refreshToken?.accessToken;
     if (token) {
       tokenStore.set(token);
@@ -43,15 +67,20 @@ async function fetchNewToken(): Promise<string | null> {
   } catch {
     // Refresh échoué — l'utilisateur sera redirigé vers /login par ProtectedOutlet
   }
-  tokenStore.set(null);
+  if (epoch === sessionEpoch) {
+    tokenStore.set(null);
+  }
   return null;
 }
 
 function getRefreshToken(): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = fetchNewToken().finally(() => {
-      refreshPromise = null;
+    const pending = fetchNewToken().finally(() => {
+      if (refreshPromise === pending) {
+        refreshPromise = null;
+      }
     });
+    refreshPromise = pending;
   }
   return refreshPromise;
 }
@@ -81,36 +110,109 @@ export function reconnectWebSocket() {
   wsClient?.terminate();
 }
 
+/**
+ * Invalide les requetes de refresh de l'ancienne session.
+ * Annule le timer et coupe la connexion WebSocket courante.
+ */
+export function invalidateAuthSession() {
+  sessionEpoch += 1;
+
+  // Detacher l'ancienne promesse sans autoriser
+  // son resultat a modifier la nouvelle session.
+  refreshPromise = null;
+
+  if (proactiveTimer) {
+    clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+  }
+
+  tokenStore.set(null);
+  reconnectWebSocket();
+}
+
 // ─── errorLink — intercepte les 401 et tente un refresh ──────────────────────
 
 const errorLink = onError(({ graphQLErrors, operation, forward }) => {
   const isUnauthenticated = graphQLErrors?.some(
-    (e) => e.extensions?.code === "UNAUTHENTICATED"
+    (error) => error.extensions?.code === "UNAUTHENTICATED",
   );
 
   if (!isUnauthenticated) return;
 
+  // Capturer la session au moment du 401.
+  // Une nouvelle identite ne doit pas reprendre
+  // une operation appartenant a l'ancienne.
+  const requestEpoch = sessionEpoch;
+
   return new Observable((observer) => {
-    getRefreshToken().then((token) => {
-      if (!token) {
-        // Pas de token valide → laisser l'erreur se propager
-        graphQLErrors?.forEach((err) => observer.error(err));
-        return;
-      }
+    let cancelled = false;
+    let retrySubscription: { unsubscribe(): void } | null = null;
 
-      // Rejouer l'opération avec le nouveau token
-      operation.setContext(({ headers = {} }: { headers: Record<string, string> }) => ({
-        headers: { ...headers, Authorization: `Bearer ${token}` },
-      }));
+    void getRefreshToken()
+      .then((token) => {
+        // Une requete abandonnee ne doit jamais etre relancee.
+        if (cancelled || observer.closed) return;
 
-      const sub = forward(operation).subscribe({
-        next: observer.next.bind(observer),
-        error: observer.error.bind(observer),
-        complete: observer.complete.bind(observer),
+        // Interdire le rejeu apres changement de session.
+        if (requestEpoch !== sessionEpoch) return;
+
+        // Le token recu doit encore etre celui de la
+        // session courante au moment du rejeu.
+        if (!token || tokenStore.get() !== token) {
+          observer.error(
+            graphQLErrors?.find(
+              (error) =>
+                error.extensions?.code === "UNAUTHENTICATED",
+            ) ?? new Error("Session non authentifiee"),
+          );
+          return;
+        }
+
+        operation.setContext(
+          ({ headers = {} }: { headers: Record<string, string> }) => ({
+            headers: {
+              ...headers,
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        );
+
+        // Le callback de nettoyage doit rester disponible
+        // apres le demarrage de la requete de remplacement.
+        retrySubscription = forward(operation).subscribe({
+          next: (value) => {
+            if (
+              !cancelled &&
+              requestEpoch === sessionEpoch &&
+              !observer.closed
+            ) {
+              observer.next(value);
+            }
+          },
+          error: (error) => {
+            if (!cancelled && !observer.closed) {
+              observer.error(error);
+            }
+          },
+          complete: () => {
+            if (!cancelled && !observer.closed) {
+              observer.complete();
+            }
+          },
+        });
+      })
+      .catch((error) => {
+        if (!cancelled && !observer.closed) {
+          observer.error(error);
+        }
       });
 
-      return () => sub.unsubscribe();
-    });
+    // Apollo appelle cette fonction des que le
+    // consommateur annule son abonnement.
+    return () => {
+      cancelled = true;
+      retrySubscription?.unsubscribe();
+    };
   });
 });
 
@@ -126,7 +228,11 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
-const httpLink = new HttpLink({ uri: httpUrl });
+const httpLink = new HttpLink({
+  uri: httpUrl,
+  credentials: "include",
+  fetch: serializedAuthFetch,
+});
 
 // ─── wsLink — connexion WebSocket avec token toujours à jour ─────────────────
 
@@ -136,13 +242,55 @@ wsClient = createClient({
     const token = tokenStore.get();
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
-  shouldRetry: () => true,
+  shouldRetry: () => Boolean(tokenStore.get()),
   retryAttempts: 5,
 });
 
 const wsLink = new GraphQLWsLink(wsClient);
 
 // ─── Split HTTP / WS ──────────────────────────────────────────────────────────
+
+/**
+ * Bloque les reponses GraphQL d'une ancienne session.
+ *
+ * Le controle se situe en amont du transport et
+ * du cache Apollo, pour HTTP comme pour WebSocket.
+ *
+ * Aucun verrou entre entreprises n'est utilise.
+ */
+const sessionGuardLink = new ApolloLink(
+  (operation, forward) =>
+    new Observable((observer) => {
+      const requestEpoch = sessionEpoch;
+
+      const isCurrentSession = () =>
+        requestEpoch === sessionEpoch;
+
+      const subscription = forward(operation).subscribe({
+        next: (result) => {
+          if (!isCurrentSession()) {
+            observer.complete();
+            return;
+          }
+
+          observer.next(result);
+        },
+        error: (error) => {
+          if (!isCurrentSession()) {
+            observer.complete();
+            return;
+          }
+
+          observer.error(error);
+        },
+        complete: () => {
+          observer.complete();
+        },
+      });
+
+      return () => subscription.unsubscribe();
+    }),
+);
 
 const splitLink = split(
   ({ query }) => {
@@ -157,7 +305,7 @@ const splitLink = split(
 );
 
 export const apolloClient = new ApolloClient({
-  link: splitLink,
+  link: from([sessionGuardLink, splitLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: { fetchPolicy: "cache-and-network" },

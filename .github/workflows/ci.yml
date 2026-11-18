@@ -1,0 +1,85 @@
+name: OpenCrisis - Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend - Build et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: 02-backend
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/opencrisis_ci?schema=public
+      OPENCRISIS_TEST_BUILD_DIR: ${{ github.workspace }}/02-backend/dist
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: opencrisis_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d opencrisis_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: 02-backend/package-lock.json
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Generer Prisma
+        run: npx prisma generate
+
+      - name: Compiler TypeScript
+        run: npm run build
+
+      - name: Verifier les migrations
+        run: npx prisma migrate deploy
+
+      - name: Executer les tests backend
+        run: node --test tests/*.test.mjs
+
+  frontend:
+    name: Frontend - Compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: 01-frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: 01-frontend/package-lock.json
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Compiler React
+        run: npm run build

@@ -85,6 +85,7 @@ async function main() {
         const payload = token ? await verifyActiveAccessToken(token) : null;
         return {
           userId: payload?.userId ?? null,
+          sessionId: payload?.sessionId ?? null,
           req: null,
           res: null,
           accessToken: token,
@@ -141,7 +142,12 @@ async function main() {
       context: async ({ req, res }: { req: express.Request; res: express.Response }) => {
         const token = extractBearerToken(req.headers.authorization);
         const payload = token ? await verifyActiveAccessToken(token) : null;
-        return { userId: payload?.userId ?? null, req, res } satisfies GraphQLContext;
+        return {
+          userId: payload?.userId ?? null,
+          sessionId: payload?.sessionId ?? null,
+          req,
+          res,
+        } satisfies GraphQLContext;
       },
     }),
   );

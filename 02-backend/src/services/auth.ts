@@ -61,8 +61,9 @@ export function generateAccessToken(
   userId: string,
   email: string,
   sessionVersion: number,
+  sessionId: string,
 ): string {
-  return jwt.sign({ userId, email, sessionVersion }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL, algorithm: 'HS256' });
+  return jwt.sign({ userId, email, sessionVersion, sessionId }, process.env.JWT_SECRET!, { expiresIn: ACCESS_TTL, algorithm: 'HS256' });
 }
 
 async function findActiveUser(filter: { id?: string; email?: string }): Promise<UserWithRoles | null> {
@@ -70,33 +71,31 @@ async function findActiveUser(filter: { id?: string; email?: string }): Promise<
   return user;
 }
 
-function setRefreshCookie(res: Response, token: string): void {
+function setRefreshCookie(
+  res: Response,
+  token: string,
+  expiresAt: Date,
+): void {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: Math.max(0, expiresAt.getTime() - Date.now()),
     path: '/',
   });
 }
 
-async function issueRefreshToken(userId: string, res: Response): Promise<void> {
+async function issueRefreshTokenForVerifiedLogin(
+  userId: string,
+  verifiedPasswordHash: string,
+  res: Response,
+): Promise<{ sessionVersion: number; sessionId: string }> {
   const token = jwt.sign({ userId, jti: randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
     expiresIn: `${REFRESH_TTL_DAYS}d`,
     algorithm: 'HS256',
   });
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
-  await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
-  setRefreshCookie(res, token);
-}
-
-async function issueRefreshTokenForVerifiedLogin(userId: string, verifiedPasswordHash: string, res: Response): Promise<number> {
-  const token = jwt.sign({ userId, jti: randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
-    expiresIn: `${REFRESH_TTL_DAYS}d`,
-    algorithm: 'HS256',
-  });
-  const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
-  const sessionVersion = await prisma.$transaction(async tx => {
+  const issued = await prisma.$transaction(async tx => {
     // Le verrou reste actif jusqu'au COMMIT du jeton.
     // Une reinitialisation du compte doit attendre cette
     // transaction, ou etre observee avant l'emission.
@@ -121,16 +120,31 @@ async function issueRefreshTokenForVerifiedLogin(userId: string, verifiedPasswor
       );
     }
 
-    await tx.refreshToken.create({
-      data: { token, userId, expiresAt },
+    const session = await tx.authSession.create({
+      data: {
+        userId,
+        expiresAt,
+      },
     });
 
-    return locked[0].sessionVersion;
+    await tx.refreshToken.create({
+      data: {
+        token,
+        userId,
+        sessionId: session.id,
+        expiresAt,
+      },
+    });
+
+    return {
+      sessionVersion: locked[0].sessionVersion,
+      sessionId: session.id,
+    };
   });
 
   if (
-    !Number.isSafeInteger(sessionVersion) ||
-    sessionVersion < 0
+    !Number.isSafeInteger(issued.sessionVersion) ||
+    issued.sessionVersion < 0
   ) {
     throw new GraphQLError(
       'Version de session invalide',
@@ -138,8 +152,8 @@ async function issueRefreshTokenForVerifiedLogin(userId: string, verifiedPasswor
     );
   }
 
-  setRefreshCookie(res, token);
-  return sessionVersion;
+  setRefreshCookie(res, token, expiresAt);
+  return issued;
 }
 
 // ─── Auth operations ──────────────────────────────────────────────────────────
@@ -171,8 +185,17 @@ export async function login(
     });
   }
 
-  const sessionVersion = await issueRefreshTokenForVerifiedLogin(user.id, user.passwordHash, res);
-  const accessToken = generateAccessToken(user.id, user.email, sessionVersion);
+  const issued = await issueRefreshTokenForVerifiedLogin(
+    user.id,
+    user.passwordHash,
+    res,
+  );
+  const accessToken = generateAccessToken(
+    user.id,
+    user.email,
+    issued.sessionVersion,
+    issued.sessionId,
+  );
 
   logAudit({ userId: user.id, action: 'LOGIN', resource: 'AUTH', ipAddress });
 
@@ -181,13 +204,58 @@ export async function login(
 
 export async function logout(
   userId: string,
-  refreshToken: string,
+  sessionId: string,
   res: Response,
 ): Promise<boolean> {
-  await prisma.refreshToken.deleteMany({ where: { userId, token: refreshToken } });
-  res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', path: '/' });
-  logAudit({ userId, action: 'LOGOUT', resource: 'AUTH' });
-  return true;
+  const revoked = await prisma.$transaction(async tx => {
+    // Meme verrou que rotateRefreshToken et les
+    // operations administratives sur le compte.
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "User"
+      WHERE "id" = ${userId}
+        AND "deletedAt" IS NULL
+        AND "isActive" = TRUE
+      FOR UPDATE
+    `;
+
+    if (locked.length !== 1) return false;
+
+    const result = await tx.authSession.updateMany({
+      where: {
+        id: sessionId,
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    if (result.count !== 1) return false;
+
+    await tx.refreshToken.deleteMany({
+      where: {
+        userId,
+        sessionId,
+      },
+    });
+
+    return true;
+  });
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+
+  if (revoked) {
+    logAudit({ userId, action: 'LOGOUT', resource: 'AUTH' });
+  }
+
+  return revoked;
 }
 
 export async function rotateRefreshToken(
@@ -232,10 +300,31 @@ export async function rotateRefreshToken(
     if (
       !stored ||
       stored.userId !== payload.userId ||
+      !stored.sessionId ||
       stored.expiresAt <= new Date()
     ) {
       throw new GraphQLError(
         'Session expiree',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
+
+    const session = await tx.authSession.findFirst({
+      where: {
+        id: stored.sessionId!,
+        userId: payload.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!session) {
+      throw new GraphQLError(
+        'Session revoquee ou expiree',
         { extensions: { code: 'UNAUTHENTICATED' } },
       );
     }
@@ -262,38 +351,66 @@ export async function rotateRefreshToken(
       where: { token: currentToken },
     });
 
+    // Ne jamais prolonger la session initiale.
+    // Arrondir a la seconde pour aligner JWT et PostgreSQL.
+    const expirationSeconds = Math.floor(
+      Math.min(
+        session.expiresAt.getTime(),
+        stored.expiresAt.getTime(),
+      ) / 1000,
+    );
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const remainingSeconds = expirationSeconds - nowSeconds;
+
+    if (remainingSeconds <= 0) {
+      throw new GraphQLError(
+        'Session expiree',
+        { extensions: { code: 'UNAUTHENTICATED' } },
+      );
+    }
+
+    const expiresAt = new Date(expirationSeconds * 1000);
+
     const nextToken = jwt.sign(
       { userId: user.id, jti: randomUUID() },
       process.env.JWT_REFRESH_SECRET!,
       {
-        expiresIn: `${REFRESH_TTL_DAYS}d`,
+        expiresIn: remainingSeconds,
         algorithm: 'HS256',
       },
-    );
-
-    const expiresAt = new Date(
-      Date.now() + REFRESH_TTL_DAYS * 86_400_000,
     );
 
     await tx.refreshToken.create({
       data: {
         token: nextToken,
         userId: user.id,
+        sessionId: session.id,
         expiresAt,
       },
     });
 
-    return { user, nextToken };
+    return {
+      user,
+      nextToken,
+      sessionId: session.id,
+      expiresAt,
+    };
   });
 
   // Cookie emis seulement apres le COMMIT.
-  setRefreshCookie(res, rotated.nextToken);
+  setRefreshCookie(
+    res,
+    rotated.nextToken,
+    rotated.expiresAt,
+  );
 
   return {
     accessToken: generateAccessToken(
       rotated.user.id,
       rotated.user.email,
       rotated.user.sessionVersion,
+      rotated.sessionId,
     ),
     user: rotated.user,
   };

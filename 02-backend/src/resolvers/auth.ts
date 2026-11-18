@@ -40,10 +40,10 @@ export const authResolvers = {
     },
 
     logout: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      if (!ctx.userId || !ctx.req || !ctx.res) return false;
-      const refreshToken = ctx.req.cookies?.refreshToken as string | undefined;
-      if (!refreshToken) return false;
-      return logout(ctx.userId, refreshToken, ctx.res);
+      if (!ctx.userId || !ctx.sessionId || !ctx.req || !ctx.res) {
+        return false;
+      }
+      return logout(ctx.userId, ctx.sessionId, ctx.res);
     },
 
     refreshToken: async (_: unknown, __: unknown, ctx: GraphQLContext) => {

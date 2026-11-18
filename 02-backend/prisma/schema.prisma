@@ -61,6 +61,7 @@ model User {
   contacts        Contact[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
+  authSessions    AuthSession[]
   createdIoCs     IoC[]
 
   @@index([deletedAt])
@@ -117,16 +118,35 @@ model RolePermission {
   @@id([roleId, permissionId])
 }
 
+// Session d'authentification stable entre rotations JWT.
+// Une revocation est individuelle, sans changer User.sessionVersion.
+model AuthSession {
+  id        String    @id @default(uuid())
+  userId    String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
+  sessionId String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  session AuthSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
 
   @@index([userId])
+  @@index([sessionId])
   @@index([expiresAt])
 }
 

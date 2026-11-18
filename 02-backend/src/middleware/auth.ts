@@ -5,6 +5,7 @@ export interface JwtAccessPayload {
   userId: string;
   email: string;
   sessionVersion: number;
+  sessionId: string;
 }
 
 export function verifyAccessToken(token: string): JwtAccessPayload | null {
@@ -39,7 +40,9 @@ export async function verifyActiveAccessToken(
     typeof payload.email !== 'string' ||
     payload.email.length === 0 ||
     !Number.isSafeInteger(payload.sessionVersion) ||
-    payload.sessionVersion < 0
+    payload.sessionVersion < 0 ||
+    typeof payload.sessionId !== 'string' ||
+    payload.sessionId.length === 0
   ) {
     return null;
   }
@@ -63,6 +66,18 @@ export async function verifyActiveAccessToken(
     ) {
       return null;
     }
+
+    const session = await prisma.authSession.findFirst({
+      where: {
+        id: payload.sessionId,
+        userId: payload.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    if (!session) return null;
 
     return payload;
   } catch {

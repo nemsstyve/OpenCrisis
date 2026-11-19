@@ -11,20 +11,38 @@
     {
       "id": "cmvjycbyx00433dnzlt4x6su4",
       "status": "DONE",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Maintenance des dépendances et contrôles CI déjà livrés. Commit 1df7fcd : ajout des tests MFA au workflow GitHub Actions. VM130FH : 65 tests réussis localement. Pipeline distant non encore contrôlé ; les outils GitLab non bloquants restent à renforcer."
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "Maintenance des dépendances et contrôles CI déjà livrés. Commit 1df7fcd : ajout des tests MFA au workflow GitHub Actions. VM130FH : 65 tests réussis localement. Pipeline distant non encore contrôlé ; les outils GitLab non bloquants restent à renforcer. 3fa623c ajoute la recette HTTP des uploads au workflow ; 0f1094e (19/11/2026) corrige les vulnérabilités Zod et minimatch du frontend."
     },
     {
       "id": "cmvjycbyy004a3dnzbbp3iv04",
       "status": "IN_PROGRESS",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "VM130FH, 19/11/2026 : build backend et frontend réussis en environnement Docker isolé ; 63 tests unitaires et 2 tests d'intégration TOTP/MFA réussis. 16 migrations Prisma appliquées sur PostgreSQL temporaire. Résultat GitHub Actions distant, tests HTTP uploads et recette navigateur encore à vérifier. Commit 1df7fcd."
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "19/11/2026 : 8 fichiers de tests unitaires et 5 d'intégration (uploads HTTP, isolation des incidents, GraphQL HTTP, Apollo réel, TOTP). Dans le lab (VM130IL-IM) : 101/101 tests backend et 16/16 migrations sur PostgreSQL 17 et Redis 7. Contrôle séparé le 19/11 avec Node 24 : 40 tests unitaires réussis ; 3 fichiers exigent le backend compilé (OPENCRISIS_TEST_BUILD_DIR). Résultat GitHub Actions et recette navigateur non vérifiés ; pas de tests frontend."
     },
     {
       "id": "cmvjycbyx003u3dnz27xqy9gs",
       "status": "DONE",
       "updatedAt": "2026-11-19T00:54:32+01:00",
       "evidence": "fb06904 (18/11/2026) : révocation des JWT par session (migration 20261118203000_add_auth_sessions, services/auth.ts). Pas de test automatisé dédié ; non vérifié sur un déploiement."
+    },
+    {
+      "id": "cmvjycbyx00453dnzz47oenej",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "1df7fcd (19/11/2026) : TOTP, secrets chiffrés AES-GCM, codes de récupération hachés, interface de sécurité. Tests unitaires et intégration PostgreSQL réussis dans le lab (VM130FH). tests/totp.test.mjs exige le backend compilé. Recette utilisateur et déploiement restants."
+    },
+    {
+      "id": "cmvjycbyy00473dnzhew3fhj8",
+      "status": "IN_PROGRESS",
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "1df7fcd (19/11/2026) : analyse clamd INSTREAM avant stockage, refus en cas de menace ou d'indisponibilité. Recette HTTP des uploads (3fa623c, tests/integration/uploadHttp.integration.mjs) avec antivirus simulé. Moteur ClamAV réel (CT107) non installé ni testé."
+    },
+    {
+      "id": "cmvjycbyy004b3dnzd3e2r8yf",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "1df7fcd (19/11/2026) : page de cartographie des incidents par gravité et état, route et menu. Build frontend réussi dans le lab (VM130FH), filtrage par organisation vérifié côté serveur. Recette navigateur non effectuée."
     }
   ],
   "milestones": [],
@@ -60,8 +78,8 @@
       "title": "Plusieurs organisations, données séparées",
       "description": "Chaque organisation ne voit que ses incidents, documents, contacts et journaux.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T19:04:05+00:00",
-      "evidence": "VM130FH : tests tenant, audit et filtrage des événements réussis. Résolveurs incidents contrôlés : permission, tenant serveur et filtre PostgreSQL. Migration des données existantes et déploiement non validés.\nVM130IB-VM130IC : recette d'isolation des incidents avec PostgreSQL 17 et Redis 7 isoles. 10 scenarios multi-tenant reussis : lecture, modification, suppression, desactivation des comptes et organisations, masquage des incidents supprimes. 63 tests unitaires et 14 tests d'integration reussis (sous-tests inclus), 16 migrations Prisma appliquees. Fichier : 02-backend/tests/integration/incidentTenant.integration.mjs. Recette GraphQL HTTP et cloture V0.2 encore a effectuer.\nVM130IF-VM130IG : recette HTTP GraphQL/RBAC en laboratoire PostgreSQL 17 et Redis 7 ; 13 scenarios GraphQL reussis, incluant lecture, creation, modification, suppression, permissions et isolation inter-organisations. Bilan backend : 63 tests unitaires et 28 tests d'integration reussis (sous-tests et tests parents inclus), 16 migrations Prisma appliquees. Preuve : 02-backend/tests/integration/incidentGraphqlHttp.integration.mjs. Serveur Apollo complet et recette navigateur restant a valider ; cloture V0.2 differee.\nVM130IL-VM130IM : dist/server.js Apollo reel teste sur PostgreSQL 17/Redis 7 isoles : 9/9 scenarios HTTP/JWT/RBAC/session/tenant reussis ; 101/101 tests backend et 16/16 migrations OK. Preuve : tests/integration/apolloRealHttp.integration.mjs. Aucun deploiement ; recette navigateur restante."
+      "updatedAt": "2026-11-19T21:58:41+01:00",
+      "evidence": "Lab PostgreSQL 17 et Redis 7 isolés, 19/11/2026 : 10 scénarios d'isolation des incidents (919a6d4), 13 scénarios GraphQL HTTP avec droits (8562819), 9/9 scénarios sur le serveur Apollo compilé : JWT, rôles, session, organisation (396aefc). 101/101 tests backend, 16/16 migrations. Reprise des données existantes, recette navigateur et déploiement non validés."
     },
     {
       "key": "propositions-incidents",
@@ -78,30 +96,6 @@
       "status": "REVIEW",
       "updatedAt": "2026-11-19T11:09:47+00:00",
       "evidence": "Tests unitaires des connecteurs, identités et secrets Wazuh réussis dans VM130FH. Aucune ingestion réelle démontrée lors de ce contrôle."
-    },
-    {
-      "key": "authentification-totp-mfa",
-      "title": "Authentification multifacteur TOTP",
-      "description": "Second facteur, récupération de compte, anti-rejeu, limitation des tentatives et gestion des sessions.",
-      "status": "REVIEW",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Commit 1df7fcd : TOTP, secrets chiffrés AES-GCM, codes de récupération hachés, interface de sécurité. Tests unitaires et intégration PostgreSQL réussis dans VM130FH. Recette utilisateur et déploiement restants."
-    },
-    {
-      "key": "antivirus-uploads-clamav",
-      "title": "Analyse antivirus des documents",
-      "description": "Analyse des fichiers entrants avant leur stockage définitif.",
-      "status": "REVIEW",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Commit 1df7fcd : protocole clamd INSTREAM intégré aux uploads avec refus en cas de menace ou d'indisponibilité. Cinq tests simulés réussis. Moteur réel CT107 non installé. Tests HTTP et gestion des fichiers temporaires à confirmer."
-    },
-    {
-      "key": "cartographie-incidents",
-      "title": "Cartographie des incidents",
-      "description": "Répartition des incidents par gravité et état, avec navigation vers leur tableau de bord.",
-      "status": "REVIEW",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Commit 1df7fcd : page React, route et menu intégrés. Build frontend validé dans VM130FH. Filtrage tenant vérifié dans les résolveurs incidents. Recette navigateur non effectuée. Ce module n'est pas une carte géographique."
     },
     {
       "key": "integration-ci-tests-mfa",

@@ -11,14 +11,20 @@
     {
       "id": "cmvjycbyx00433dnzlt4x6su4",
       "status": "DONE",
-      "updatedAt": "2026-11-17T13:16:40+01:00",
-      "evidence": ".gitlab-ci.yml contient eslint (front et back), gitleaks, semgrep et Trivy. Les scans gitleaks et Trivy se terminent par « || true » et ne bloquent donc pas le pipeline. Le 17/11/2026, 5cf8e27 met à jour les dépendances vulnérables du backend (package-lock.json)."
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": ".gitlab-ci.yml contient eslint (front et back), gitleaks, semgrep et Trivy ; gitleaks et Trivy se terminent par « || true » et ne bloquent pas le pipeline. Dépendances vulnérables mises à jour par 5cf8e27 et a04802d (backend), puis e183e8a (frontend et backend, 18/11/2026). Un pipeline GitHub Actions s'ajoute le 18/11 (6540d7f)."
     },
     {
       "id": "cmvjycbyy004a3dnzbbp3iv04",
       "status": "IN_PROGRESS",
-      "updatedAt": "2026-11-17T13:16:40+01:00",
-      "evidence": "Premier fichier de tests : 02-backend/tests/incident-lifecycle.test.mjs (b0e2607), 6 tests node:test réussis le 17/11/2026 avec Node 24. Aucun script npm test dans 02-backend/package.json ; les autres modules ne sont pas couverts."
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": "6 fichiers dans 02-backend/tests (cycle de vie, propositions d'incident, isolation des organisations, audit, connecteurs Wazuh). 40 tests node:test réussis le 19/11/2026 avec Node 24 (5 fichiers) ; le 6e fichier, wazuh-connector-authentication, exige le backend compilé (OPENCRISIS_TEST_BUILD_DIR) et n'a pas été lancé localement. 6540d7f ajoute .github/workflows/ci.yml : compilation, migrations Prisma, tests backend et build du frontend ; résultat du pipeline non consulté. Le frontend n'a pas de tests."
+    },
+    {
+      "id": "cmvjycbyx003u3dnz27xqy9gs",
+      "status": "DONE",
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": "fb06904 (18/11/2026) : révocation des JWT par session (migration 20261118203000_add_auth_sessions, services/auth.ts). Pas de test automatisé dédié ; non vérifié sur un déploiement."
     }
   ],
   "milestones": [],
@@ -48,6 +54,30 @@
       "status": "REVIEW",
       "updatedAt": "2026-11-17T13:16:40+01:00",
       "evidence": "b0ff90b (17/11/2026) : docker-compose.yml publie les ports 80 et 443 uniquement sur LAN_IP et TAILSCALE_IP ; nginx ajoute /graphql en POST seul vers le backend et retire une suite TLS inexistante. Configuration non testée sur le lab dans cette vérification."
+    },
+    {
+      "key": "isolation-multi-organisations",
+      "title": "Plusieurs organisations, données séparées",
+      "description": "Chaque organisation ne voit que ses incidents, documents, contacts et journaux.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migration 20261117140800_add_tenant_foundation, middlewares tenant, rbac et audit, scripts de reprise des données. Tests tenant-event-filter (5) et audit-tenant-policy (7) réussis. Reprise des données existantes et déploiement non vérifiés."
+    },
+    {
+      "key": "propositions-incidents",
+      "title": "Propositions d'incident à valider",
+      "description": "Un incident détecté automatiquement est proposé, puis accepté ou refusé par une personne habilitée.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migrations add_incident_proposals et guard_incident_proposal_lifecycle, services d'approbation et de refus, page IncidentProposals. 13 tests incident-proposal-policy réussis. Interface non testée."
+    },
+    {
+      "key": "ingestion-wazuh",
+      "title": "Réception des alertes Wazuh",
+      "description": "Des connecteurs Wazuh envoient leurs alertes à OpenCrisis, qui peut en tirer des propositions d'incident.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T00:54:32+01:00",
+      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migration add_wazuh_connectors, route routes/wazuhIngestion.ts exposée par nginx sous /api/integrations/wazuh/, page WazuhConnectors. 9 tests wazuh-connector-credentials réussis ; test d'authentification non lancé (backend non compilé). Aucune alerte réelle reçue dans cette vérification."
     }
   ]
 }

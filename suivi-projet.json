@@ -11,14 +11,14 @@
     {
       "id": "cmvjycbyx00433dnzlt4x6su4",
       "status": "DONE",
-      "updatedAt": "2026-11-19T00:54:32+01:00",
-      "evidence": ".gitlab-ci.yml contient eslint (front et back), gitleaks, semgrep et Trivy ; gitleaks et Trivy se terminent par « || true » et ne bloquent pas le pipeline. Dépendances vulnérables mises à jour par 5cf8e27 et a04802d (backend), puis e183e8a (frontend et backend, 18/11/2026). Un pipeline GitHub Actions s'ajoute le 18/11 (6540d7f)."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Maintenance des dépendances et contrôles CI déjà livrés. Commit 1df7fcd : ajout des tests MFA au workflow GitHub Actions. VM130FH : 65 tests réussis localement. Pipeline distant non encore contrôlé ; les outils GitLab non bloquants restent à renforcer."
     },
     {
       "id": "cmvjycbyy004a3dnzbbp3iv04",
       "status": "IN_PROGRESS",
-      "updatedAt": "2026-11-19T00:54:32+01:00",
-      "evidence": "6 fichiers dans 02-backend/tests (cycle de vie, propositions d'incident, isolation des organisations, audit, connecteurs Wazuh). 40 tests node:test réussis le 19/11/2026 avec Node 24 (5 fichiers) ; le 6e fichier, wazuh-connector-authentication, exige le backend compilé (OPENCRISIS_TEST_BUILD_DIR) et n'a pas été lancé localement. 6540d7f ajoute .github/workflows/ci.yml : compilation, migrations Prisma, tests backend et build du frontend ; résultat du pipeline non consulté. Le frontend n'a pas de tests."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "VM130FH, 19/11/2026 : build backend et frontend réussis en environnement Docker isolé ; 63 tests unitaires et 2 tests d'intégration TOTP/MFA réussis. 16 migrations Prisma appliquées sur PostgreSQL temporaire. Résultat GitHub Actions distant, tests HTTP uploads et recette navigateur encore à vérifier. Commit 1df7fcd."
     },
     {
       "id": "cmvjycbyx003u3dnz27xqy9gs",
@@ -36,8 +36,8 @@
       "title": "Tableau de bord global des incidents",
       "description": "Vue d'ensemble de toutes les crises en cours, accessible depuis le menu.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-17T13:16:40+01:00",
-      "evidence": "8aede91 (17/11/2026) : page 01-frontend/src/app/pages/GlobalDashboard.tsx, route et entrée du menu. Code présent ; ni compilation ni test d'interface dans cette vérification."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Build frontend global réussi dans VM130FH. Recette navigateur du tableau de bord non effectuée."
     },
     {
       "key": "cycle-de-vie-incidents",
@@ -60,24 +60,72 @@
       "title": "Plusieurs organisations, données séparées",
       "description": "Chaque organisation ne voit que ses incidents, documents, contacts et journaux.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T00:54:32+01:00",
-      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migration 20261117140800_add_tenant_foundation, middlewares tenant, rbac et audit, scripts de reprise des données. Tests tenant-event-filter (5) et audit-tenant-policy (7) réussis. Reprise des données existantes et déploiement non vérifiés."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "VM130FH : tests tenant, audit et filtrage des événements réussis. Résolveurs incidents contrôlés : permission, tenant serveur et filtre PostgreSQL. Migration des données existantes et déploiement non validés."
     },
     {
       "key": "propositions-incidents",
       "title": "Propositions d'incident à valider",
       "description": "Un incident détecté automatiquement est proposé, puis accepté ou refusé par une personne habilitée.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T00:54:32+01:00",
-      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migrations add_incident_proposals et guard_incident_proposal_lifecycle, services d'approbation et de refus, page IncidentProposals. 13 tests incident-proposal-policy réussis. Interface non testée."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Tests de la politique des propositions et du refus inter-tenant réussis dans VM130FH. Flux réel et interface non encore validés."
     },
     {
       "key": "ingestion-wazuh",
       "title": "Réception des alertes Wazuh",
       "description": "Des connecteurs Wazuh envoient leurs alertes à OpenCrisis, qui peut en tirer des propositions d'incident.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T00:54:32+01:00",
-      "evidence": "8eea8c3 et 6a10f36 (18/11/2026) : migration add_wazuh_connectors, route routes/wazuhIngestion.ts exposée par nginx sous /api/integrations/wazuh/, page WazuhConnectors. 9 tests wazuh-connector-credentials réussis ; test d'authentification non lancé (backend non compilé). Aucune alerte réelle reçue dans cette vérification."
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Tests unitaires des connecteurs, identités et secrets Wazuh réussis dans VM130FH. Aucune ingestion réelle démontrée lors de ce contrôle."
+    },
+    {
+      "key": "authentification-totp-mfa",
+      "title": "Authentification multifacteur TOTP",
+      "description": "Second facteur, récupération de compte, anti-rejeu, limitation des tentatives et gestion des sessions.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Commit 1df7fcd : TOTP, secrets chiffrés AES-GCM, codes de récupération hachés, interface de sécurité. Tests unitaires et intégration PostgreSQL réussis dans VM130FH. Recette utilisateur et déploiement restants."
+    },
+    {
+      "key": "antivirus-uploads-clamav",
+      "title": "Analyse antivirus des documents",
+      "description": "Analyse des fichiers entrants avant leur stockage définitif.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Commit 1df7fcd : protocole clamd INSTREAM intégré aux uploads avec refus en cas de menace ou d'indisponibilité. Cinq tests simulés réussis. Moteur réel CT107 non installé. Tests HTTP et gestion des fichiers temporaires à confirmer."
+    },
+    {
+      "key": "cartographie-incidents",
+      "title": "Cartographie des incidents",
+      "description": "Répartition des incidents par gravité et état, avec navigation vers leur tableau de bord.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Commit 1df7fcd : page React, route et menu intégrés. Build frontend validé dans VM130FH. Filtrage tenant vérifié dans les résolveurs incidents. Recette navigateur non effectuée. Ce module n'est pas une carte géographique."
+    },
+    {
+      "key": "integration-ci-tests-mfa",
+      "title": "Tests MFA dans GitHub Actions",
+      "description": "Exécuter automatiquement migrations et tests d'intégration sur PostgreSQL.",
+      "status": "IN_PROGRESS",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Commit 1df7fcd : workflow CI enrichi des tests TOTP/MFA. Parcours équivalent validé localement dans VM130FH. Résultat GitHub Actions distant encore à contrôler."
+    },
+    {
+      "key": "recette-http-uploads",
+      "title": "Recette HTTP des uploads sécurisés",
+      "description": "Tester les refus antivirus, les droits, le nettoyage temporaire et l'absence de documents enregistrés après rejet.",
+      "status": "TODO",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Au 19/11/2026 : client antivirus et tests protocolaires présents ; essais HTTP complets non encore démontrés."
+    },
+    {
+      "key": "deploiement-lot-securite",
+      "title": "Déploiement contrôlé du lot sécurité",
+      "description": "Préparer la sauvegarde, les migrations, le raccordement antivirus et la recette avant activation des nouvelles fonctionnalités.",
+      "status": "TODO",
+      "updatedAt": "2026-11-19T11:09:47+00:00",
+      "evidence": "Au 19/11/2026 : code publié par fusion cb554bb. Aucun déploiement du lot sur les conteneurs opérationnels. ClamAV réel non installé. Plan de retour arrière et recettes à réaliser."
     }
   ]
 }

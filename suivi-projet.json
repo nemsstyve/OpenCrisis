@@ -115,9 +115,9 @@
       "key": "recette-http-uploads",
       "title": "Recette HTTP des uploads sécurisés",
       "description": "Tester les refus antivirus, les droits, le nettoyage temporaire et l'absence de documents enregistrés après rejet.",
-      "status": "TODO",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Au 19/11/2026 : client antivirus et tests protocolaires présents ; essais HTTP complets non encore démontrés."
+      "status": "IN_PROGRESS",
+      "updatedAt": "2026-11-19T15:02:24+00:00",
+      "evidence": "VM130FZ et VM130HJ : recette HTTP des uploads validee en laboratoire Docker isole (Node 24, PostgreSQL 17, Redis 7). HTTP 401/403/422/503/201, acces inter-tenant refuse, fichiers temporaires nettoyes. 66 tests backend reussis, 16 migrations Prisma validees, audit npm backend : 0 vulnerabilite. Preuves : tests/integration/uploadHttp.integration.mjs et scripts/verify-upload-http-isolated.sh. CI distante et recette globale V0.2 encore a confirmer ; ClamAV reel CT107 non teste. Cloture DONE reportee a la recette globale."
     },
     {
       "key": "deploiement-lot-securite",

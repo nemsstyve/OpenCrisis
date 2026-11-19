@@ -37,6 +37,16 @@ jobs:
           --health-timeout 5s
           --health-retries 15
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
     steps:
       - uses: actions/checkout@v4
 
@@ -65,10 +75,14 @@ jobs:
         env:
           NODE_ENV: test
           OPENCRISIS_INTEGRATION_TEST: '1'
+          OPENCRISIS_HTTP_TEST_ISOLATED: '1'
+          REDIS_URL: redis://localhost:6379
           JWT_SECRET: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1'
           JWT_REFRESH_SECRET: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2'
           TOTP_ENCRYPTION_KEY: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3'
-        run: node --test tests/integration/*.integration.mjs
+        run: |
+          sudo install -d -m 0700 -o "$(id -u)" -g "$(id -g)" /app/uploads
+          node --test tests/integration/*.integration.mjs
 
   frontend:
     name: Frontend - Compilation

@@ -13,6 +13,8 @@ export default function Login() {
   const currentUser = useAppStore((s) => s.currentUser);
 
   const [error, setError] = useState<string | null>(null);
+  const [requiresTotp, setRequiresTotp] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
   const {
     register,
     handleSubmit,
@@ -28,7 +30,7 @@ export default function Login() {
   async function onSubmit(values: LoginForm) {
     setError(null);
     try {
-      const user = await login(values.email, values.password);
+      const user = await login(values.email, values.password, totpCode || undefined);
       if (user.mustChangePassword) {
         navigate("/change-password", { replace: true });
         return;
@@ -40,7 +42,12 @@ export default function Login() {
         (err as { graphQLErrors?: Array<{ message: string }> })
           ?.graphQLErrors?.[0]?.message;
       // N'afficher que les messages intentionnels du backend ; masquer tout message technique
-      setError(graphqlMsg ?? "Identifiants incorrects ou service indisponible.");
+      if (graphqlMsg?.includes("Code de verification requis")) {
+        setRequiresTotp(true);
+        setError("Saisissez le code de votre application ou un code de récupération.");
+      } else {
+        setError(graphqlMsg ?? "Identifiants incorrects ou service indisponible.");
+      }
     }
   }
 
@@ -80,6 +87,28 @@ export default function Login() {
             />
             {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
           </div>
+
+          {requiresTotp && (
+            <div>
+              <label htmlFor="totp-login" className="block text-sm text-gray-400 mb-1.5">
+                Code de vérification ou de récupération
+              </label>
+              <input
+                id="totp-login"
+                type="text"
+                inputMode="text"
+                autoComplete="one-time-code"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={totpCode}
+                onChange={(event) => setTotpCode(event.target.value.trim())}
+                className="w-full bg-[#0a0b0d] border border-[#1e2229] rounded-md px-3 py-2 text-white text-sm"
+                placeholder="Code à 6 chiffres"
+                required
+              />
+            </div>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-md px-3 py-2">

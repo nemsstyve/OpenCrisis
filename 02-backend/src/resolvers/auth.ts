@@ -3,6 +3,11 @@ import type { GraphQLContext } from '../context';
 import type { UserWithRoles } from '../services/auth';
 import { requireAuth } from '../middleware/rbac';
 import { login, logout, rotateRefreshToken, getMe, changePassword } from '../services/auth';
+import {
+  beginTotpEnrollment,
+  enableTotp,
+  disableTotp,
+} from '../services/totpAccount';
 
 function flattenPermissions(user: UserWithRoles) {
   const seen = new Set<string>();
@@ -30,14 +35,32 @@ export const authResolvers = {
   Mutation: {
     login: async (
       _: unknown,
-      { email, password }: { email: string; password: string },
+      { email, password, totpCode }: { email: string; password: string; totpCode?: string },
       ctx: GraphQLContext,
     ) => {
       if (!ctx.res) {
         throw new GraphQLError('Contexte HTTP requis', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
       }
-      return login(email, password, ctx.res, ctx.req?.ip);
+      return login(email, password, ctx.res, ctx.req?.ip, totpCode);
     },
+
+    beginTotpEnrollment: (
+      _: unknown,
+      args: { password: string },
+      ctx: GraphQLContext,
+    ) => beginTotpEnrollment(requireAuth(ctx), args.password),
+
+    enableTotp: (
+      _: unknown,
+      args: { code: string },
+      ctx: GraphQLContext,
+    ) => enableTotp(requireAuth(ctx), args.code),
+
+    disableTotp: (
+      _: unknown,
+      args: { password: string; code: string },
+      ctx: GraphQLContext,
+    ) => disableTotp(requireAuth(ctx), args.password, args.code),
 
     logout: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       if (!ctx.userId || !ctx.sessionId || !ctx.req || !ctx.res) {

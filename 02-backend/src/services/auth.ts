@@ -7,6 +7,12 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { logAudit } from '../middleware/audit';
 import { passwordSchema } from '../utils/validation';
+import { consumeMfaAttempt } from './mfaRateLimit';
+import {
+  decryptTotpSecret,
+  hashRecoveryCode,
+  verifyTotpStep,
+} from './totp';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,6 +95,7 @@ async function issueRefreshTokenForVerifiedLogin(
   userId: string,
   verifiedPasswordHash: string,
   res: Response,
+  totpCode?: string,
 ): Promise<{ sessionVersion: number; sessionId: string }> {
   const token = jwt.sign({ userId, jti: randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
     expiresIn: `${REFRESH_TTL_DAYS}d`,
@@ -118,6 +125,67 @@ async function issueRefreshTokenForVerifiedLogin(
         'Session invalidee : veuillez vous reconnecter',
         { extensions: { code: 'UNAUTHENTICATED' } },
       );
+    }
+
+
+    // La verification MFA et la creation de session
+    // appartiennent a la meme transaction, sous verrou User.
+    const credential = await tx.totpCredential.findUnique({
+      where: { userId },
+    });
+
+    if (credential?.enabledAt) {
+      if (!credential.secretCiphertext || !totpCode) {
+        throw new GraphQLError(
+          'Code de verification requis',
+          { extensions: { code: 'UNAUTHENTICATED' } },
+        );
+      }
+
+      let accepted = false;
+
+      if (/^[0-9]{6}$/.test(totpCode)) {
+        const secret = decryptTotpSecret(
+          credential.secretCiphertext,
+          userId,
+        );
+
+        const step = verifyTotpStep(
+          secret,
+          totpCode,
+          Date.now(),
+          credential.lastUsedStep,
+        );
+
+        if (step !== null) {
+          await tx.totpCredential.update({
+            where: { userId },
+            data: { lastUsedStep: step },
+          });
+
+          accepted = true;
+        }
+      } else if (/^[a-f0-9]{40}$/.test(totpCode)) {
+        const hash = hashRecoveryCode(totpCode);
+
+        const consumed = await tx.totpRecoveryCode.updateMany({
+          where: {
+            userId,
+            codeHash: hash,
+            usedAt: null,
+          },
+          data: { usedAt: new Date() },
+        });
+
+        accepted = consumed.count === 1;
+      }
+
+      if (!accepted) {
+        throw new GraphQLError(
+          'Code de verification incorrect',
+          { extensions: { code: 'UNAUTHENTICATED' } },
+        );
+      }
     }
 
     const session = await tx.authSession.create({
@@ -163,6 +231,7 @@ export async function login(
   password: string,
   res: Response,
   ipAddress?: string | null,
+  totpCode?: string,
 ): Promise<{ accessToken: string; user: UserWithRoles }> {
   // C1 — vérifier le rate limit avant tout traitement
   checkLoginRateLimit(ipAddress ?? 'unknown');
@@ -185,10 +254,24 @@ export async function login(
     });
   }
 
+  // Compteur partagé, persisté même si le second
+  // facteur est incorrect. Aucun jeton n'est émis
+  // avant ce contrôle.
+  const credentialForRateLimit =
+    await prisma.totpCredential.findUnique({
+      where: { userId: user.id },
+      select: { enabledAt: true },
+    });
+
+  if (credentialForRateLimit?.enabledAt) {
+    await consumeMfaAttempt(user.id);
+  }
+
   const issued = await issueRefreshTokenForVerifiedLogin(
     user.id,
     user.passwordHash,
     res,
+    totpCode,
   );
   const accessToken = generateAccessToken(
     user.id,

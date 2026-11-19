@@ -20,8 +20,8 @@ export const CHANGE_PASSWORD_MUTATION = gql`
 
 export const LOGIN_MUTATION = gql`
   ${USER_FIELDS}
-  mutation Login($email: String!, $password: String!) {
-    login(email: $email, password: $password) {
+  mutation Login($email: String!, $password: String!, $totpCode: String) {
+    login(email: $email, password: $password, totpCode: $totpCode) {
       accessToken
       user { ...UserFields }
     }
@@ -48,5 +48,26 @@ export const ME_QUERY = gql`
   ${USER_FIELDS}
   query Me {
     me { ...UserFields }
+  }
+`;
+
+export const BEGIN_TOTP_ENROLLMENT_MUTATION = gql`
+  mutation BeginTotpEnrollment($password: String!) {
+    beginTotpEnrollment(password: $password) {
+      secret
+      provisioningUri
+    }
+  }
+`;
+
+export const ENABLE_TOTP_MUTATION = gql`
+  mutation EnableTotp($code: String!) {
+    enableTotp(code: $code)
+  }
+`;
+
+export const DISABLE_TOTP_MUTATION = gql`
+  mutation DisableTotp($password: String!, $code: String!) {
+    disableTotp(password: $password, code: $code)
   }
 `;

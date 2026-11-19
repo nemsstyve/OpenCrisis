@@ -61,6 +61,15 @@ jobs:
       - name: Executer les tests backend
         run: node --test tests/*.test.mjs
 
+      - name: Tester MFA et audit multi-tenant sur PostgreSQL
+        env:
+          NODE_ENV: test
+          OPENCRISIS_INTEGRATION_TEST: '1'
+          JWT_SECRET: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1'
+          JWT_REFRESH_SECRET: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2'
+          TOTP_ENCRYPTION_KEY: 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3'
+        run: node --test tests/integration/*.integration.mjs
+
   frontend:
     name: Frontend - Compilation
     runs-on: ubuntu-latest

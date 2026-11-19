@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { openVerifiedUpload } from '../services/fileStorageSafety';
+import { scanUploadFile, AntivirusError } from '../services/antivirus';
 import { DocumentCategory } from '@prisma/client';
 import { GraphQLError } from 'graphql';
 import { verifyActiveAccessToken, extractBearerToken } from '../middleware/auth';
@@ -109,6 +110,10 @@ router.post('/upload', requireAuth, async (req, res, next) => {
       }
     }
 
+    // Scanner avant de rendre le fichier accessible.
+    // Aucun document n'est cree avant le verdict OK.
+    await scanUploadFile(file.path);
+
     // Déplacer vers le dossier cible
     const targetDir = incidentId
       ? path.join(UPLOADS_DIR, 'incidents', incidentId)
@@ -159,6 +164,11 @@ router.post('/upload', requireAuth, async (req, res, next) => {
       const code = err instanceof GraphQLError
         ? err.extensions.code
         : undefined;
+
+      if (err instanceof AntivirusError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
 
       const status =
         code === 'BAD_USER_INPUT' ? 400 :

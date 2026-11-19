@@ -24,7 +24,7 @@ import type { GqlUser } from "../types/generated";
 interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<GqlUser>;
+  login: (email: string, password: string, totpCode?: string) => Promise<GqlUser>;
   logout: () => Promise<void>;
 }
 
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [clearSession]);
 
-  async function login(email: string, password: string): Promise<GqlUser> {
+  async function login(email: string, password: string, totpCode?: string): Promise<GqlUser> {
     // Toute authentification invalide les restaurations precedentes.
     const generation = ++authGeneration.current;
 
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = await apolloClient.mutate({
       mutation: LOGIN_MUTATION,
-      variables: { email, password },
+      variables: { email, password, totpCode },
       fetchPolicy: "no-cache",
     });
     if (generation !== authGeneration.current) {

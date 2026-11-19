@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import {
   LayoutDashboard,
+  ShieldCheck,
+  Network,
   Users,
   Library,
   FileText,
   ClipboardList,
-  ShieldCheck,
+
   Clock,
   ChevronLeft,
   LogOut,
@@ -105,6 +107,18 @@ export default function Sidebar() {
           path: "/incidents",
           label: "Tous les incidents",
           icon: FileText,
+          permission: "DASHBOARD",
+        },
+        {
+          path: "/securite-compte",
+          label: "Sécurité du compte",
+          icon: ShieldCheck,
+          permission: "DASHBOARD",
+        },
+        {
+          path: "/cartographie",
+          label: "Cartographie",
+          icon: Network,
           permission: "DASHBOARD",
         },
         {

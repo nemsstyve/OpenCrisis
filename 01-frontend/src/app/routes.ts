@@ -8,6 +8,8 @@ import ChangePassword from "./pages/ChangePassword";
 import IncidentSelector from "./pages/IncidentSelector";
 import Dashboard from "./pages/Dashboard";
 import GlobalDashboard from "./pages/GlobalDashboard";
+import SecuriteCompte from "./pages/SecuriteCompte";
+import Cartographie from "./pages/Cartographie";
 import Annuaire from "./pages/Annuaire";
 import Bibliotheque from "./pages/Bibliotheque";
 import MainCouranteDirection from "./pages/MainCouranteDirection";
@@ -46,6 +48,26 @@ export const router = createBrowserRouter([
           {
             index: true,
             Component: guarded("DASHBOARD", GlobalDashboard),
+          },
+        ],
+      },
+      {
+        path: "/securite-compte",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("DASHBOARD", SecuriteCompte),
+          },
+        ],
+      },
+      {
+        path: "/cartographie",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("DASHBOARD", Cartographie),
           },
         ],
       },

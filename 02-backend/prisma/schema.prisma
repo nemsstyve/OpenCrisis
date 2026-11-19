@@ -62,6 +62,8 @@ model User {
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
   authSessions    AuthSession[]
+  totpCredential TotpCredential?
+  mfaAttemptBucket MfaAttemptBucket?
   createdIoCs     IoC[]
 
   @@index([deletedAt])
@@ -132,6 +134,43 @@ model AuthSession {
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+}
+
+
+// Authentification multifacteur, un utilisateur = une configuration.
+model MfaAttemptBucket {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts  Int      @default(0)
+  resetAt   DateTime
+}
+
+model TotpCredential {
+  userId                  String   @id
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretCiphertext        String?
+  pendingSecretCiphertext String?
+  pendingExpiresAt        DateTime?
+  enabledAt               DateTime?
+  lastUsedStep            BigInt?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  recoveryCodes TotpRecoveryCode[]
+}
+
+// Seule l'empreinte du code est stockee.
+// usedAt doit etre actualise atomiquement a l'utilisation.
+model TotpRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  credential TotpCredential @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, usedAt])
 }
 
 model RefreshToken {

@@ -195,7 +195,12 @@ async function makeUser(tenantId, suffix, grantDocuments) {
   };
 }
 
-async function upload(baseUrl, token, incidentId) {
+async function upload(
+  baseUrl,
+  token,
+  incidentId,
+  fileContent = Buffer.from('contenu de test HTTP')
+) {
   const form = new FormData();
 
   form.append('category', 'OTHER');
@@ -206,7 +211,7 @@ async function upload(baseUrl, token, incidentId) {
 
   form.append(
     'file',
-    new Blob([Buffer.from('contenu de test HTTP')], {
+    new Blob([fileContent], {
       type: 'text/plain',
     }),
     'integration-test.txt'
@@ -298,6 +303,39 @@ test(
       // Sans DOCUMENTS:WRITE : refus.
       response = await upload(baseUrl, denied.token);
       assert.equal(response.status, 403);
+
+      // Depassement de la limite Multer : HTTP 413.
+      const oversizedFile = Buffer.alloc(
+        20 * 1024 * 1024 + 1,
+        0x41
+      );
+
+      response = await upload(
+        baseUrl,
+        allowed.token,
+        undefined,
+        oversizedFile
+      );
+
+      assert.equal(response.status, 413);
+
+      assert.equal(
+        await prisma.document.count({
+          where: { tenantId: tenantAId },
+        }),
+        0,
+        'Aucun document ne doit etre cree apres HTTP 413'
+      );
+
+      assert.deepEqual(
+        await temporaryFiles(),
+        initialFiles,
+        'Aucun fichier temporaire apres HTTP 413'
+      );
+
+      console.log(
+        'PASS : HTTP 413, aucun document, aucun fichier temporaire'
+      );
 
       // Une alerte de malware provoque HTTP 422.
       scanner.state.verdict = 'stream: Test FOUND';

@@ -43,8 +43,30 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 Mo
+  // Limite volontairement inferieure au StreamMaxLength de ClamAV (25 Mio).
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 Mio
 });
+
+// Gerer explicitement le depassement de taille avant le handler HTTP.
+function uploadWithSizeLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  upload.single('file')(req, res, (error: unknown) => {
+    if (
+      error instanceof multer.MulterError &&
+      error.code === 'LIMIT_FILE_SIZE'
+    ) {
+      res.status(413).json({
+        error: 'Fichier trop volumineux (maximum 20 Mio)',
+      });
+      return;
+    }
+
+    next(error);
+  });
+}
 
 // ─── Middleware d'authentification ────────────────────────────────────────────
 
@@ -70,7 +92,7 @@ router.post('/upload', requireAuth, async (req, res, next) => {
   const allowed = await requireHttpPermission(req as AuthRequest, res, 'DOCUMENTS', 'WRITE');
   if (!allowed) return;
   next();
-}, upload.single('file'), async (req, res) => {
+}, uploadWithSizeLimit, async (req, res) => {
   // Le fichier reste provisoire tant que son
   // enregistrement en base n'est pas confirme.
   let uncommittedFilePath: string | null =

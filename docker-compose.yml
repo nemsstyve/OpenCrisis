@@ -103,6 +103,8 @@ services:
       OPENCTI_TOKEN: ${OPENCTI_TOKEN:-}
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
+      CLAMAV_HOST: "10.10.10.107"
+      CLAMAV_PORT: "3310"
     volumes:
       - uploads_data:/app/uploads
     depends_on:

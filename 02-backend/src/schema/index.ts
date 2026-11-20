@@ -10,6 +10,7 @@ import { adminTypeDefs } from './admin';
 import { wazuhConnectorTypeDefs } from './wazuhConnector';
 import { openctiTypeDefs } from './opencti';
 import { sharedThreatTypeDefs } from './sharedThreat';
+import { wazuhCorrelationHistoryTypeDefs } from './wazuhCorrelationHistory';
 
 // Base types — étendu par chaque module
 const baseTypeDefs = `#graphql
@@ -31,4 +32,5 @@ export const typeDefs = [
   wazuhConnectorTypeDefs,
   openctiTypeDefs,
   sharedThreatTypeDefs,
+  wazuhCorrelationHistoryTypeDefs,
 ];

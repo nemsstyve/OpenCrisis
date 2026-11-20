@@ -18,6 +18,8 @@ import Timeline from "./pages/Timeline";
 import Administration from "./pages/Administration";
 import IncidentProposals from "./pages/IncidentProposals";
 import WazuhConnectors from "./pages/WazuhConnectors";
+import SharedThreatIntelligence from "./pages/SharedThreatIntelligence";
+import WazuhCorrelations from "./pages/WazuhCorrelations";
 import NotFound from "./pages/NotFound";
 
 function guarded(resource: string, Page: React.ComponentType) {
@@ -78,6 +80,29 @@ export const router = createBrowserRouter([
           {
             index: true,
             Component: guarded("DASHBOARD", IncidentProposals),
+          },
+        ],
+      },
+      {
+        path: "/threat-intelligence",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded(
+              "DASHBOARD",
+              SharedThreatIntelligence
+            ),
+          },
+        ],
+      },
+      {
+        path: "/correlations-soc",
+        Component: RootLayout,
+        children: [
+          {
+            index: true,
+            Component: guarded("DASHBOARD", WazuhCorrelations),
           },
         ],
       },

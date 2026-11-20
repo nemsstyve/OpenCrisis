@@ -39,3 +39,55 @@ export async function correlateAuthenticatedWazuhAlert(
     { externalEventId: alert.externalEventId, indicators: alert.indicators },
   );
 }
+
+// V0.4 - La source et le tenant proviennent du connecteur authentifie.
+export async function correlateAuthenticatedWazuhAlertWithIdentity(
+  db: PrismaClient,
+  connectorId: unknown,
+  presentedSecret: unknown,
+  alert: AuthenticatedCorrelationInput,
+): Promise<{
+  tenantId: string;
+  sourceId: string;
+  result: WazuhCorrelationResult;
+} | null> {
+  const authenticated = await authenticateWazuhConnector(
+    db,
+    connectorId,
+    presentedSecret,
+  );
+
+  if (!authenticated) return null;
+
+  if (
+    !alert ||
+    typeof alert !== 'object' ||
+    (
+      alert.eventTenantId !== undefined &&
+      alert.eventTenantId !== null &&
+      alert.eventTenantId !== authenticated.tenantId
+    )
+  ) {
+    throw new GraphQLError(
+      'Entreprise declaree incompatible avec le connecteur',
+      { extensions: { code: 'FORBIDDEN' } },
+    );
+  }
+
+  const result = await correlateTrustedWazuhAlert(
+    {
+      tenantId: authenticated.tenantId,
+      sourceId: authenticated.sourceId,
+    },
+    {
+      externalEventId: alert.externalEventId,
+      indicators: alert.indicators,
+    },
+  );
+
+  return {
+    tenantId: authenticated.tenantId,
+    sourceId: authenticated.sourceId,
+    result,
+  };
+}

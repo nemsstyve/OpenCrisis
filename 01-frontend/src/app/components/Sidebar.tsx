@@ -128,6 +128,18 @@ export default function Sidebar() {
           permission: "DASHBOARD",
         },
         {
+          path: "/threat-intelligence",
+          label: "Threat Intelligence",
+          icon: ShieldCheck,
+          permission: "DASHBOARD",
+        },
+        {
+          path: "/correlations-soc",
+          label: "Corrélations SOC",
+          icon: ShieldCheck,
+          permission: "DASHBOARD",
+        },
+        {
           path: "/connecteurs-wazuh",
           label: "Connecteurs Wazuh",
           icon: ShieldCheck,

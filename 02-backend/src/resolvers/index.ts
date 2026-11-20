@@ -10,6 +10,7 @@ import { adminResolvers } from './admin';
 import { wazuhConnectorResolvers } from './wazuhConnector';
 import { openctiResolvers } from './opencti';
 import { sharedThreatResolvers } from './sharedThreat';
+import { wazuhCorrelationHistoryResolvers } from './wazuhCorrelationHistory';
 
 export const resolvers = [
   authResolvers,
@@ -24,4 +25,5 @@ export const resolvers = [
   wazuhConnectorResolvers,
   openctiResolvers,
   sharedThreatResolvers,
+  wazuhCorrelationHistoryResolvers,
 ];

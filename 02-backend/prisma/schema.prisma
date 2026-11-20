@@ -17,6 +17,7 @@ model Tenant {
   automaticCreationApproved Boolean @default(false)
   incidentProposals IncidentProposal[]
   wazuhConnectors WazuhConnector[]
+  wazuhCorrelationRecords WazuhCorrelationRecord[]
   threatSubmissions ThreatSubmission[]
   incidentThreatLinks IncidentThreatLink[]
 
@@ -598,4 +599,22 @@ model IncidentThreatLink {
 
   @@unique([tenantId, incidentId, threatId])
   @@index([tenantId, createdAt])
+}
+
+
+// V0.4 - Historique minimal sans payload Wazuh brut ni secret.
+model WazuhCorrelationRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceId        String
+  externalEventId String
+  matched         Boolean
+  confidence      Int
+  matches         Json
+  correlatedAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, sourceId, externalEventId])
+  @@index([tenantId, correlatedAt])
 }

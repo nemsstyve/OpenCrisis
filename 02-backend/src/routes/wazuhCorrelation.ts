@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import { GraphQLError } from 'graphql';
 import { prisma } from '../prisma';
-import { correlateAuthenticatedWazuhAlert } from '../services/wazuhAuthenticatedCorrelation';
+import { correlateAuthenticatedWazuhAlertWithIdentity } from '../services/wazuhAuthenticatedCorrelation';
+import { randomUUID } from 'node:crypto';
 
 const router = Router();
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -39,10 +40,48 @@ router.post('/correlate', async (req, res) => {
     res.status(400).json({ error: 'Alerte invalide' }); return;
   }
   try {
-    const result = await correlateAuthenticatedWazuhAlert(prisma, connectorId, secret, req.body);
-    if (!result) {
-      res.status(401).json({ error: 'Authentification refusee' }); return;
+    const authenticated =
+      await correlateAuthenticatedWazuhAlertWithIdentity(
+        prisma,
+        connectorId,
+        secret,
+        req.body,
+      );
+
+    if (!authenticated) {
+      res.status(401).json({ error: 'Authentification refusee' });
+      return;
     }
+
+    const { tenantId, sourceId, result } = authenticated;
+
+    // Une seule ligne par tenant, source et evenement Wazuh.
+    // Aucun secret, payload brut ou document prive stocke.
+    await prisma.wazuhCorrelationRecord.upsert({
+      where: {
+        tenantId_sourceId_externalEventId: {
+          tenantId,
+          sourceId,
+          externalEventId: result.externalEventId,
+        },
+      },
+      create: {
+        id: randomUUID(),
+        tenantId,
+        sourceId,
+        externalEventId: result.externalEventId,
+        matched: result.matched,
+        confidence: result.confidence,
+        matches: JSON.parse(JSON.stringify(result.matches)),
+      },
+      update: {
+        matched: result.matched,
+        confidence: result.confidence,
+        matches: JSON.parse(JSON.stringify(result.matches)),
+        correlatedAt: new Date(),
+      },
+    });
+
     res.status(200).json(result);
   } catch (error) {
     if (error instanceof GraphQLError) {

@@ -1,6 +1,6 @@
 # OpenCrisis
 
-Application web de gestion de crise cyber pour une seule organisation. Elle réunit la cellule directionnelle et la cellule opérationnelle sur une interface unique avec collaboration en temps réel.
+Application web de gestion de crise cyber pour une ou plusieurs organisation. Elle réunit la cellule directionnelle et la cellule opérationnelle sur une interface unique avec collaboration en temps réel.
 
 ![React](https://img.shields.io/badge/React-18-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-20-green)

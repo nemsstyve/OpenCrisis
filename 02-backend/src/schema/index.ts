@@ -9,6 +9,7 @@ import { contactTypeDefs } from './contact';
 import { adminTypeDefs } from './admin';
 import { wazuhConnectorTypeDefs } from './wazuhConnector';
 import { openctiTypeDefs } from './opencti';
+import { sharedThreatTypeDefs } from './sharedThreat';
 
 // Base types — étendu par chaque module
 const baseTypeDefs = `#graphql
@@ -29,4 +30,5 @@ export const typeDefs = [
   adminTypeDefs,
   wazuhConnectorTypeDefs,
   openctiTypeDefs,
+  sharedThreatTypeDefs,
 ];

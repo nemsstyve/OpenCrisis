@@ -17,6 +17,8 @@ model Tenant {
   automaticCreationApproved Boolean @default(false)
   incidentProposals IncidentProposal[]
   wazuhConnectors WazuhConnector[]
+  threatSubmissions ThreatSubmission[]
+  incidentThreatLinks IncidentThreatLink[]
 
   id        String   @id @default(uuid())
   name      String
@@ -193,6 +195,7 @@ model RefreshToken {
 
 model Incident {
   originatingProposal IncidentProposal?
+  sharedThreatLinks IncidentThreatLink[]
 
   tenantId      String?
   tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -530,4 +533,69 @@ model WazuhConnector {
 
   @@unique([tenantId, sourceId])
   @@index([tenantId, isActive])
+}
+
+
+// V0.3 — bibliothèque commune, jamais directement reliée aux preuves privées.
+model SharedThreat {
+  id             String   @id @default(uuid())
+  indicatorType  IoCType
+  indicatorValue String
+  title          String
+  mitigation     String
+  publishedAt    DateTime @default(now())
+  revokedAt      DateTime?
+  publishedById  String
+
+  submissions    ThreatSubmission[]
+  incidentLinks  IncidentThreatLink[]
+
+  @@unique([indicatorType, indicatorValue])
+  @@index([revokedAt, publishedAt])
+}
+
+enum ThreatReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Une proposition est privée. Seule la version explicitement validée est publiée.
+model ThreatSubmission {
+  id                String             @id @default(uuid())
+  tenantId          String
+  sourceIoCId       String
+  indicatorType     IoCType
+  indicatorValue    String
+  title             String
+  mitigation        String
+  status            ThreatReviewStatus @default(PENDING)
+  submittedById     String
+  reviewedById      String?
+  reviewedAt        DateTime?
+  publishedThreatId String?
+  createdAt         DateTime           @default(now())
+
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  publishedThreat SharedThreat? @relation(fields: [publishedThreatId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+// Une association reste strictement dans le périmètre du tenant.
+model IncidentThreatLink {
+  id         String   @id @default(uuid())
+  tenantId   String
+  incidentId String
+  threatId   String
+  linkedById String
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  incident Incident     @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  threat   SharedThreat @relation(fields: [threatId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, incidentId, threatId])
+  @@index([tenantId, createdAt])
 }

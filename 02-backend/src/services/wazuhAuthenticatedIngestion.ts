@@ -229,7 +229,7 @@ export async function ingestAuthenticatedWazuhAlert(
               AND "tenantId" = ${candidate.tenantId}
               AND "isActive" = true
               AND "revokedAt" IS NULL
-            FOR SHARE
+            FOR UPDATE
           `;
 
           if (connectors.length !== 1) {
@@ -267,6 +267,20 @@ export async function ingestAuthenticatedWazuhAlert(
             alert.eventTenantId !== connector.tenantId
           ) {
             throw new WazuhTenantMismatchError();
+          }
+
+          const usageUpdate = await tx.wazuhConnector.updateMany({
+            where: {
+              id: connector.id,
+              tenantId: connector.tenantId,
+              isActive: true,
+              revokedAt: null,
+            },
+            data: { lastUsedAt: new Date() },
+          });
+
+          if (usageUpdate.count !== 1) {
+            throw new Error('Traçabilité du connecteur indisponible');
           }
 
           const policy = evaluateIncidentAlert({

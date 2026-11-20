@@ -19,8 +19,28 @@ const original = {
 };
 function mock({ connectorExists=true, active=true, sourceTenant=tenantId, currentHash=secretHash } = {}) {
   const calls = [];
+
+  Object.defineProperty(calls, 'usageUpdates', {
+    value: [],
+    enumerable: false,
+  });
+
   prisma.wazuhConnector.findUnique = async () => connectorExists ? {tenantId:sourceTenant} : null;
-  prisma.$transaction = async callback => callback({$queryRaw:async (parts,...params) => {
+  prisma.$transaction = async callback => callback({
+    wazuhConnector: {
+      async updateMany(args) {
+        assert.equal(args.where.id, 'connector-a');
+        assert.equal(args.where.tenantId, sourceTenant);
+        assert.equal(args.where.isActive, true);
+        assert.equal(args.where.revokedAt, null);
+        assert.ok(args.data.lastUsedAt instanceof Date);
+
+        calls.usageUpdates.push(args);
+
+        return { count: 1 };
+      },
+    },
+    $queryRaw:async (parts,...params) => {
     const sql = parts.join('?');
     if (sql.includes('FROM "Tenant"')) return active ? [{id:sourceTenant}] : [];
     if (sql.includes('FROM "WazuhConnector"')) return active ? [{id:'connector-a',tenantId:sourceTenant,sourceId:'source-a',secretHash:currentHash}] : [];
@@ -53,6 +73,7 @@ test('Secret machine correct : correspondance publique et identite derivee de DB
     assert.equal(result.confidence,90);
     assert.equal(result.incidentAutomaticallyCreated,false);
     assert.deepEqual(calls,['tenant','threat']);
+    assert.equal(calls.usageUpdates.length, 1);
     assert.equal(JSON.stringify(result).includes(secret), false);
     assert.equal(JSON.stringify(result).includes(tenantId), false);
   } finally {reset();}
@@ -62,6 +83,7 @@ test('Secret incorrect : aucune correlation', async () => {
   try {
     const result=await correlateAuthenticatedWazuhAlert(prisma,'connector-a',generateWazuhConnectorSecret(),input());
     assert.equal(result,null); assert.deepEqual(calls,[]);
+    assert.equal(calls.usageUpdates.length,0);
   } finally {reset();}
 });
 test('Connecteur inconnu : aucune correlation', async () => {
@@ -70,7 +92,20 @@ test('Connecteur inconnu : aucune correlation', async () => {
 });
 test('Connecteur ou tenant inactif : aucune correlation', async () => {
   const calls=mock({active:false});
-  try {assert.equal(await correlateAuthenticatedWazuhAlert(prisma,'connector-a',secret,input()),null); assert.deepEqual(calls,[]);} finally {reset();}
+
+  try {
+    assert.equal(
+      await correlateAuthenticatedWazuhAlert(
+        prisma,'connector-a',secret,input()
+      ),
+      null
+    );
+
+    assert.deepEqual(calls,[]);
+    assert.equal(calls.usageUpdates.length,0);
+  } finally {
+    reset();
+  }
 });
 test('Tenant injecte dans l alerte : refus', async () => {
   const calls=mock();
@@ -86,5 +121,6 @@ test('Sans tenant fourni : identite serveur et sortie sans informations privees'
     assert.equal(result.matches[0].mitigation,'Isoler le poste');
     assert.equal(Object.hasOwn(result,'tenantId'),false);
     assert.deepEqual(calls,['tenant','threat']);
+    assert.equal(calls.usageUpdates.length, 1);
   } finally {reset();}
 });

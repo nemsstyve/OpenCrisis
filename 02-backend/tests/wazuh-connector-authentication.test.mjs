@@ -43,7 +43,29 @@ function fixture(options = {}) {
   const calls = [];
 
   const tx = {
-    async $queryRaw() {
+    wazuhConnector: {
+      async updateMany(args) {
+        calls.push('usage');
+
+        assert.equal(args.where.id, 'connector-a');
+        assert.equal(args.where.tenantId, 'tenant-a');
+        assert.equal(args.where.isActive, true);
+        assert.equal(args.where.revokedAt, null);
+        assert.ok(args.data.lastUsedAt instanceof Date);
+
+        return { count: 1 };
+      },
+    },
+    async $queryRaw(parts) {
+      const sql = parts.join('?');
+      const count = calls.filter(x => x === 'lock').length;
+
+      if (count === 0) {
+        assert.match(sql, /FOR SHARE/);
+      } else {
+        assert.match(sql, /FOR UPDATE/);
+      }
+
       calls.push('lock');
       return calls.filter(x => x === 'lock').length === 1
         ? tenantRows
@@ -91,6 +113,7 @@ test('connecteur valide retourne uniquement son identite', async () => {
     'transaction',
     'lock',
     'lock',
+    'usage',
   ]);
 });
 
@@ -104,6 +127,7 @@ test('secret incorrect refuse', async () => {
   );
 
   assert.equal(result, null);
+  assert.equal(f.calls.includes('usage'), false);
 });
 
 test('secret malforme refuse avant la base', async () => {
@@ -167,6 +191,8 @@ test('connecteur revoque ou inactif refuse', async () => {
     ),
     null,
   );
+
+  assert.equal(f.calls.includes('usage'), false);
 });
 
 test('erreur de base de donnees non masquee', async () => {

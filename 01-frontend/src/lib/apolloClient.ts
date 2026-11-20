@@ -133,6 +133,12 @@ export function invalidateAuthSession() {
 // ─── errorLink — intercepte les 401 et tente un refresh ──────────────────────
 
 const errorLink = onError(({ graphQLErrors, operation, forward }) => {
+  // Ne jamais renouveler une session pendant la connexion.
+  // Les erreurs MFA doivent parvenir au formulaire Login.
+  if (operation.operationName === "Login") {
+    return;
+  }
+
   const isUnauthenticated = graphQLErrors?.some(
     (error) => error.extensions?.code === "UNAUTHENTICATED",
   );

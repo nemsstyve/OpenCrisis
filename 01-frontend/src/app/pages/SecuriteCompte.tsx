@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useMutation } from "@apollo/client";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -170,6 +171,22 @@ export default function SecuriteCompte() {
                 <p className="text-sm text-gray-400">
                   Ajoutez manuellement la clé suivante dans votre application
                   d'authentification. Le code change toutes les 30 secondes.
+                </p>
+                <div className="flex justify-center">
+                  <div className="rounded-xl bg-white p-4">
+                    <QRCodeSVG
+                      value={enrollment.provisioningUri}
+                      size={224}
+                      level="M"
+                      marginSize={4}
+                      title="QR code de configuration TOTP OpenCrisis"
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Scannez ce QR code avec votre application
+                  d'authentification. Si le scan est impossible,
+                  utilisez la cle de configuration ci-dessous.
                 </p>
                 <code className="block break-all rounded bg-gray-900 p-3 text-sm">
                   {enrollment.secret}

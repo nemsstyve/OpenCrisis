@@ -3,11 +3,11 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Installation de pnpm (le template utilise pnpm)
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.34.9
 
 # Dépendances en premier pour profiter du cache Docker
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Code source
 COPY . .

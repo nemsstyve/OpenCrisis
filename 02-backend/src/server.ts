@@ -1,3 +1,4 @@
+import wazuhCorrelationRouter from './routes/wazuhCorrelation';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
@@ -70,6 +71,7 @@ async function main() {
 
   // API machine Wazuh, independante des JWT GraphQL.
   app.use('/api/integrations/wazuh', wazuhIngestionRouter);
+  app.use('/api/integrations/wazuh', wazuhCorrelationRouter);
 
   const schema = makeExecutableSchema({ typeDefs, resolvers });
 

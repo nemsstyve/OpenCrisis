@@ -146,7 +146,7 @@ export default function SharedThreatIntelligence() {
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">
-          Threat Intelligence — V0.3
+          Threat Intelligence
         </h1>
         <p className="text-sm text-muted-foreground">
           Renseignement partagé, indicateurs de compromission

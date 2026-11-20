@@ -79,7 +79,7 @@ export default function WazuhCorrelations() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold">
-            Corrélations SOC — V0.4
+            Corrélations SOC
           </h1>
           <p className="text-sm text-muted-foreground">
             Correspondances entre alertes Wazuh et menaces
@@ -184,9 +184,9 @@ export default function WazuhCorrelations() {
       {!loading && !error && visible.length === 0 && (
         <div className={panel}>
           <p className="text-sm text-muted-foreground">
-            Aucun résultat correspondant aux filtres.
-            L'historique commence à partir de l'activation
-            de la persistance V0.4.
+            Aucun résultat disponible pour le moment.
+            Les corrélations apparaîtront ici dès leur enregistrement.
+
           </p>
         </div>
       )}

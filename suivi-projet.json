@@ -17,8 +17,8 @@
     {
       "id": "cmvjycbyy004a3dnzbbp3iv04",
       "status": "IN_PROGRESS",
-      "updatedAt": "2026-11-19T21:58:41+01:00",
-      "evidence": "19/11/2026 : 8 fichiers de tests unitaires et 5 d'intégration (uploads HTTP, isolation des incidents, GraphQL HTTP, Apollo réel, TOTP). Dans le lab (VM130IL-IM) : 101/101 tests backend et 16/16 migrations sur PostgreSQL 17 et Redis 7. Contrôle séparé le 19/11 avec Node 24 : 40 tests unitaires réussis ; 3 fichiers exigent le backend compilé (OPENCRISIS_TEST_BUILD_DIR). Résultat GitHub Actions et recette navigateur non vérifiés ; pas de tests frontend."
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "21/11/2026, backend compilé avec Node 24 : 79 tests unitaires réussis sur 11 fichiers. 3 fichiers (shared-threat-policy, wazuh-authenticated-correlation, wazuh-threat-correlation) chargent /app/dist en dur : ils ne passent que dans le conteneur et échoueront dans GitHub Actions ; réussis ici en remplaçant ce chemin par le dossier de build. Tests d'intégration non relancés (PostgreSQL requis). Pas de tests frontend."
     },
     {
       "id": "cmvjycbyx003u3dnz27xqy9gs",
@@ -29,14 +29,14 @@
     {
       "id": "cmvjycbyx00453dnzz47oenej",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T21:58:41+01:00",
-      "evidence": "1df7fcd (19/11/2026) : TOTP, secrets chiffrés AES-GCM, codes de récupération hachés, interface de sécurité. Tests unitaires et intégration PostgreSQL réussis dans le lab (VM130FH). tests/totp.test.mjs exige le backend compilé. Recette utilisateur et déploiement restants."
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "1df7fcd (19/11/2026) : TOTP, secrets chiffrés AES-GCM, codes de récupération hachés. b87ac59 (20/11) ajoute le QR code d'enrôlement et répare la connexion avec second facteur. tests/totp.test.mjs réussi le 21/11 sur le backend compilé. Recette utilisateur et déploiement restants."
     },
     {
       "id": "cmvjycbyy00473dnzhew3fhj8",
       "status": "IN_PROGRESS",
-      "updatedAt": "2026-11-19T21:58:41+01:00",
-      "evidence": "1df7fcd (19/11/2026) : analyse clamd INSTREAM avant stockage, refus en cas de menace ou d'indisponibilité. Recette HTTP des uploads (3fa623c, tests/integration/uploadHttp.integration.mjs) avec antivirus simulé. Moteur ClamAV réel (CT107) non installé ni testé."
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "1df7fcd (19/11/2026) : analyse clamd INSTREAM avant stockage, refus en cas de menace ou d'indisponibilité. e4b5345 (20/11) renforce les uploads et pointe le backend vers le conteneur ClamAV du lab (CT107) ; recette HTTP des uploads étendue. tests/antivirus.test.mjs réussi le 21/11 avec un antivirus simulé. Analyse par le moteur ClamAV réel non démontrée."
     },
     {
       "id": "cmvjycbyy004b3dnzd3e2r8yf",
@@ -94,8 +94,8 @@
       "title": "Réception des alertes Wazuh",
       "description": "Des connecteurs Wazuh envoient leurs alertes à OpenCrisis, qui peut en tirer des propositions d'incident.",
       "status": "REVIEW",
-      "updatedAt": "2026-11-19T11:09:47+00:00",
-      "evidence": "Tests unitaires des connecteurs, identités et secrets Wazuh réussis dans VM130FH. Aucune ingestion réelle démontrée lors de ce contrôle."
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "Tests unitaires des connecteurs, identités et secrets Wazuh réussis dans VM130FH. Aucune ingestion réelle démontrée lors de ce contrôle. 6c5958f (20/11/2026) : suivi de l'usage des connecteurs et authentification concurrente sécurisée ; wazuh-connector-authentication réussi le 21/11 sur le backend compilé."
     },
     {
       "key": "integration-ci-tests-mfa",
@@ -120,6 +120,22 @@
       "status": "TODO",
       "updatedAt": "2026-11-19T11:09:47+00:00",
       "evidence": "Au 19/11/2026 : code publié par fusion cb554bb. Aucun déploiement du lot sur les conteneurs opérationnels. ClamAV réel non installé. Plan de retour arrière et recettes à réaliser."
+    },
+    {
+      "key": "partage-menaces",
+      "title": "Partage contrôlé des menaces entre organisations",
+      "description": "Une organisation peut partager des indicateurs de menace avec les autres, après validation et sans données internes.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "7986987 (20/11/2026) : migration add_shared_threat_intelligence, résolveur sharedThreat et règles de normalisation des IoC. 41ef72c ajoute la page SharedThreatIntelligence. Test shared-threat-policy réussi le 21/11 (chemin de build corrigé localement). Interface et déploiement non vérifiés."
+    },
+    {
+      "key": "correlation-alertes-wazuh",
+      "title": "Rapprochement des alertes Wazuh avec les menaces connues",
+      "description": "Les alertes reçues de Wazuh sont comparées aux menaces partagées, avec un historique consultable.",
+      "status": "REVIEW",
+      "updatedAt": "2026-11-21T19:08:33+01:00",
+      "evidence": "2178f63 (20/11/2026) : corrélation des alertes Wazuh authentifiées avec les menaces partagées. 41ef72c : historique (migration add_wazuh_correlation_history) et page WazuhCorrelations. Tests wazuh-threat-correlation et wazuh-authenticated-correlation réussis le 21/11 (chemin de build corrigé localement). Aucune alerte réelle corrélée dans cette vérification."
     }
   ]
 }

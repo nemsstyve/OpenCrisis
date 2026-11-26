@@ -54,6 +54,7 @@ export async function verifyActiveAccessToken(
         email: payload.email,
         isActive: true,
         deletedAt: null,
+        tenant: { is: { isActive: true } },
       },
       select: {
         sessionVersion: true,

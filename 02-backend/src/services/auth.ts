@@ -73,7 +73,7 @@ export function generateAccessToken(
 }
 
 async function findActiveUser(filter: { id?: string; email?: string }): Promise<UserWithRoles | null> {
-  const user = await prisma.user.findFirst({ where: { ...filter, deletedAt: null, isActive: true }, include: USER_INCLUDE });
+  const user = await prisma.user.findFirst({ where: { ...filter, deletedAt: null, isActive: true, tenant: { is: { isActive: true } } }, include: USER_INCLUDE });
   return user;
 }
 
@@ -114,6 +114,12 @@ async function issueRefreshTokenForVerifiedLogin(
       WHERE "id" = ${userId}
         AND "deletedAt" IS NULL
         AND "isActive" = TRUE
+        AND EXISTS (
+          SELECT 1
+          FROM "Tenant" t
+          WHERE t."id" = "User"."tenantId"
+            AND t."isActive" = TRUE
+        )
       FOR UPDATE
     `;
 
@@ -363,6 +369,12 @@ export async function rotateRefreshToken(
       WHERE "id" = ${payload.userId}
         AND "deletedAt" IS NULL
         AND "isActive" = TRUE
+        AND EXISTS (
+          SELECT 1
+          FROM "Tenant" t
+          WHERE t."id" = "User"."tenantId"
+            AND t."isActive" = TRUE
+        )
       FOR UPDATE
     `;
 
@@ -417,6 +429,7 @@ export async function rotateRefreshToken(
         id: payload.userId,
         deletedAt: null,
         isActive: true,
+        tenant: { is: { isActive: true } },
       },
       include: USER_INCLUDE,
     });
